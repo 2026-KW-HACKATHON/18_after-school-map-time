@@ -1,0 +1,16 @@
+# 에디터 공통 설정 (VS Code는 EditorConfig 확장 설치 시 적용)
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{html,css,js,json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
