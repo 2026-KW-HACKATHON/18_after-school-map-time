@@ -5,6 +5,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("", include("core.urls")),
     # 새 앱을 만들면 여기에 추가: path("places/", include("places.urls")),
 ]
 

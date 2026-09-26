@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "rest_framework",
 
     # 우리 앱 (python manage.py startapp <앱이름> 후 여기에 추가)
+    "core",  # 헬스체크, 홈, 공통 템플릿
 ]
 
 MIDDLEWARE = [
