@@ -11,7 +11,7 @@
 | 단계 | 내용 | 어디서 |
 | --- | --- | --- |
 | 1 | EC2 생성 · 보안 그룹 · 탄력적 IP | AWS 콘솔 |
-| 2 | 서버 초기 설정 (swap, Docker, 레포 clone, `.env`) | EC2 (SSH) |
+| 2 | 서버 초기 설정 (swap, Docker, 로그 제한, fail2ban, 레포 clone, `.env`) | EC2 (SSH) |
 | 3 | 도메인 연결 | DuckDNS / 도메인 업체 |
 | 4 | 첫 기동 + 인증서 발급 + HTTPS 전환 | EC2 |
 | 5 | GitHub Secrets 등록 · 자동 배포 켜기 | GitHub |
@@ -28,22 +28,22 @@ EC2 → **인스턴스 시작**
 | --- | --- |
 | 리전 | 아시아 태평양(서울) `ap-northeast-2` |
 | 이름 | `teokeopne` |
-| AMI | **Ubuntu Server 24.04 LTS** |
+| AMI | **Ubuntu Server 26.04 LTS** |
 | 인스턴스 유형 | **t3.small** (RAM 2GB). t3.micro(1GB, 프리티어)면 2단계 swap 필수 |
-| 키 페어 | 새로 생성 → RSA, `.pem` → 다운로드한 파일은 **레포 밖**에 보관 (절대 커밋 금지) |
+| 키 페어 | 새로 생성 → RSA, `.pem` → 다운로드한 파일은 **레포 밖**에 보관 (절대 커밋 금지). 이하 이 파일 위치를 `<키 파일 경로>`라고 부름 |
 | 스토리지 | **30GB gp3** (Docker 이미지가 쌓이므로 여유 있게) |
 
 **보안 그룹** (인바운드 규칙)
 
 | 유형 | 포트 | 소스 | 이유 |
 | --- | --- | --- | --- |
-| SSH | 22 | **내 IP** | 서버 접속 |
+| SSH | 22 | 0.0.0.0/0 | 서버 접속 + GitHub Actions 배포 (**키 인증 전용 + fail2ban**) |
 | HTTP | 80 | 0.0.0.0/0 | 인증서 발급·https 리다이렉트 |
 | HTTPS | 443 | 0.0.0.0/0 | 서비스 |
 
 > ❌ 5432(PostgreSQL)는 **열지 않습니다.** DB는 서버 안의 web 컨테이너만 접근합니다.
 >
-> ⚠️ SSH를 "내 IP"로 막으면 GitHub Actions도 접속할 수 없습니다. 5단계에서 자동 배포를 쓰려면 22번 소스를 `0.0.0.0/0`으로 열어야 합니다 (키 파일 없이는 접속 불가하므로 해커톤 규모에선 허용 범위).
+> ⚠️ GitHub Actions는 실행할 때마다 접속 IP가 바뀌어서, 22번을 "내 IP"로 막으면 자동 배포가 서버에 접속하지 못합니다. 그래서 22번은 `0.0.0.0/0`으로 열고, 대신 **키 인증 전용**(비밀번호 로그인 불가)과 **fail2ban**(2-3단계, 로그인 실패가 반복되는 IP 자동 차단)으로 막습니다.
 
 **탄력적 IP**: EC2 → 탄력적 IP → 할당 → 방금 만든 인스턴스에 **연결**. (재시작해도 IP가 안 바뀜) 이 IP를 이하 `<EIP>`라고 부릅니다.
 
@@ -51,11 +51,29 @@ EC2 → **인스턴스 시작**
 
 ## 2. 서버 초기 설정 (SSH)
 
-내 PC에서 접속 (Git Bash):
+내 PC에서 접속합니다. `<키 파일 경로>`는 1단계에서 받은 `.pem` 파일의 위치입니다.
+
+**Git Bash / macOS / Linux**
 
 ```bash
-chmod 400 ~/keys/teokeopne.pem
-ssh -i ~/keys/teokeopne.pem ubuntu@<EIP>
+chmod 400 "<키 파일 경로>"
+ssh -i "<키 파일 경로>" ubuntu@<EIP>
+```
+
+**Windows cmd / PowerShell** — Windows에 내장된 ssh는 `chmod`가 통하지 않고, 키 파일을 다른 계정도 읽을 수 있으면 `UNPROTECTED PRIVATE KEY FILE` 에러로 접속을 거부합니다. `icacls`로 **내 계정만 읽을 수 있게** 권한을 바꿉니다.
+
+```powershell
+# PowerShell
+icacls "<키 파일 경로>" /inheritance:r                      # 상위 폴더에서 물려받은 권한 제거
+icacls "<키 파일 경로>" /grant:r "$($env:USERNAME):(R)"     # 내 계정에만 읽기 권한
+ssh -i "<키 파일 경로>" ubuntu@<EIP>
+```
+
+```bat
+:: cmd
+icacls "<키 파일 경로>" /inheritance:r
+icacls "<키 파일 경로>" /grant:r "%USERNAME%:(R)"
+ssh -i "<키 파일 경로>" ubuntu@<EIP>
 ```
 
 ### 2-1. 시간대 · swap 2GB
@@ -81,11 +99,41 @@ exit                             # 권한 적용을 위해 재접속
 ```
 
 ```bash
-ssh -i ~/keys/teokeopne.pem ubuntu@<EIP>
+ssh -i "<키 파일 경로>" ubuntu@<EIP>
 docker compose version   # 버전이 나오면 OK
 ```
 
-### 2-3. 레포 clone · 배포용 `.env`
+### 2-3. Docker 로그 용량 제한 · fail2ban
+
+**Docker 로그 용량 제한** — 컨테이너 로그는 기본적으로 끝없이 쌓여서, 전시 기간처럼 오래 켜 두면 디스크를 가득 채울 수 있습니다. 컨테이너마다 10MB × 3개(최대 30MB)만 남기도록 제한합니다.
+
+```bash
+sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+EOF
+sudo systemctl restart docker
+docker info --format '{{.LoggingDriver}}'   # json-file 이 나오면 OK
+```
+
+> 이 설정은 **새로 만들어지는 컨테이너부터** 적용됩니다. 이미 서비스가 떠 있는 서버라면 한 번 재생성하세요:
+> `cd ~/teokeopne && docker compose -f docker-compose.prod.yml up -d --force-recreate`
+
+**fail2ban** — SSH(22)를 전체에 열어 두므로(1단계), 로그인 실패를 반복하는 IP를 자동으로 차단합니다.
+
+```bash
+# 키 인증 전용인지 확인 → "passwordauthentication no" 면 OK (EC2 Ubuntu 기본값)
+sudo sshd -T | grep -i '^passwordauthentication'
+
+sudo apt-get update
+sudo apt-get install -y fail2ban
+sudo systemctl enable --now fail2ban
+sudo fail2ban-client status sshd   # "Status for the jail: sshd" 가 나오면 SSH 감시 중
+```
+
+### 2-4. 레포 clone · 배포용 `.env`
 
 ```bash
 git clone https://github.com/2026-KW-HACKATHON/18_after-school-map-time.git ~/teokeopne
@@ -171,6 +219,10 @@ sudo certbot certonly --webroot -w /var/www/certbot \
 
 ### 4-3. HTTPS 설정으로 전환
 
+> ⚠️ **새 SSH 세션에서 실행하세요.** 셸에 `.env` 값을 `export`해 둔 상태(예: `set -a; source .env`, `export $(cat .env | xargs)`)라면,
+> docker compose는 `.env` 파일보다 **셸 환경변수를 우선**합니다. 그러면 아래에서 `.env`를 `NGINX_CONF=https`로 바꿔도 셸에 남은 예전 값(`http`)으로 nginx가 뜹니다.
+> `exit` 후 다시 접속하거나, `echo "$NGINX_CONF"`가 빈 줄인지 확인한 뒤 진행하세요.
+
 ```bash
 sed -i 's/^NGINX_CONF=.*/NGINX_CONF=https/' .env
 docker compose -f docker-compose.prod.yml up -d nginx   # 바뀐 설정으로 nginx 재생성
@@ -194,11 +246,12 @@ sudo certbot renew --dry-run   # "Congratulations, all simulated renewals succee
 
 ### 4-5. 카카오 개발자센터에 배포 도메인 등록
 
-내 애플리케이션 → 플랫폼 → Web → 사이트 도메인에 `https://<도메인>` 추가. (안 하면 배포 사이트에서 지도가 안 뜸)
+[카카오 개발자센터](https://developers.kakao.com) → 앱 선택 → **앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인**에 `https://<도메인>` 추가.
+개발용 `http://localhost:8000`은 그대로 둡니다. (등록하지 않으면 배포 사이트에서 지도가 안 뜸)
 
 ---
 
-## 5. GitHub Secrets 등록 · 자동 배포 켜기
+## 5. GitHub Secrets 등록 · 자동 배포
 
 ### 5-1. Docker Hub
 
@@ -220,18 +273,12 @@ sudo certbot renew --dry-run   # "Congratulations, all simulated renewals succee
 
 레포 → Actions → **Deploy to EC2** → Run workflow (branch: `develop`) → 모든 단계 초록불 확인.
 
-### 5-4. 자동 배포 켜기
+### 5-4. 자동 배포 (켜져 있음)
 
-`.github/workflows/deploy.yml`의 `push:` 트리거 주석을 풀고 PR로 머지합니다. 이후로는 **`develop`에 머지 = 자동 배포**입니다.
+`.github/workflows/deploy.yml`은 `push`(develop) 트리거가 켜져 있어서 **`develop`에 머지 = 자동 배포**입니다. 진행 상황은 Actions 탭에서 확인합니다.
 
-```yaml
-on:
-  workflow_dispatch:
-
-  push:
-    branches:
-      - develop
-```
+> 서버를 처음부터 새로 구축하는 중이라면(1~5-3단계 진행 중) `develop` 머지 때 배포가 실패합니다.
+> 그동안은 `deploy.yml`의 `push:` 트리거 3줄을 잠시 주석 처리하고, 5-3 수동 배포가 성공한 뒤 다시 켜세요.
 
 ---
 
@@ -262,7 +309,7 @@ docker run --rm -v teokeopne-prod_media_volume:/media:ro -v "$PWD/backups":/back
 서버가 통째로 망가질 때를 대비해 내 PC로도 복사 (내 PC의 Git Bash에서):
 
 ```bash
-scp -i ~/keys/teokeopne.pem "ubuntu@<EIP>:~/teokeopne/backups/*" ./teokeopne-backups/
+scp -i "<키 파일 경로>" "ubuntu@<EIP>:~/teokeopne/backups/*" ./teokeopne-backups/
 ```
 
 ### 6-3. 최종 점검 체크리스트
@@ -272,6 +319,7 @@ scp -i ~/keys/teokeopne.pem "ubuntu@<EIP>:~/teokeopne/backups/*" ./teokeopne-bac
 - [ ] 폰 사진(3~8MB) 업로드가 413 없이 된다
 - [ ] `DEBUG=False` (없는 주소 접속 시 노란 에러 화면이 아닌 404 페이지)
 - [ ] 외부에서 5432 포트 접속 불가 (보안 그룹에 없음)
+- [ ] SSH는 키 인증 전용, `sudo fail2ban-client status sshd` 동작 중
 - [ ] `sudo certbot renew --dry-run` 성공
 - [ ] `sudo reboot` 후 1~2분 뒤 사이트가 자동으로 다시 뜬다 (`restart: unless-stopped`)
 - [ ] 백업 파일이 `backups/`에 매일 생긴다
