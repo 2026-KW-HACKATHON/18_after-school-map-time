@@ -1,0 +1,22 @@
+# ── 코어 (필수) ──
+Django==5.2.17             # 웹 프레임워크. 5.2는 LTS(장기 지원) 버전
+asgiref==3.12.1            # Django 의존성
+sqlparse==0.6.0            # Django 의존성
+tzdata==2026.4             # Windows에서 타임존(Asia/Seoul) 처리
+
+# ── 설정/환경변수 (settings.py에서 사용) ──
+python-dotenv==1.2.3       # .env 로드 (from dotenv import load_dotenv)
+dj-database-url==3.1.2     # DATABASE_URL 문자열 → Django DB 설정으로 파싱
+
+# ── DB / 서버 (배포: PostgreSQL + gunicorn, static·media는 nginx가 서빙) ──
+psycopg2-binary==2.9.13    # PostgreSQL 드라이버 (바이너리 휠이라 컴파일 불필요)
+gunicorn==26.2.0           # 배포용 WSGI 서버 (옵션은 Dockerfile CMD 참고)
+
+# ── API (지도 데이터는 DRF JSON API로 제공) ──
+djangorestframework==3.18.1
+
+# ── 외부 API 호출 (카카오 REST API: 주소→좌표 등, AI 사진 판별) ──
+requests==2.34.2
+
+# ── 이미지 처리 (제보 사진 ImageField 업로드에 필요) ──
+pillow==12.3.0
