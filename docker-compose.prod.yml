@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────
+# 배포용 docker compose (EC2 서버에서 실행)
+#   nginx : 80/443 → HTTPS 처리, /static/ /media/ 직접 서빙, 나머지는 web으로 전달
+#   web   : Django + gunicorn (Docker Hub 이미지)
+#   db    : PostgreSQL 16 (외부 포트 노출 없음)
+#
+# 실행:  docker compose -f docker-compose.prod.yml up -d
+# 로컬에서 배포 구성 검증: docker compose -f docker-compose.prod.yml up --build -d → http://localhost
+# 자세한 순서는 docs/deploy.md 참고
+# ─────────────────────────────────────────────────────────
+
+# 프로젝트 이름 고정 → 개발용 docker-compose.yml과 컨테이너·볼륨이 섞이지 않음
+name: teokeopne-prod
+
+services:
+  nginx:
+    image: nginx:1.30-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # 설정 템플릿의 ${DOMAIN} 을 이 값으로 치환 (nginx 공식 이미지 기능)
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      # NGINX_CONF=http(기본, 인증서 발급 전·로컬) / https(인증서 발급 후) 중 하나를 템플릿으로 사용
+      - ./nginx/${NGINX_CONF:-http}:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+      # 서버(호스트)의 certbot이 만든 인증서·확인 파일을 읽기 전용으로 연결
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - web
+    restart: unless-stopped   # 서버 재부팅·에러 시 자동 재시작 (전시 기간 무중단)
+
+  web:
+    # GitHub Actions가 빌드해서 올린 이미지. IMAGE_TAG에 커밋 SHA를 넣으면 그 버전으로 롤백
+    image: cjs1004ounds/teokeopne:${IMAGE_TAG:-latest}
+    build: .   # 로컬 검증 시 --build 로 직접 빌드
+    env_file:
+      - .env
+    environment:
+      DEBUG: "False"   # .env 값과 상관없이 배포 구성은 항상 DEBUG=False
+    volumes:
+      - static_volume:/app/staticfiles   # collectstatic 결과 → nginx가 읽음
+      - media_volume:/app/media          # 제보 사진 → nginx가 읽음 (백업 대상)
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # 포트를 외부에 열지 않음 → nginx를 통해서만 접근
+
+  db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teokeopne}
+      POSTGRES_USER: ${POSTGRES_USER:-teokeopne}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?배포 .env에 POSTGRES_PASSWORD를 설정하세요}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # ports 없음: DB는 같은 compose 네트워크(web)에서만 접근 가능
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

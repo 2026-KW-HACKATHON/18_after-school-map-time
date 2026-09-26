@@ -38,8 +38,13 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 
+# ── 배포 설정·운영 스크립트 (서버에서 레포로 직접 사용, 이미지엔 불필요) ──
+nginx/
+scripts/
+
 # ── Docker ──
 docker-compose.yml
+docker-compose.prod.yml
 Dockerfile
 .dockerignore
 docker-compose.override.yml
