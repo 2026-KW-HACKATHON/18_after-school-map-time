@@ -100,7 +100,7 @@
 - 인스턴스: **t3.small (RAM 2GB)** 권장. 1GB급이면 swap 2GB 필수.
 - EBS: 20GB 이상 (Docker 이미지가 쌓여 디스크가 차기 쉬움 → 배포마다 `docker image prune -f`)
 - **탄력적 IP** 할당 (재시작 시 IP 변경 방지)
-- 보안 그룹: 22 → 팀장 IP만 / 80, 443 → 전체 / **5432는 열지 않음**
+- 보안 그룹: 22 → 전체(`0.0.0.0/0`, GitHub Actions 배포 때문 — 실행마다 IP가 바뀜) + **키 인증 전용 + fail2ban** / 80, 443 → 전체 / **5432는 열지 않음**
 - 서버 디렉토리: 레포를 `~/teokeopne`에 clone, 그 안에 배포용 `.env` 생성
 - 백업: `scripts/backup_db.sh`를 cron으로 매일 실행, 최근 N일치만 보관. 전시 기간 전 media 폴더도 백업.
 
@@ -124,7 +124,7 @@ develop push (또는 Actions에서 수동 실행)
   → /health/ 확인
 ```
 
-- EC2 준비 전까지는 `push` 트리거를 주석 처리하고 `workflow_dispatch`(수동 실행)만 켜 둔다.
+- 수동 배포(Deploy to EC2 #1) 성공 후 `push`(develop) 트리거를 활성화했다. `workflow_dispatch`(수동 실행)도 유지.
 - 필요한 GitHub Secrets: `DOCKER_USERNAME`, `DOCKER_PASSWORD`(Docker Hub 액세스 토큰 권장), `EC2_HOST`, `EC2_KEY`
 
 ---
