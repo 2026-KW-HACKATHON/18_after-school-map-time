@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────
+# CI: develop / main 으로 가는 PR과 push마다 실행
+#   의존성 설치 → Django 설정 검사 → 마이그레이션 누락 검사 → 테스트
+# DATABASE_URL을 주지 않으므로 SQLite로 돌아갑니다.
+# ─────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: "True"
+      SECRET_KEY: ci-only-secret-key
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: Django 설정 검사
+        run: python manage.py check
+
+      - name: 마이그레이션 누락 검사 (모델 바꾸고 makemigrations 안 했으면 실패)
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: 테스트
+        run: python manage.py test
