@@ -1,0 +1,45 @@
+# ── 환경변수·시크릿 (이미지에 굽지 않기) ──
+.env
+.env.*
+*.pem
+
+# ── Git ──
+.git
+.gitignore
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Django ──
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+backups/
+
+# ── 문서·설정 (이미지에 불필요) ──
+README.md
+CONTRIBUTING.md
+CLAUDE.md
+docs/
+.github/
+
+# ── AI 도구 ──
+.claude/
+CLAUDE.local.md
+
+# ── IDE / OS ──
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Docker ──
+docker-compose.yml
+Dockerfile
+.dockerignore
+docker-compose.override.yml
