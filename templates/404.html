@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}페이지를 찾을 수 없어요 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>404</h1>
+  <p class="muted">길을 잃었어요. 지도에도 없는 페이지예요.</p>
+  <a class="btn btn-primary" href="{% url 'core:home' %}">홈으로</a>
+</section>
+{% endblock %}

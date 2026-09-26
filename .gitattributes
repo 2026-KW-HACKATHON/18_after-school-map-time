@@ -1,0 +1,17 @@
+# 줄바꿈을 LF로 통일 (Windows에서 CRLF로 커밋되면 컨테이너 안 셸 스크립트가 깨지고, diff가 전체 변경으로 보임)
+* text=auto eol=lf
+
+# 셸 스크립트는 반드시 LF (CRLF면 컨테이너/서버에서 '/bin/bash^M: bad interpreter' 에러)
+*.sh text eol=lf
+
+# 바이너리
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.otf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
