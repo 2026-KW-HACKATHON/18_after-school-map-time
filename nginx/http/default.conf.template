@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────
+# HTTP 전용 설정 (.env 의 NGINX_CONF=http, 기본값)
+#   1) 인증서가 아직 없을 때 첫 발급용 (certbot이 80번 포트로 도메인 소유 확인)
+#   2) 도메인 없이 로컬에서 배포 구성 검증용 (http://localhost)
+# 인증서 발급이 끝나면 NGINX_CONF=https 로 바꿔서 ../https 설정을 씁니다.
+# ─────────────────────────────────────────────────────────
+
+# 텍스트 응답 압축 (모바일 로딩 속도)
+gzip on;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_types text/css application/javascript application/json image/svg+xml text/plain;
+
+server {
+    listen 80;
+    server_name _;   # 어떤 도메인/IP로 들어와도 응답
+
+    # Let's Encrypt 도메인 소유 확인 파일 (certbot --webroot 가 여기에 파일을 만듦)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    include /etc/nginx/snippets/app.conf;
+}

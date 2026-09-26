@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────
+# HTTPS 설정 (.env 의 NGINX_CONF=https)
+#   인증서를 발급받은 뒤에만 사용 (인증서 파일이 없으면 nginx가 시작되지 않음)
+#   ${DOMAIN} 은 nginx 컨테이너가 시작할 때 .env 의 DOMAIN 값으로 치환됨
+# ─────────────────────────────────────────────────────────
+
+gzip on;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_types text/css application/javascript application/json image/svg+xml text/plain;
+
+# 80번: 인증서 갱신 확인 파일만 응답하고, 나머지는 https로 리다이렉트
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# 443번: 실제 서비스
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    # certbot이 발급한 인증서 (호스트의 /etc/letsencrypt 를 읽기 전용으로 마운트)
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    # 오래된 프로토콜(TLS 1.0/1.1) 차단
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    include /etc/nginx/snippets/app.conf;
+}
