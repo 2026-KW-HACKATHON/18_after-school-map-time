@@ -226,7 +226,7 @@ gzip 압축은 두 템플릿 맨 위에서 켭니다 (CSS·JS·JSON).
 | `ISSUE_TEMPLATE/config.yml` | 빈 이슈 금지(템플릿 강제). 디스코드 문의 링크 자리(TODO) |
 | `pull_request_template.md` | PR 작성 양식: 종류 → 무엇을/왜 → 관련 이슈 → 변경 사항 → 테스트 방법 → 스크린샷 → 체크리스트 → 리뷰어에게 |
 | `workflows/ci.yml` | `develop`·`main`으로 가는 PR·push마다 실행: 패키지 설치 → `manage.py check` → 마이그레이션 누락 검사 → 테스트. 실패하면 머지 금지 |
-| `workflows/deploy.yml` | 이미지 빌드 → Docker Hub push(`latest` + 커밋 SHA) → EC2 SSH 접속 → `git pull` → 이미지 pull → 재시작 → migrate → collectstatic → 이미지 정리 → `https://<도메인>/health/` 확인. **지금은 수동 실행만**, EC2 준비 후 `push` 트리거 주석 해제. 필요한 Secrets는 파일 상단 주석 참고 |
+| `workflows/deploy.yml` | 이미지 빌드 → Docker Hub push(`latest` + 커밋 SHA) → EC2 SSH 접속 → `git pull` → 이미지 pull → 재시작 → migrate → collectstatic → 이미지 정리 → `https://<도메인>/health/` 확인. `develop`에 머지되면 자동 실행(수동 실행도 가능). 필요한 Secrets는 파일 상단 주석 참고 |
 
 ---
 
