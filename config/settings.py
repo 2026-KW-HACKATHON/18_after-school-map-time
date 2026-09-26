@@ -73,6 +73,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.kakao_keys",  # 모든 템플릿에서 {{ KAKAO_JAVASCRIPT_KEY }} 사용
             ],
         },
     },

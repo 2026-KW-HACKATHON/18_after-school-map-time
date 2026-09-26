@@ -17,3 +17,10 @@ class HealthCheckTests(TestCase):
             res = self.client.get(reverse("core:health"))
         self.assertEqual(res.status_code, 503)
         self.assertEqual(res.json()["db"], False)
+
+
+class HomeTests(TestCase):
+    def test_home(self):
+        res = self.client.get(reverse("core:home"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "턱없네")
