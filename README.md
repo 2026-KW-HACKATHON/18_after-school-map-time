@@ -45,7 +45,7 @@
 | DB | PostgreSQL 16 (Docker 없이 실행 시 SQLite 폴백) |
 | 서버 | Gunicorn, Nginx (리버스 프록시·HTTPS·정적 파일) |
 | 인프라 | Docker, Docker Compose, AWS EC2 |
-| CI/CD | GitHub Actions (PR마다 테스트, `develop` push 시 자동 배포 예정) |
+| CI/CD | GitHub Actions (PR마다 테스트, `develop` 머지 시 EC2 자동 배포) |
 
 ---
 
@@ -94,7 +94,9 @@ docker compose exec web python manage.py createsuperuser
 | `KAKAO_JAVASCRIPT_KEY` | 카카오맵 JS 키 (브라우저 노출 → 카카오 개발자센터에 허용 도메인 등록 필수) | (발급값) |
 | `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**) | (발급값) |
 | `AI_VISION_API_KEY` | AI 사진 판별 API 키 (서비스 미정) | |
-| `DOMAIN` | 배포 도메인 (배포 서버에서만) | |
+| `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
+| `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
+| `IMAGE_TAG` | 배포 이미지 태그. 롤백할 때만 이전 커밋 SHA로 변경 | `latest` |
 
 ### 테스트 실행
 
@@ -108,6 +110,22 @@ docker compose exec web python manage.py test
 docker compose down        # 컨테이너 종료 (DB 데이터는 유지)
 docker compose down -v     # DB 데이터까지 삭제
 ```
+
+### 배포 구성 로컬 검증 (선택)
+
+nginx까지 포함한 배포 구성(`DEBUG=False`)을 도메인 없이 내 PC에서 띄워볼 수 있습니다.
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+```
+
+`http://localhost/health/` (8000번이 아닌 80번, nginx 경유) 확인 후 `docker compose -f docker-compose.prod.yml down`.
+
+### 서버 배포
+
+AWS EC2 생성부터 HTTPS·자동 배포·백업까지 **[docs/deploy.md](docs/deploy.md)** 런북을 따라 하면 됩니다.
 
 <details>
 <summary>Docker 없이 실행하기 (선택)</summary>
@@ -134,11 +152,14 @@ python manage.py runserver
 ├── core/                   # 헬스체크(/health/), 홈, 공통 context processor
 ├── templates/              # 전역 템플릿 — base.html(공통 레이아웃), 404, 500
 ├── static/                 # 전역 정적 파일 — 공통 CSS(디자인 변수)·JS(api() fetch 헬퍼)
-├── docs/                   # 문서 — structure.md(파일별 역할), context/(기획·인프라 설계)
-├── .github/                # 이슈·PR 템플릿, CI 워크플로우
+├── nginx/                  # 배포용 nginx 설정 — http(인증서 발급 전)·https·공통 스니펫
+├── scripts/                # 운영 스크립트 — backup_db.sh(DB 백업)
+├── docs/                   # 문서 — deploy.md(배포 런북), structure.md(파일별 역할), context/(기획·인프라 설계)
+├── .github/                # 이슈·PR 템플릿, CI·자동 배포 워크플로우
 ├── .claude/commands/       # Claude Code 팀 공용 커맨드
 ├── Dockerfile              # 배포용 이미지 (gunicorn)
 ├── docker-compose.yml      # 개발용: web(runserver) + db(PostgreSQL)
+├── docker-compose.prod.yml # 배포용: nginx + web(gunicorn) + db
 ├── requirements.txt        # 파이썬 패키지 (버전 고정)
 ├── .env.example            # 환경 변수 템플릿
 ├── manage.py
@@ -156,9 +177,10 @@ python manage.py runserver
 
 | 시기 | 목표 | 상태 |
 | --- | --- | :--: |
-| 9/26 ~ 9/28 | 레포 규칙 · Docker 개발 환경 · CI | ✅ |
+| 9/26 | 레포 규칙 · Docker 개발 환경 · CI | ✅ |
+| 9/26 | 배포 구성 (nginx · HTTPS 설정 · 자동 배포 워크플로우 · 백업 · 런북) | ✅ |
 | 9/28(월) | 중간발표·멘토링 (기획 중심) | ⏳ |
-| ~ 10/7 | 배포 인프라 (EC2 · Nginx · HTTPS · 자동 배포), ERD 확정 | ⏳ |
+| ~ 10/7 | EC2 · 도메인 · 인증서 실제 적용, ERD 확정 | ⏳ |
 | 10/8(목) ~ 10/9(금) | **본선 무박 2일** — Must 기능(F1~F6) 구현, 10/9 최종발표 | ⏳ |
 | 10/11(일) ~ 10/13(화) | 전시 + 주민투표 (서비스 무중단 운영) | ⏳ |
 
