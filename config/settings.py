@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     "rest_framework",
 
     # 우리 앱 (python manage.py startapp <앱이름> 후 여기에 추가)
-    "core",  # 헬스체크, 홈, 공통 템플릿
+    "core",      # 헬스체크, 홈, 공통 템플릿
+    "accounts",  # 회원 (커스텀 User)
 ]
 
 MIDDLEWARE = [
@@ -94,6 +95,10 @@ else:
         }
     }
 
+
+# ── 회원·로그인 ──
+# 커스텀 User: 닉네임·가입일 규칙 등을 넣기 위해 프로젝트 초기에 지정 (나중에 바꾸면 DB를 다시 만들어야 함)
+AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
