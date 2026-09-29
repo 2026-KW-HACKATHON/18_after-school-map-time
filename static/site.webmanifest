@@ -1,0 +1,14 @@
+{
+  "name": "턱없네 — 월계1동 접근성 지도",
+  "short_name": "턱없네",
+  "description": "휠체어·유아차·보행 보조기·목발로 월계1동 가게에 들어가는 방법을 알려주는 지도",
+  "start_url": "/map/",
+  "display": "standalone",
+  "background_color": "#FFF4E2",
+  "theme_color": "#2F5DA8",
+  "lang": "ko",
+  "icons": [
+    {"src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/img/teokeopne-icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

@@ -5,6 +5,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}턱없네{% endblock %}</title>
+  <!-- 아이콘: 브라우저 탭(SVG), iPhone 홈 화면(PNG 180), 안드로이드 홈 화면(manifest) -->
+  <link rel="icon" href="{% static 'img/teokeopne-icon.svg' %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <link rel="manifest" href="{% static 'site.webmanifest' %}">
+  <meta name="theme-color" content="#2F5DA8">
   <!-- Pretendard 웹폰트 (SIL OFL 1.1, README 오픈소스 / 출처 참고) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
   <link rel="stylesheet" href="{% static 'css/common.css' %}">
@@ -12,7 +17,10 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="{% url 'core:home' %}">턱없네</a>
+    <a class="logo" href="{% url 'core:home' %}">
+      <img src="{% static 'img/teokeopne-icon.svg' %}" alt="" width="28" height="28">
+      <span>턱없네</span>
+    </a>
     <nav class="nav">
       <a href="{% url 'places:map' %}">지도</a>
       {% block nav %}{% endblock %}

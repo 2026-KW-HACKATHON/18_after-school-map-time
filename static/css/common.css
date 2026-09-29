@@ -42,7 +42,7 @@ a { color: var(--color-primary); text-decoration: none; }
   height: var(--topbar-height); padding: 0 16px;
   background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
-.logo { font-weight: 700; color: var(--color-text); }
+.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--color-text); }
 .nav { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .inline { display: inline; margin: 0; }
 
