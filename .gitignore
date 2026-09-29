@@ -21,6 +21,9 @@ db.sqlite3-journal
 # ── DB 백업 (scripts/backup_db.sh 결과물) ──
 backups/
 
+# ── 답사 사진 원본 (용량이 크고 사람·번호판이 찍힐 수 있어 레포에 넣지 않음. docs/survey-guide.md) ──
+survey_photos/
+
 # ── Docker ──
 docker-compose.override.yml
 

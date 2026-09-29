@@ -40,6 +40,7 @@
 │   ├── templates/places/       ←   map.html, detail.html, _entrance.html, _fields.html
 │   ├── static/places/          ←   css/places.css, js/map-app.js (지도 화면)
 │   ├── data/*.json             ←   기본 데이터 (월계1동, 필드 정의) — 코드 수정 없이 여기서 바꿈
+│   ├── data/survey/            ←   답사 양식 template.csv (+ 팀 답사 결과 wolgye1.csv)
 │   └── management/commands/seed_base.py  ← 기본 데이터 넣기
 │
 ├── reports/                    ← 접근성 값과 그 출처 (제보 묶음·값·확인)
@@ -60,6 +61,8 @@
 │   ├── views.py / urls.py      ←   /ops/ 대시보드·제보 검토·장소 등록
 │   ├── services.py             ←   장소 답사 저장, 제보 승인(새 장소 생성)·반려, 기존 정보와 차이, 반복 하향 제보 확인
 │   ├── forms.py
+│   ├── survey_import.py        ←   팀 답사 CSV 가져오기 (검사 → 저장, 다시 넣어도 중복 없음)
+│   ├── management/commands/import_survey.py ← python manage.py import_survey 답사.csv
 │   └── templatetags/ops_tags.py ←   제보 상태 문구(대기 중·승인됨·반려됨)
 │
 ├── owners/                     ← 사장님·건물주 (기획 v2 4·6장)
@@ -307,6 +310,8 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 **위치 고르기** (`templates/includes/location_picker.html` + `static/js/map/location-picker.js`): 지도를 누르면 표시하고 같은 폼의 `lat`/`lng`에 좌표를 넣음. "내 위치로"는 보조. 처음 중심은 지역 설정. 주민 새 장소 제보·운영자 새 장소 승인·장소 등록에서 공용. 새 장소 제보는 지도 위치 또는 위치 설명 중 하나 필수.
 
 확인일: 비우거나 오늘이면 지금 시각, 지난 날짜면 그날 정오로 기록 → 예전 답사를 나중에 입력해도 최신 값이 뒤바뀌지 않음.
+
+**답사 CSV 한 번에 넣기** (F6, `ops/survey_import.py`): 한 줄 = 장소 하나. 칸 이름은 필드 정의에서 만들어서 필드를 추가하면 양식도 따라 바뀜. 장소 등록 화면과 같은 '팀 답사' 기록으로 저장하고 재판정. 이름+주소로 같은 장소를 찾고, 값·확인일이 같으면 건너뜀(다시 넣어도 중복 없음). 잘못된 칸이 하나라도 있으면 모든 줄의 문제를 알려 주고 아무것도 저장하지 않음. 위도·경도가 비면 카카오 주소 검색, 사진은 1600px로 줄이고 EXIF 삭제. 사용법: **[survey-guide.md](survey-guide.md)**
 
 ## 2-6. 사장님·건물주 — `owners/`
 
