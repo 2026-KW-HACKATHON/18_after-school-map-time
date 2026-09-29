@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}와이어프레임 4번 "장소명 검색" + 5번 "검색 결과 없음". 이름순 정렬 (접근성 순 정렬 없음){% endcomment %}
+
+{% block title %}{% if q %}"{{ q }}" 검색{% else %}장소 검색{% endif %} | 턱없네{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>어떤 장소를 찾으세요?</h1>
+  <p class="muted">장소 이름을 입력하면 입구 정보를 확인할 수 있어요.</p>
+
+  <form method="get" class="search-bar" role="search">
+    <label for="q" class="sr-only">장소 이름</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="장소 이름 검색" autofocus>
+    <label for="search-profile" class="sr-only">이동 조건</label>
+    <select name="profile" id="search-profile">
+      {% for p in profiles %}<option value="{{ p.key }}" {% if p == profile %}selected{% endif %}>{{ p.label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">검색</button>
+  </form>
+
+  {% if searched %}
+    {% if results %}
+      <h2 class="small muted">검색 결과 {{ results|length }}곳 · {{ profile.label }} 기준</h2>
+      <ul class="result-list">
+        {% for r in results %}
+          <li>
+            <a class="card result-card" href="{% url 'places:detail' r.place.pk %}">
+              <strong>{{ r.place.name }}</strong>
+              <span class="result-status">
+                <span class="judge-dot judge-{{ r.judgment.code }}" aria-hidden="true">{% if r.judgment.icon == "hand" %}✋{% endif %}</span>
+                {{ r.judgment.label }}
+              </span>
+              <span class="small">{% if r.facts %}{{ r.facts }}{% else %}아직 확인된 입구 정보가 없어요{% endif %}</span>
+              <span class="muted small">{% if r.last_checked %}확인 {{ r.last_checked|date:"Y.m" }}{% else %}확인 정보 없음{% endif %}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {# 와이어프레임 5번: 검색 결과 없음 #}
+      <div class="card empty-state">
+        <strong>"{{ q }}"(으)로 등록된 장소가 없어요</strong>
+        <div class="actions">
+          <a class="btn" href="{% url 'places:search' %}">다시 검색하기</a>
+          <a class="btn btn-primary" href="{% url 'reports:new' %}">새 장소 제보하기</a>
+        </div>
+        <p class="muted small">검색 팁: 가게 이름의 일부(예: "약국", "카페")로도 찾을 수 있어요. 등록되지 않은 장소는 제보해 주시면 확인 후 지도에 올라가요.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
