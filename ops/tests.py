@@ -176,3 +176,8 @@ class PageSmokeTests(OpsTestBase):
         ]:
             with self.subTest(url=url):
                 self.assertContains(self.client.get(url), text)
+
+
+class PlaceFormPickerTests(OpsTestBase):
+    def test_place_form_has_picker(self):
+        self.assertContains(self.client.get(reverse("ops:place-new")), 'id="picker-map"')

@@ -22,10 +22,10 @@
         <p><strong>{{ place.name }}</strong>{% if place.address %} <span class="muted">· {{ place.address }}</span>{% endif %}</p>
       {% else %}
         {% include "reports/_field.html" with field=form.suggested_name %}
-        {% include "reports/_field.html" with field=form.location_text %}
-        <button type="button" class="btn" id="use-location">현재 위치 넣기</button>
-        <span id="location-status" class="muted small" aria-live="polite"></span>
+        {% include "includes/location_picker.html" %}
         {{ form.lat }}{{ form.lng }}
+        {% for e in form.lat.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
+        {% include "reports/_field.html" with field=form.location_text %}
       {% endif %}
     </fieldset>
 
@@ -57,25 +57,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  // 새 장소 제보: 현재 위치를 좌표 칸에 넣는다 (HTTPS에서만 동작)
-  (function () {
-    const btn = document.getElementById("use-location");
-    if (!btn) return;
-    const status = document.getElementById("location-status");
-    btn.addEventListener("click", () => {
-      if (!navigator.geolocation) { status.textContent = "이 브라우저는 위치를 지원하지 않아요."; return; }
-      status.textContent = "위치 확인 중...";
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          document.getElementById("id_lat").value = coords.latitude.toFixed(6);
-          document.getElementById("id_lng").value = coords.longitude.toFixed(6);
-          status.textContent = "현재 위치를 넣었어요.";
-        },
-        () => { status.textContent = "위치를 가져오지 못했어요. 위치 설명을 적어 주세요."; },
-        { timeout: 8000 },
-      );
-    });
-  })();
-</script>
+{% if not place %}{% include "includes/location_picker_js.html" %}{% endif %}
 {% endblock %}

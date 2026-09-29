@@ -14,13 +14,18 @@ from django.utils import timezone
 
 from judgments.constants import display
 from judgments.services import report_direction, report_effect
-from places.models import Place
+from places.models import Place, Region
 from reports.models import Report
 
 from . import services
 from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceForm, ReviewForm
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
+
+
+def _region():
+    """위치 선택 지도의 처음 중심"""
+    return Region.objects.filter(is_active=True).order_by("id").first()
 
 
 class OpsLoginView(auth_views.LoginView):
@@ -108,6 +113,7 @@ def report_review(request, pk):
         "downgrade_places": services.recent_downgrade_places(report.created_by),
         "abuse_threshold": services.ABUSE_PLACE_COUNT,
         "confirmations": report.confirmations.select_related("user"),
+        "region": _region(),
     })
 
 
@@ -140,6 +146,7 @@ def place_edit(request, pk=None):
         "entrance_fields": [form[k] for k in ENTRANCE_KEYS],
         "place_fields": [form[k] for k in PLACE_KEYS],
         "missing": form.missing_required() if form.is_bound else [],
+        "region": _region(),
     })
 
 

@@ -27,8 +27,7 @@
       {% include "reports/_field.html" with field=form.address %}
       {% include "reports/_field.html" with field=form.floor %}
       {% include "reports/_field.html" with field=form.phone %}
-      <p class="small"><strong>지도에서 위치 선택</strong> — 지도를 누르면 좌표가 들어가요.</p>
-      <div id="picker-map" class="picker-map"></div>
+      {% include "includes/location_picker.html" %}
       <div class="coord-row">
         {% include "reports/_field.html" with field=form.lat %}
         {% include "reports/_field.html" with field=form.lng %}
@@ -60,4 +59,4 @@
 </section>
 {% endblock %}
 
-{% block extra_js %}{% include "ops/_picker_js.html" %}{% endblock %}
+{% block extra_js %}{% include "includes/location_picker_js.html" %}{% endblock %}
