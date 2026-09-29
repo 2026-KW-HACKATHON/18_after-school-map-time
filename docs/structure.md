@@ -32,8 +32,13 @@
 │   ├── admin.py
 │   └── tests.py
 │
-├── places/                     ← 장소 데이터 (지역·건물·장소·출입구·접근성 필드 정의)
+├── places/                     ← 장소 데이터 (지역·건물·장소·출입구·접근성 필드 정의) + 지도·상세 화면 + 공개 API
 │   ├── models.py
+│   ├── selectors.py            ←   화면·API 공통 조회 (표시 정책 적용: 기본 숨김, 섹션 분리)
+│   ├── api.py / api_urls.py    ←   공개 읽기 API /api/v1/ (목록·상세·GeoJSON)
+│   ├── views.py / urls.py      ←   /map/, /places/<id>/
+│   ├── templates/places/       ←   map.html, detail.html, _entrance.html, _fields.html
+│   ├── static/places/          ←   css/places.css, js/map-app.js (지도 화면)
 │   ├── data/*.json             ←   기본 데이터 (월계1동, 필드 정의) — 코드 수정 없이 여기서 바꿈
 │   └── management/commands/seed_base.py  ← 기본 데이터 넣기
 │
@@ -61,6 +66,7 @@
 ├── static/                     ← 전역 정적 파일
 │   ├── css/common.css          ←   디자인 변수(색·간격)와 공통 컴포넌트
 │   ├── js/common.js            ←   api() fetch 헬퍼 (CSRF 자동 처리)
+│   ├── js/map/kakao-adapter.js ←   카카오맵 호출은 여기 한 곳만 (지도 SDK 교체 대비)
 │   └── img/
 │
 ├── nginx/                      ← 배포용 nginx 설정
@@ -190,6 +196,19 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 | `FieldDefinition` | 필드 키를 자유 텍스트로 쓰지 않기 위한 정의 테이블. 대상(`PLACE`/`BUILDING`/`ENTRANCE`), 값 종류(`NUMBER`/`BOOL`/`CHOICE`/`TEXT`), 측정 방법 |
 
 기본 데이터는 `places/data/regions.json`, `field_definitions.json`에 있고 `python manage.py seed_base`로 넣습니다 (여러 번 실행해도 결과 같음). 개발용 compose는 시작할 때 자동 실행.
+
+### 화면과 공개 API
+
+| URL | 내용 |
+| --- | --- |
+| `/map/` | 지도 + 목록. 이동 조건 선택(마지막 선택 기억), 기본은 "들어갈 수 있어요"·"도움 받으면"만, **"모든 장소 보기"** 로 어려움·미확인 표시, 목록은 **거리순**(내 위치 또는 지역 중심). 지도 키가 없거나 SDK를 못 불러와도 목록은 동작 |
+| `/places/<id>/` | 상세: 이동 조건별 요약(사실 한 줄·개선 완료 배지) → 가게 입구(대체 출입구 포함) → **건물 공용 입구·시설**(따로 섹션) → 가게 안 → 사장님 한마디 → 법 안내(OP-8). 확인 중인 제보가 있는 값에 "새 제보 확인 중" |
+| `/api/v1/meta/` | 지역 정보, 이동 조건 목록, 표시 정책(문구·색·모양·기본 숨김) |
+| `/api/v1/places/?region=wolgye1&profile=WHEELCHAIR[&all=1]` | 지도용 목록. 정렬 파라미터 없음 (접근성 낮은 순 정렬 금지) |
+| `/api/v1/places/<id>/` | 상세 (건물 공용 / 가게 섹션) |
+| `/api/v1/places.geojson?region=wolgye1` | GeoJSON 내보내기 (B2G 데이터 개방, 이동 조건별 판정 포함) |
+
+지도 SDK는 `static/js/map/kakao-adapter.js`의 `TeokMap.create()`로만 씁니다. 다른 지도로 바꾸려면 같은 모양의 어댑터 파일만 새로 만들면 됩니다.
 
 ## 2-3. 제보·접근성 값 — `reports/`
 

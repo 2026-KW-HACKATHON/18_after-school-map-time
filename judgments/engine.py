@@ -180,7 +180,7 @@ def facts_line(result, rules, all_rules):
     """
     사실 한 줄 (기획 v2 3.1: 어려움 옆에 항상 사실 한 줄. 예: 입구 단차 30cm · 계단 수 2칸)
       1. 이 이동 조건의 기준에 걸린 출입구 숫자 값
-      2. 자리가 남으면, 다른 규칙에서 쓰는 출입구 숫자 값 중 0보다 큰 것 (계단 수 등)
+      2. 자리가 남으면, 다른 이동 조건의 기준에 걸린 출입구 숫자 값 (계단 수 등)
       기준을 통과한 값(예: 충분한 문 폭)은 이유가 아니므로 넣지 않는다
     """
     subject = result.subject
@@ -201,13 +201,13 @@ def facts_line(result, rules, all_rules):
         elif ok is True:
             passed.add(cond.field)
 
+    # 덧붙이는 값도 "어떤 이동 조건에서든 기준에 걸린 값"만 (예: 계단 수). 문 폭처럼 걸린 적 없는 값은 이유가 아님
     extra = []
     for cond in numeric_entrance_fields(all_rules):
         f = cond.field
         if f in failed or f in passed or f in extra:
             continue
-        value = subject.values.get(f.key)
-        if value is not None and Decimal(value) > 0:
+        if evaluate_condition(cond, subject) is False:
             extra.append(f)
 
     fields = sorted(failed, key=lambda f: f.order) + sorted(extra, key=lambda f: f.order)

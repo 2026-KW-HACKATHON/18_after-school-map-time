@@ -8,15 +8,13 @@ PENDING 값은 판정에 쓰지 않고 "확인 중" 표시에만 쓴다 (기획 
 from .models import AccessibilityValue, Report
 
 
-def _target_filter(target):
+def _target_filter(target, prefix="report__"):
+    """대상(장소·건물·출입구)으로 거르는 조건. Report를 직접 거를 땐 prefix="""""
     from places.models import Building, Entrance, Place
 
-    if isinstance(target, Entrance):
-        return {"report__entrance": target}
-    if isinstance(target, Building):
-        return {"report__building": target}
-    if isinstance(target, Place):
-        return {"report__place": target}
+    for model, name in ((Entrance, "entrance"), (Building, "building"), (Place, "place")):
+        if isinstance(target, model):
+            return {f"{prefix}{name}": target}
     raise TypeError(f"지원하지 않는 대상: {type(target).__name__}")
 
 
@@ -31,6 +29,17 @@ def current_values(target):
     for v in values:
         result.setdefault(v.field_id, v)  # 필드별로 첫 번째(=가장 최근) 값만
     return result
+
+
+def latest_photo(target):
+    """검증된 제보 중 가장 최근 사진 (없으면 None)"""
+    report = (
+        Report.objects.filter(status=Report.Status.VERIFIED, **_target_filter(target, prefix=""))
+        .exclude(photo="")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    return report.photo if report else None
 
 
 def pending_fields(target):

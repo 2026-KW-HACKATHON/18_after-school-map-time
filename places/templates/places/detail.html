@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+  장소 상세 (기획 v2)
+  - OP-1 평가하지 않고 사실만: 점수·순위 없음, 수치와 확인일만
+  - OP-2 방법 먼저: 판정 요약 바로 다음에 출입구(대체 출입구 포함)
+  - OP-4 건물 공용 입구와 가게 입구를 섹션으로 나눔
+  - OP-3 사장님 코멘트 영역 / OP-8 법 위반 판정이 아니라는 안내
+{% endcomment %}
+
+{% block title %}{{ place.name }} | 턱없네{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block content %}
+<article class="place-detail">
+  <header class="detail-header">
+    <p class="muted small"><a href="{% url 'places:map' %}">← 지도</a></p>
+    <h1>{{ place.name }}</h1>
+    <p class="muted">
+      {{ place.get_category_display }}{% if place.address %} · {{ place.address }}{% endif %}
+      {% if place.floor != 1 %} · {% if place.floor < 0 %}지하 {{ place.floor|stringformat:"d"|slice:"1:" }}층{% else %}{{ place.floor }}층{% endif %}{% endif %}
+    </p>
+  </header>
+
+  <section class="card" aria-labelledby="summary-title">
+    <h2 id="summary-title">이동 조건별로 보면</h2>
+    <ul class="judgment-list">
+      {% for row in judgments %}
+        <li>
+          <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
+          <span>
+            <strong>{{ row.profile.label }}</strong> · {{ row.judgment.label }}
+            {% if row.judgment.reason %}<span class="muted small">— {{ row.judgment.reason }}</span>{% endif %}
+            {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">
+      마지막 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="entrance-title">
+    <h2 id="entrance-title">가게 입구</h2>
+    {% for entrance in place_section.entrances %}
+      {% include "places/_entrance.html" %}
+    {% empty %}
+      <p class="muted">아직 입구 정보가 없어요. 알고 계시면 알려주세요.</p>
+    {% endfor %}
+  </section>
+
+  {% if building %}
+  <section class="card section-building" aria-labelledby="building-title">
+    <h2 id="building-title">건물 공용 입구 · 시설</h2>
+    <p class="muted small">
+      {{ building.building }} — 건물 공용 공간 정보예요. 가게가 아닌 건물의 구조입니다.
+    </p>
+    {% for entrance in building.entrances %}
+      {% include "places/_entrance.html" %}
+    {% endfor %}
+    {% include "places/_fields.html" with fields=building.fields %}
+  </section>
+  {% endif %}
+
+  <section class="card" aria-labelledby="inside-title">
+    <h2 id="inside-title">가게 안</h2>
+    {% include "places/_fields.html" with fields=place_section.fields %}
+  </section>
+
+  <section class="card owner-comment" aria-labelledby="owner-title">
+    <h2 id="owner-title">사장님 한마디</h2>
+    <p class="muted">아직 사장님이 남긴 말이 없어요.</p>
+    <p class="small">사장님이신가요? 도움 제공 여부, 다른 출입구, 이동식 경사로 같은 정보를 직접 보완할 수 있어요. (준비 중)</p>
+  </section>
+
+  <p class="small"><a href="#" aria-disabled="true" class="link-disabled">정보가 달라요 · 알려주기 (준비 중)</a></p>
+
+  <footer class="notice small muted">
+    이 안내는 「장애인·노인·임산부 등의 편의증진 보장에 관한 법률」 시행규칙의 수치를 <strong>참고한 기준</strong>이며,
+    법 위반 여부를 판단한 것이 아니에요. 소규모 기존 건물은 경사로 등 설치 의무가 없는 경우가 많아요.
+  </footer>
+</article>
+{% endblock %}

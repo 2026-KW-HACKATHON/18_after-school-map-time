@@ -14,6 +14,7 @@
   <header class="topbar">
     <a class="logo" href="{% url 'core:home' %}">턱없네</a>
     <nav class="nav">
+      <a href="{% url 'places:map' %}">지도</a>
       {% block nav %}{% endblock %}
       {% if user.is_authenticated %}
         <span class="muted">{{ user.display_name }}님</span>
