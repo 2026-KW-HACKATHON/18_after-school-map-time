@@ -23,6 +23,16 @@ def main_entrance(place):
     return entrance or Entrance.objects.create(place=place, name="정문", is_main=True)
 
 
+def observed_at_for(observed_on):
+    """
+    확인일(날짜) → 확인 시각. 비었거나 오늘이면 지금 시각 → 오늘 앞서 입력한 기록보다 확실히 최신이 됨.
+    지난 날짜면 그날 정오 (예전 답사 기록을 나중에 입력하는 경우)
+    """
+    if observed_on is None or observed_on >= timezone.localdate():
+        return timezone.now()
+    return timezone.make_aware(datetime.combine(observed_on, time(12, 0)))
+
+
 def _survey_report(user, observed_at, note, **target):
     return Report.objects.create(
         source=Report.Source.TEAM_SURVEY, status=Report.Status.VERIFIED, created_by=user,
@@ -50,13 +60,7 @@ def save_place_survey(form, user):
     place.save()
 
     data = form.cleaned_data
-    # 확인일이 비었거나 오늘이면 지금 시각 → 오늘 앞서 입력한 기록보다 확실히 최신이 됨
-    # 지난 날짜면 그날 정오 (예전 답사 기록을 나중에 입력하는 경우)
-    observed_on = data.get("observed_on")
-    if observed_on is None or observed_on >= timezone.localdate():
-        observed_at = timezone.now()
-    else:
-        observed_at = timezone.make_aware(datetime.combine(observed_on, time(12, 0)))
+    observed_at = observed_at_for(data.get("observed_on"))
     note = " · ".join(filter(None, [f"출처: {data['source_note']}" if data.get("source_note") else "", data.get("memo")]))
 
     entrance_values = form.values_for(ENTRANCE_KEYS)
