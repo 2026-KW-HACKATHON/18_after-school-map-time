@@ -15,7 +15,7 @@
 <article class="place-detail">
   <header class="detail-header">
     <p class="muted small"><a href="{% url 'places:map' %}">← 지도</a></p>
-    <h1>{{ place.name }}</h1>
+    <h1>{{ place.name }}{% if assistance_badge %} <span class="badge-positive">도움 제공 가게</span>{% endif %}</h1>
     <p class="muted">
       {% if place.address %}{{ place.address }} · {% endif %}{{ place.get_category_display }}
       {% if place.floor != 1 %} · {% if place.floor < 0 %}지하 {{ place.floor|stringformat:"d"|slice:"1:" }}층{% else %}{{ place.floor }}층{% endif %}{% endif %}
@@ -39,6 +39,22 @@
           {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}
         </p>
         <p class="small">{{ row.judgment.explanation }}</p>
+        {% if row.judgment.code == "DIFFICULT" %}
+          {# 가고 싶어요: 어려운 가게에만. 사장님 대시보드의 수요 신호 (기획 v2 4.5·6.2) #}
+          {% if user.is_authenticated %}
+            <form method="post" action="{% url 'owners:wish' place.pk %}" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="profile" value="{{ row.profile.key }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn" aria-pressed="{% if row.profile.key in wished %}true{% else %}false{% endif %}">
+                {% if row.profile.key in wished %}가고 싶어요 ✓ (취소){% else %}가고 싶어요{% endif %}
+              </button>
+            </form>
+          {% else %}
+            <a class="btn" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">가고 싶어요</a>
+          {% endif %}
+          <p class="muted small">"{{ row.profile.label }}로 가고 싶은 손님이 있어요"라고 사장님께 전해져요. 사장님은 무료 경사로 지원사업 안내를 함께 받아요.</p>
+        {% endif %}
       </div>
     {% endfor %}
   </section>
@@ -49,6 +65,16 @@
     <p class="small">최근 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}</p>
     {% if verified_user_reports %}<p class="small">💬 주민 제보 {{ verified_user_reports }}건이 반영됐어요.</p>{% endif %}
   </section>
+
+  {% if owner_response.assistance_contact or owner_response.assistance_hours or owner_response.alt_entrance %}
+  {# 방법 먼저 (OP-2): 사장님이 알려준 도움 요청 방법·다른 출입구 #}
+  <section class="card" aria-labelledby="help-title">
+    <h2 id="help-title">사장님이 알려준 들어가는 방법</h2>
+    {% if owner_response.alt_entrance %}<p>🚪 {{ owner_response.alt_entrance }}</p>{% endif %}
+    {% if owner_response.assistance_contact %}<p>🙋 도움 요청: {{ owner_response.assistance_contact }}{% if owner_response.assistance_hours %} ({{ owner_response.assistance_hours }}){% endif %}</p>{% endif %}
+    <p class="muted small">{{ owner_response.updated_at|date:"Y년 n월 j일" }} 사장님 작성</p>
+  </section>
+  {% endif %}
 
   <section class="card" aria-labelledby="entrance-title">
     <h2 id="entrance-title">가게 입구</h2>
@@ -103,8 +129,17 @@
 
   <section class="card owner-comment" aria-labelledby="owner-title">
     <h2 id="owner-title">사장님 한마디</h2>
-    <p class="muted">아직 사장님이 남긴 말이 없어요.</p>
-    <p class="small">사장님이신가요? 도움 제공 여부, 다른 출입구, 이동식 경사로 같은 정보를 직접 보완할 수 있어요. (준비 중)</p>
+    {% if owner_response.owner_comment %}
+      <p>"{{ owner_response.owner_comment }}"</p>
+    {% else %}
+      <p class="muted">아직 사장님이 남긴 말이 없어요.</p>
+    {% endif %}
+    {% if is_owner %}
+      <a class="btn" href="{% url 'owners:dashboard' place.pk %}">사장님 화면으로</a>
+    {% else %}
+      <p class="small">사장님이신가요? 도움 제공 여부, 다른 출입구, 이동식 경사로 같은 정보를 직접 보완할 수 있어요.
+        <a href="{% url 'owners:claim' %}">사장님 인증하기 →</a></p>
+    {% endif %}
   </section>
 
   <a class="btn btn-primary btn-block" href="{% url 'reports:new' %}?place={{ place.pk }}">접근성 정보 제보하기</a>

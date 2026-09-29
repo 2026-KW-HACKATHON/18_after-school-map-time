@@ -13,7 +13,8 @@
   const urls = {
     meta: root.dataset.metaUrl,
     places: root.dataset.placesUrl,
-    detail: (id) => withId(root.dataset.detailUrl, id),
+    // 상세로 갈 때 고른 이동 조건을 붙임 → 사장님 대시보드의 조건별 조회 수 (기획 v2 4.5)
+    detail: (id) => withId(root.dataset.detailUrl, id) + (state.profile ? `?profile=${encodeURIComponent(state.profile)}` : ""),
     detailApi: (id) => withId(root.dataset.detailApiUrl, id),
   };
   const region = root.dataset.region;
