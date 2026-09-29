@@ -179,6 +179,7 @@ python manage.py runserver
 ├── accounts/               # 회원 — 커스텀 User, 카카오 로그인
 ├── places/                 # 장소 데이터 — 지역·건물·장소·출입구·접근성 필드 정의
 ├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인
+├── judgments/              # 판정 — 규칙(데이터)·판정 엔진·판정 결과
 ├── templates/              # 전역 템플릿 — base.html(공통 레이아웃), 404, 500
 ├── static/                 # 전역 정적 파일 — 공통 CSS(디자인 변수)·JS(api() fetch 헬퍼)
 ├── nginx/                  # 배포용 nginx 설정 — http(인증서 발급 전)·https·공통 스니펫
