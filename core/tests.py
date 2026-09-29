@@ -20,10 +20,9 @@ class HealthCheckTests(TestCase):
 
 
 class HomeTests(TestCase):
-    def test_home(self):
+    def test_home_goes_to_map(self):
         res = self.client.get(reverse("core:home"))
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "턱없네")
+        self.assertRedirects(res, reverse("places:map"))
 
 
 class StaticStorageTests(TestCase):

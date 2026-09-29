@@ -21,8 +21,10 @@
       <img src="{% static 'img/teokeopne-icon.svg' %}" alt="" width="28" height="28">
       <span>턱없네</span>
     </a>
-    <nav class="nav">
-      <a href="{% url 'places:map' %}">지도</a>
+    <nav class="nav" aria-label="주 메뉴">
+      <a class="nav-wide" href="{% url 'places:map' %}">지도</a>
+      <a class="nav-wide" href="{% url 'places:search' %}">검색</a>
+      <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
       {% block nav %}{% endblock %}
       {% if user.is_authenticated %}
         <span class="muted">{{ user.display_name }}님</span>
@@ -48,6 +50,15 @@
   <main class="{% block main_class %}container{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+
+  {% block tabbar %}
+  {# 모바일 하단 탭 (와이어프레임: 지도 · 검색 · 제보). 데스크톱에서는 상단 메뉴를 씀 #}
+  <nav class="tabbar" aria-label="하단 메뉴">
+    <a href="{% url 'places:map' %}" {% if request.resolver_match.url_name == 'map' %}aria-current="page"{% endif %}>지도</a>
+    <a href="{% url 'places:search' %}" {% if request.resolver_match.url_name == 'search' %}aria-current="page"{% endif %}>검색</a>
+    <a href="{% url 'reports:new' %}" {% if request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>제보</a>
+  </nav>
+  {% endblock %}
 
   <script src="{% static 'js/common.js' %}"></script>
   {% block extra_js %}{% endblock %}

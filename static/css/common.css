@@ -24,6 +24,9 @@
 
 * { box-sizing: border-box; }
 
+/* hidden 속성은 항상 숨김 (.empty-state 등에 display를 줘도 hidden이 이기도록) */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
@@ -45,6 +48,19 @@ a { color: var(--color-primary); text-decoration: none; }
 .logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--color-text); }
 .nav { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .inline { display: inline; margin: 0; }
+
+/* 모바일 하단 탭: 작은 화면에서만 보이고, 상단의 지도·검색·제보 링크는 숨김 */
+.tabbar { display: none; }
+@media (max-width: 768px) {
+  .nav-wide { display: none; }
+  body { padding-bottom: 60px; }
+  .tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 56px;
+    background: var(--color-surface); border-top: 1px solid var(--color-border);
+  }
+  .tabbar a { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--color-muted); font-weight: 600; }
+  .tabbar a[aria-current="page"] { color: var(--color-primary); }
+}
 
 /* ── 공통 컴포넌트 ── */
 .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 24px; }
