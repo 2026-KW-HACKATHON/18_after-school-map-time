@@ -11,6 +11,15 @@
   --color-success: #16a34a;
   --radius: 12px;
   --topbar-height: 56px;
+
+  /* ── 판정 4단계 색 (기획 v2 3.1) ──
+     빨간색은 "위험·금지"로 읽혀 가게에 낙인을 찍으므로 쓰지 않는다. DIFFICULT는 회색.
+     색만으로 구분하지 않고 모양·아이콘을 같이 쓴다 (색약 대응). 표시 문구는 판정 앱의 상수에서 관리 */
+  --judge-accessible: #16a34a;   /* ACCESSIBLE  들어갈 수 있어요            초록 · 원 */
+  --judge-conditional: #2563eb;  /* CONDITIONAL 도움 받으면 들어갈 수 있어요 파랑 · 원 + 손 아이콘 */
+  --judge-difficult: #9ca3af;    /* DIFFICULT   혼자 들어가기 어려워요       회색 · 원 */
+  --judge-unknown: #ffffff;      /* UNKNOWN     아직 정보가 없어요           흰색 · 점선 테두리 */
+  --judge-unknown-border: #6b7280;
 }
 
 * { box-sizing: border-box; }
