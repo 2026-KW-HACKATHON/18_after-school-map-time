@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 9번 "제보 제출 완료 안내"{% endcomment %}
+
+{% block title %}제보 접수 완료 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow center">
+  <p class="done-mark" aria-hidden="true">✓</p>
+  <h1>제보가 접수되었습니다</h1>
+  <p class="muted">고마워요. 알려주신 정보는 확인을 거쳐 지도에 반영됩니다.</p>
+
+  <ol class="steps card">
+    <li><strong>확인</strong> — 다른 주민의 "맞아요" 확인 또는 운영자가 사진과 정보를 확인해요.</li>
+    <li><strong>반영</strong> — 확인된 정보만 공개 지도에 나타나요. 판정이 나빠지는 정보는 더 꼼꼼히 확인해요.</li>
+    <li><strong>공유</strong> — 같은 이동 조건의 이웃이 헛걸음하지 않게 돼요.</li>
+  </ol>
+
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'places:map' %}">지도로 돌아가기</a>
+    <a class="btn" href="{% url 'reports:new' %}">다른 장소 제보하기</a>
+  </div>
+</section>
+{% endblock %}

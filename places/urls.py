@@ -6,5 +6,6 @@ app_name = "places"
 
 urlpatterns = [
     path("map/", views.map_page, name="map"),
+    path("search/", views.search_page, name="search"),
     path("places/<int:pk>/", views.detail_page, name="detail"),
 ]

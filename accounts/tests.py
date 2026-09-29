@@ -59,7 +59,7 @@ class LogoutTests(TestCase):
         self.client.force_login(self.user)
 
     def test_nav_shows_nickname_and_logout(self):
-        res = self.client.get(reverse("core:home"))
+        res = self.client.get(reverse("places:search"))  # 홈은 지도로 이동하므로 상단 바가 있는 아무 페이지
         self.assertContains(res, "테스터님")
         self.assertContains(res, "로그아웃")
 

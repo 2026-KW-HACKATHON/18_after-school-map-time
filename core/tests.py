@@ -20,7 +20,18 @@ class HealthCheckTests(TestCase):
 
 
 class HomeTests(TestCase):
-    def test_home(self):
+    def test_home_goes_to_map(self):
         res = self.client.get(reverse("core:home"))
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "턱없네")
+        self.assertRedirects(res, reverse("places:map"))
+
+
+class StaticStorageTests(TestCase):
+    def test_uncollected_file_falls_back_to_original_name(self):
+        # 배포 중 collectstatic 전에 새 파일을 요청해도 500 대신 원래 이름 (config/storage.py)
+        import tempfile
+
+        from config.storage import CacheBustingStaticStorage
+
+        with tempfile.TemporaryDirectory() as root:
+            storage = CacheBustingStaticStorage(location=root, base_url="/static/")
+            self.assertEqual(storage.url("js/new.js"), "/static/js/new.js")

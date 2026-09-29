@@ -175,3 +175,61 @@ class EntrancePhotoTests(ViewTestBase):
             url = data["place"]["entrances"][0]["photo_url"]
             self.assertIn("door", url)          # 확인 중인 사진은 보여주지 않음
             self.assertContains(self.client.get(reverse("places:detail", args=[self.easy.pk])), url)
+
+
+class SearchPageTests(ViewTestBase):
+    url = reverse("places:search")
+
+    def test_finds_by_name_with_judgment_and_facts(self):
+        res = self.client.get(self.url, {"q": "식당", "profile": "WHEELCHAIR"})
+        self.assertContains(res, "계단 식당")
+        self.assertContains(res, "혼자 들어가기 어려워요")      # 이름으로 찾은 장소는 판정과 관계없이 보여줌
+        self.assertContains(res, "입구 단차 30cm")              # 입구 핵심 값 요약
+        self.assertNotContains(res, "턱없는 카페")
+
+    def test_no_result_state(self):
+        res = self.client.get(self.url, {"q": "없는가게"})
+        self.assertContains(res, "등록된 장소가 없어요")
+        self.assertContains(res, "새 장소 제보하기")
+
+    def test_empty_query_shows_form_only(self):
+        res = self.client.get(self.url)
+        self.assertContains(res, "어떤 장소를 찾으세요?")
+        self.assertNotContains(res, "검색 결과")
+
+
+class MapHomeTests(ViewTestBase):
+    def test_home_redirects_to_map_with_search_and_summary(self):
+        res = self.client.get("/", follow=True)
+        self.assertContains(res, 'role="search"')
+        self.assertContains(res, 'data-count="ACCESSIBLE"')
+        self.assertNotContains(res, 'data-count="DIFFICULT"')   # 어려움 개수는 집계해 보여주지 않음 (기획 v2 3.2)
+        self.assertContains(res, "지도를 불러올 수 없어요")      # 6번 오류 상태 (숨김으로 들어 있음)
+
+
+class DetailV2Tests(ViewTestBase):
+    def test_explanation_and_trust_info(self):
+        res = self.client.get(reverse("places:detail", args=[self.hard.pk]))
+        self.assertContains(res, "확인된 사실: 입구 단차 30cm · 계단 수 2칸.")
+        self.assertContains(res, "다른 출입구나 도움 요청 방법")   # 어려움이면 방법 안내 (OP-2)
+        self.assertContains(res, "출처: 팀 답사")
+        self.assertContains(res, "적용 기준(법령)", count=0)       # 어려움은 적용된 규칙이 없음
+        res = self.client.get(reverse("places:detail", args=[self.easy.pk]))
+        self.assertContains(res, "적용 기준(법령)")               # 가능은 규칙 근거 표시 (M-9)
+
+    def test_pending_report_confirm_button(self):
+        from accounts.models import User
+
+        author = User.objects.create_user(username="author")
+        report = self.add_values(self.easy.entrances.first(), status=Report.Status.PENDING, step_height_cm=20)
+        report.source, report.created_by = Report.Source.USER_REPORT, author
+        report.save()
+        url = reverse("places:detail", args=[self.easy.pk])
+
+        self.assertContains(self.client.get(url), "로그인하고 확인하기")
+        self.client.force_login(User.objects.create_user(username="neighbor"))
+        res = self.client.get(url)
+        self.assertContains(res, "맞아요, 저도 확인했어요")
+        self.assertContains(res, "확인 0/2명")                   # 판정이 내려가는 제보라 2명 필요
+        self.client.force_login(author)
+        self.assertNotContains(self.client.get(url), "맞아요, 저도 확인했어요")  # 본인 제보

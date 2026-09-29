@@ -1,149 +1,170 @@
 /**
- * 지도 화면. 지도 SDK는 직접 부르지 않고 TeokMap 어댑터(static/js/map/kakao-adapter.js)만 쓴다.
+ * 지도 홈 (와이어프레임 1·2·3·6번). 지도 SDK는 TeokMap 어댑터(static/js/map/kakao-adapter.js)만 쓴다.
  *
  * 표시 정책 (기획 v2 3.2)
- * - 이동 조건을 고르면 기본으로 "들어갈 수 있어요"·"도움 받으면 들어갈 수 있어요"만 보인다
+ * - 이동 조건을 고르면 기본으로 "들어갈 수 있어요"·"도움 받으면"만 보인다 (hidden_by_default 인 결과는 숨김)
  * - "모든 장소 보기"를 켜면 어려움(회색)·미확인(점선)도 보인다
- * - 목록은 거리순. "접근성 낮은 순" 정렬이나 "어려운 곳만 보기"는 만들지 않는다
- * - 지도 SDK를 못 불러와도(키 없음 등) 목록은 동작한다
+ * - 목록은 거리순. "접근성 낮은 순" 정렬·"어려운 곳만 보기"·어려움 개수 집계는 만들지 않는다
+ * - 지도 SDK를 못 불러와도 목록·검색·제보는 동작한다 (6번 화면)
  */
 (function () {
   const root = document.getElementById("map-app");
+  const withId = (url, id) => url.replace(/\/0\/$/, `/${id}/`);  // 템플릿이 넘긴 ".../0/"의 0을 id로
   const urls = {
     meta: root.dataset.metaUrl,
     places: root.dataset.placesUrl,
-    // 템플릿이 넘겨준 "/places/0/"의 마지막 0을 실제 id로
-    detail: (id) => root.dataset.detailUrl.replace(/\/0\/$/, `/${id}/`),
+    detail: (id) => withId(root.dataset.detailUrl, id),
+    detailApi: (id) => withId(root.dataset.detailApiUrl, id),
   };
   const region = root.dataset.region;
-
+  const $ = (id) => document.getElementById(id);
   const els = {
-    map: document.getElementById("map"),
-    profiles: document.getElementById("profile-chips"),
-    showAll: document.getElementById("show-all"),
-    list: document.getElementById("place-list"),
-    status: document.getElementById("list-status"),
+    map: $("map"), mapError: $("map-error"), chips: $("profile-chips"), showAll: $("show-all"),
+    list: $("place-list"), status: $("list-status"), empty: $("empty-state"), emptyProfile: $("empty-profile"),
+    popup: $("popup"), popupBody: $("popup-body"), searchProfile: $("search-profile"),
   };
 
   const STORAGE_KEY = "teokeopne.profile";
-  const state = { profile: null, showAll: false, center: null, me: null, map: null, places: [] };
+  const state = { profiles: [], profile: null, showAll: false, center: null, me: null, map: null, all: [] };
 
+  // ── 작은 도우미 ─────────────────────────────────────────
   function savedProfile() {
     try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
   }
   function saveProfile(key) {
     try { localStorage.setItem(STORAGE_KEY, key); } catch (e) { /* 저장 못 해도 동작 */ }
   }
-
-  // 두 좌표 사이 거리(m) — 목록 거리순 정렬용
+  function el(tag, attrs = {}, text) {
+    const node = document.createElement(tag);
+    Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+    if (text != null) node.textContent = text;  // 외부 데이터는 textContent로 (XSS 방지)
+    return node;
+  }
   function distance(a, b) {
-    const R = 6371000;
-    const toRad = (d) => (d * Math.PI) / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    const R = 6371000, rad = (d) => (d * Math.PI) / 180;
+    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(h));
   }
-  function formatDistance(m) {
-    return m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`;
-  }
+  const formatDistance = (m) => (m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`);
+  const profileLabel = () => (state.profiles.find((p) => p.key === state.profile) || {}).label || "";
+  const judgmentClass = (p) => (p.judgment ? `judge-${p.judgment.code}` : "judge-NONE");
+  const judgmentIcon = (p) => (p.judgment && p.judgment.icon === "hand" ? "✋" : "");
+  const visiblePlaces = () => state.all.filter((p) => state.showAll || !p.judgment || !p.judgment.hidden_by_default);
 
-  function renderProfiles(profiles) {
-    els.profiles.innerHTML = "";
-    profiles.forEach((p) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chip";
-      btn.textContent = p.label;
-      btn.setAttribute("aria-pressed", String(p.key === state.profile));
+  // ── 이동 조건 칩 ───────────────────────────────────────
+  function renderProfiles() {
+    els.chips.innerHTML = "";
+    state.profiles.forEach((p) => {
+      const btn = el("button", { type: "button", class: "chip", "aria-pressed": String(p.key === state.profile) }, p.label);
       btn.addEventListener("click", () => {
         state.profile = p.key;
         saveProfile(p.key);
-        renderProfiles(profiles);
+        renderProfiles();
         loadPlaces();
       });
-      els.profiles.appendChild(btn);
+      els.chips.appendChild(btn);
+    });
+    els.searchProfile.value = state.profile || "";
+  }
+
+  // ── 상태 요약 (어려움 개수는 세지 않음) ────────────────
+  function renderSummary() {
+    const counts = { ACCESSIBLE: 0, CONDITIONAL: 0, UNKNOWN: 0 };
+    state.all.forEach((p) => { if (p.judgment && p.judgment.code in counts) counts[p.judgment.code] += 1; });
+    document.querySelectorAll("[data-count]").forEach((node) => {
+      node.textContent = `${counts[node.dataset.count]}곳`;
     });
   }
 
-  function judgmentClass(place) {
-    return place.judgment ? `judge-${place.judgment.code}` : "judge-NONE";
-  }
-  function judgmentIcon(place) {
-    return place.judgment && place.judgment.icon === "hand" ? "✋" : "";
-  }
-
+  // ── 목록 ───────────────────────────────────────────────
   function renderList() {
     const origin = state.me || state.center;
-    const rows = state.places
+    const rows = visiblePlaces()
       .map((p) => ({ ...p, dist: origin ? distance(origin, p) : null }))
       .sort((a, b) => (a.dist ?? 0) - (b.dist ?? 0) || a.name.localeCompare(b.name, "ko"));
 
     els.list.innerHTML = "";
-    els.status.textContent = rows.length
-      ? `${rows.length}곳${state.me ? " · 내 위치에서 가까운 순" : ""}`
-      : state.showAll ? "이 지역에 등록된 장소가 아직 없어요." : "조건에 맞는 장소가 아직 없어요. '모든 장소 보기'를 켜 보세요.";
+    els.empty.hidden = rows.length > 0;
+    els.emptyProfile.textContent = profileLabel();
+    els.status.textContent = rows.length ? `${rows.length}곳${state.me ? " · 내 위치에서 가까운 순" : " · 가까운 순"}` : "";
 
     rows.forEach((p) => {
-      const li = document.createElement("li");
-      const a = document.createElement("a");
-      a.className = "place-item";
-      a.href = urls.detail(p.id);
-
-      const badge = document.createElement("span");
-      badge.className = `judge-dot ${judgmentClass(p)}`;
-      badge.textContent = judgmentIcon(p);
-      badge.setAttribute("aria-hidden", "true");
-
-      const body = document.createElement("span");
-      body.className = "place-item-body";
-      const name = document.createElement("strong");
-      name.textContent = p.name;  // 외부 데이터는 textContent로 (XSS 방지)
-      const meta = document.createElement("span");
-      meta.className = "muted small";
-      meta.textContent = [p.category_label, p.dist != null ? formatDistance(p.dist) : ""].filter(Boolean).join(" · ");
-      body.append(name, meta);
+      const a = el("a", { class: "place-item", href: urls.detail(p.id) });
+      a.appendChild(el("span", { class: `judge-dot ${judgmentClass(p)}`, "aria-hidden": "true" }, judgmentIcon(p)));
+      const body = el("span", { class: "place-item-body" });
+      body.appendChild(el("strong", {}, p.name));
+      body.appendChild(el("span", { class: "muted small" },
+        [p.category_label, p.dist != null ? formatDistance(p.dist) : ""].filter(Boolean).join(" · ")));
       if (p.judgment) {
-        const label = document.createElement("span");
-        label.className = "small";
-        label.textContent = p.judgment.label + (p.judgment.reason ? ` — ${p.judgment.reason}` : "");
-        body.append(label);
-        if (p.judgment.improved) {
-          const improved = document.createElement("span");
-          improved.className = "badge-positive";
-          improved.textContent = "개선 완료";
-          body.append(improved);
-        }
+        body.appendChild(el("span", { class: "small" }, p.judgment.label + (p.judgment.reason ? ` — ${p.judgment.reason}` : "")));
+        if (p.judgment.improved) body.appendChild(el("span", { class: "badge-positive" }, "개선 완료"));
       }
-      a.append(badge, body);
+      a.appendChild(body);
+      const li = el("li");
       li.appendChild(a);
       els.list.appendChild(li);
     });
   }
 
+  // ── 지도 마커 + 팝업 (와이어프레임 3번) ───────────────
   function renderMarkers() {
     if (!state.map) return;
     state.map.setMarkers(
-      state.places.map((p) => ({
-        id: p.id,
-        lat: p.lat,
-        lng: p.lng,
-        className: judgmentClass(p),
-        icon: judgmentIcon(p),
+      visiblePlaces().map((p) => ({
+        id: p.id, lat: p.lat, lng: p.lng, className: judgmentClass(p), icon: judgmentIcon(p),
         label: `${p.name}${p.judgment ? ` · ${p.judgment.label}` : ""}`,
       })),
-      (item) => { window.location.href = urls.detail(item.id); },
+      (item) => openPopup(item.id),
     );
   }
 
+  const POPUP_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type"];
+
+  async function openPopup(id) {
+    const brief = state.all.find((p) => p.id === id);
+    els.popup.hidden = false;
+    els.popupBody.textContent = "불러오는 중...";
+    try {
+      const d = await api(urls.detailApi(id));
+      const j = d.judgments.find((x) => x.profile === state.profile) || d.judgments[0];
+      const entrance = (d.place.entrances || [])[0];
+      const facts = entrance
+        ? entrance.fields.filter((f) => POPUP_FIELDS.includes(f.key) && f.value != null).map((f) => `${f.label} ${f.value}${f.unit}`)
+        : [];
+      const origin = state.me || state.center;
+
+      els.popupBody.innerHTML = "";
+      const head = el("div", { class: "popup-head" });
+      head.appendChild(el("strong", {}, d.name));
+      head.appendChild(el("a", { href: urls.detail(id), class: "btn" }, "상세 보기"));
+      els.popupBody.appendChild(head);
+      els.popupBody.appendChild(el("p", { class: "muted small" },
+        [j ? j.profile_label : "", brief && origin ? `거리 ${formatDistance(distance(origin, brief))}` : ""].filter(Boolean).join(" · ")));
+      if (j) {
+        const status = el("p", {});
+        status.appendChild(el("span", { class: `judge-dot judge-${j.code}`, "aria-hidden": "true" }, j.icon === "hand" ? "✋" : ""));
+        status.appendChild(document.createTextNode(` ${j.label}`));
+        els.popupBody.appendChild(status);
+      }
+      els.popupBody.appendChild(el("p", { class: "small" }, facts.length ? facts.join(" · ") : "아직 확인된 입구 정보가 없어요."));
+      els.popupBody.appendChild(el("p", { class: "muted small" },
+        d.last_checked ? `${d.last_checked.slice(0, 10)} 확인` : "확인 정보 없음"));
+    } catch (err) {
+      els.popupBody.textContent = err.message;
+    }
+  }
+  $("popup-close").addEventListener("click", () => { els.popup.hidden = true; });
+
+  // ── 데이터 불러오기 ────────────────────────────────────
   async function loadPlaces() {
-    const params = new URLSearchParams({ region });
+    // 전체(all=1)를 한 번 받아 화면에서 거른다 → 요약 개수와 '모든 장소 보기'를 서버 왕복 없이
+    const params = new URLSearchParams({ region, all: "1" });
     if (state.profile) params.set("profile", state.profile);
-    if (state.showAll) params.set("all", "1");
     els.status.textContent = "불러오는 중...";
     try {
-      const data = await api(`${urls.places}?${params}`);
-      state.places = data.results;
+      state.all = (await api(`${urls.places}?${params}`)).results;
+      renderSummary();
       renderMarkers();
       renderList();
     } catch (err) {
@@ -151,23 +172,33 @@
     }
   }
 
+  function setShowAll(value) {
+    state.showAll = value;
+    els.showAll.checked = value;
+    renderMarkers();
+    renderList();
+  }
+
   async function init() {
     const meta = await api(`${urls.meta}?region=${encodeURIComponent(region)}`);
     state.center = meta.region.center;
+    state.profiles = meta.profiles;
     const keys = meta.profiles.map((p) => p.key);
     state.profile = keys.includes(savedProfile()) ? savedProfile() : keys[0] || null;
-    renderProfiles(meta.profiles);
+    renderProfiles();
 
-    els.showAll.addEventListener("change", () => {
-      state.showAll = els.showAll.checked;
-      loadPlaces();
+    els.showAll.addEventListener("change", () => setShowAll(els.showAll.checked));
+    $("empty-show-all").addEventListener("click", () => setShowAll(true));
+    $("empty-change").addEventListener("click", () => {
+      const first = els.chips.querySelector("button");
+      if (first) first.focus();
+      els.chips.scrollIntoView({ behavior: "smooth", block: "center" });
     });
 
     try {
       state.map = await window.TeokMap.create(els.map, { ...meta.region.center, level: meta.region.map_level });
     } catch (err) {
-      els.map.classList.add("map-unavailable");
-      els.map.textContent = "지도를 불러오지 못했어요. 아래 목록으로 볼 수 있어요.";
+      els.mapError.hidden = false;  // 와이어프레임 6번
     }
 
     // 현재 위치 (HTTPS 또는 localhost에서만 동작). 거부해도 지역 중심 기준으로 동작

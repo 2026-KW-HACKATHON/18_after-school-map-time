@@ -24,6 +24,9 @@
 
 * { box-sizing: border-box; }
 
+/* hidden 속성은 항상 숨김 (.empty-state 등에 display를 줘도 hidden이 이기도록) */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
@@ -42,9 +45,22 @@ a { color: var(--color-primary); text-decoration: none; }
   height: var(--topbar-height); padding: 0 16px;
   background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
-.logo { font-weight: 700; color: var(--color-text); }
+.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--color-text); }
 .nav { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .inline { display: inline; margin: 0; }
+
+/* 모바일 하단 탭: 작은 화면에서만 보이고, 상단의 지도·검색·제보 링크는 숨김 */
+.tabbar { display: none; }
+@media (max-width: 768px) {
+  .nav-wide { display: none; }
+  body { padding-bottom: 60px; }
+  .tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 56px;
+    background: var(--color-surface); border-top: 1px solid var(--color-border);
+  }
+  .tabbar a { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--color-muted); font-weight: 600; }
+  .tabbar a[aria-current="page"] { color: var(--color-primary); }
+}
 
 /* ── 공통 컴포넌트 ── */
 .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 24px; }
@@ -73,6 +89,27 @@ input[type="text"], input[type="password"], input[type="email"], input[type="sea
 .small { font-size: 13px; }
 /* 카카오 로그인 버튼: 카카오 디자인 가이드 색 (배경 #FEE500, 글자 85% 검정) */
 .btn-kakao { background: #fee500; border-color: #fee500; color: rgba(0, 0, 0, 0.85); font-weight: 600; margin: 8px 0; }
+
+/* ── 일반 페이지·폼 (디자인은 추후 Figma CSS로 교체, 지금은 기능이 보이는 최소 스타일) ── */
+.page { display: grid; gap: 16px; }
+.narrow { max-width: 640px; margin: 0 auto; }
+.center { text-align: center; }
+.form-stack { display: grid; gap: 16px; }
+fieldset.card { margin: 0; }
+legend { font-weight: 700; padding: 0 4px; }
+.field { display: grid; gap: 4px; margin: 8px 0; }
+.field label { font-weight: 600; }
+.field input[type="number"], .field select, .field textarea, .field input[type="file"], .field input[type="date"] {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; background: var(--color-surface);
+}
+.field ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.field-error, .has-error label { color: var(--color-error); }
+.alert { padding: 12px 16px; border: 1px solid var(--color-error); border-radius: 8px; color: var(--color-error); background: #fff5f5; }
+.alert p { margin: 4px 0; }
+.notice { padding: 12px; border-radius: 8px; background: #eef2f7; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.done-mark { font-size: 48px; margin: 0; color: var(--color-success); }
+.steps { text-align: left; display: grid; gap: 8px; padding-left: 36px; }
 
 /* ── 폼 에러 ── */
 .errorlist { color: var(--color-error); font-size: 13px; padding-left: 16px; }

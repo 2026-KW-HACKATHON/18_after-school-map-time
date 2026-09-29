@@ -204,8 +204,10 @@ python manage.py runserver
 
 | URL | 설명 |
 | --- | --- |
-| `/map/` | 지도 — 이동 조건 선택, 들어갈 수 있는 곳 우선 표시, 거리순 목록 |
-| `/places/<id>/` | 장소 상세 — 건물 공용 입구와 가게 입구를 나눠 표시 |
+| `/` → `/map/` | 지도 홈 — 검색창, 이동 조건 선택, 들어갈 수 있는 곳 우선 표시, 마커 팝업, 거리순 목록 |
+| `/search/?q=` | 장소명 검색 |
+| `/places/<id>/` | 장소 상세 — 판단 근거, 정보 신뢰도, 건물 공용 입구와 가게 입구를 나눠 표시, 확인 중인 제보 "맞아요" |
+| `/report/new/` | 제보 작성 — 기존 장소 입구 정보 또는 새 장소 제안 (로그인·사진 필수) |
 | `/api/v1/places/?region=wolgye1&profile=WHEELCHAIR` | 공개 읽기 API (목록) |
 | `/api/v1/places.geojson?region=wolgye1` | GeoJSON 내보내기 |
 | `/admin/` | 관리자 — 장소·제보 반영·판정 규칙 관리 |

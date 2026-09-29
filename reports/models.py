@@ -3,6 +3,7 @@
 
 Report(제보 묶음) 1건 = 사진 1장 + 필드 값 여러 개.
 팀 답사·이용자 제보·사장님 선언·AI 판별 모두 같은 구조로 들어오고, source 로 구분한다 (dev-plan-v2 D4, D7).
+아직 등록 안 된 장소는 대상 없이 "새 장소 제안"(이름·위치)으로 제보하고, 운영자가 승인할 때 장소를 만든다.
 판정에는 status=VERIFIED 인 값만 쓴다. PENDING 은 "확인 중"으로만 보여준다 (기획 v2 OP-6).
 """
 
@@ -11,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from places.models import Building, Entrance, FieldDefinition, Place
 
@@ -36,10 +38,20 @@ class Report(models.Model):
         Entrance, verbose_name="출입구", on_delete=models.CASCADE, null=True, blank=True, related_name="reports"
     )
 
+    # 새 장소 제안: 대상이 없을 때만 사용 (운영자가 승인하면서 장소를 만든다)
+    suggested_name = models.CharField("새 장소 이름", max_length=100, blank=True)
+    location_text = models.CharField("위치 설명", max_length=200, blank=True, help_text="예: 월계역 2번 출구 앞 건물 1층")
+    lat = models.DecimalField("제보 위치 위도", max_digits=9, decimal_places=6, null=True, blank=True)
+    lng = models.DecimalField("제보 위치 경도", max_digits=9, decimal_places=6, null=True, blank=True)
+
     source = models.CharField("출처", max_length=20, choices=Source.choices)
     status = models.CharField("상태", max_length=10, choices=Status.choices, default=Status.PENDING)
     photo = models.ImageField("사진", upload_to="reports/%Y/%m/", blank=True)
-    note = models.CharField("메모", max_length=200, blank=True)
+    note = models.CharField("설명", max_length=500, blank=True)
+    profiles = models.JSONField("이동 조건", default=list, blank=True, help_text='제보자가 고른 이동 조건 키 목록. 예: ["WHEELCHAIR"]')
+    # 실제로 현장을 확인한 시각. 운영자가 예전 답사 기록을 나중에 입력할 수 있어서 작성 시각과 따로 둔다.
+    # "지금 쓸 값"은 이 시각이 가장 최근인 제보로 정한다 (reports/selectors.py)
+    observed_at = models.DateTimeField("확인 시각", default=timezone.now)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="작성자", on_delete=models.SET_NULL, null=True, blank=True,
@@ -52,19 +64,25 @@ class Report(models.Model):
     )
     reviewed_at = models.DateTimeField("처리일", null=True, blank=True)
     reject_reason = models.CharField("반려 사유", max_length=200, blank=True)
+    review_note = models.CharField("검토 의견", max_length=300, blank=True, help_text="충돌 항목 처리 방향 등 (처리 기록)")
 
     class Meta:
         verbose_name = "제보"
         verbose_name_plural = "제보"
         ordering = ["-created_at"]
         constraints = [
+            # 대상(장소·건물·출입구)은 정확히 하나. 대상이 없으면 새 장소 이름이 있어야 함
             models.CheckConstraint(
                 condition=(
                     models.Q(place__isnull=False, building__isnull=True, entrance__isnull=True)
                     | models.Q(place__isnull=True, building__isnull=False, entrance__isnull=True)
                     | models.Q(place__isnull=True, building__isnull=True, entrance__isnull=False)
+                    | (
+                        models.Q(place__isnull=True, building__isnull=True, entrance__isnull=True)
+                        & ~models.Q(suggested_name="")
+                    )
                 ),
-                name="report_has_exactly_one_target",
+                name="report_has_one_target_or_new_place",
             ),
         ]
 
@@ -76,9 +94,29 @@ class Report(models.Model):
         return self.place or self.building or self.entrance
 
     @property
+    def is_new_place(self):
+        return self.target is None
+
+    @property
+    def target_label(self):
+        """화면 표시용 대상 이름"""
+        if self.is_new_place:
+            return f"새 장소: {self.suggested_name}"
+        return str(self.target)
+
+    @property
+    def target_place(self):
+        """이 제보가 속한 장소 (출입구 제보면 그 출입구의 장소). 건물·새 장소 제보는 None"""
+        if self.place_id:
+            return self.place
+        if self.entrance_id and self.entrance.place_id:
+            return self.entrance.place
+        return None
+
+    @property
     def target_scope(self):
-        """이 제보에 들어갈 수 있는 필드의 대상(FieldDefinition.Scope)"""
-        if self.entrance_id:
+        """이 제보에 들어갈 수 있는 필드의 대상(FieldDefinition.Scope). 새 장소 제안은 입구 정보를 받는다"""
+        if self.entrance_id or self.is_new_place:
             return FieldDefinition.Scope.ENTRANCE
         if self.building_id:
             return FieldDefinition.Scope.BUILDING

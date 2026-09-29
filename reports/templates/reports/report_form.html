@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 8번 "제보 작성". 디자인은 추후 Figma CSS로 교체 — 기능 구조만{% endcomment %}
+
+{% block title %}접근성 정보 제보 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>접근성 정보 제보</h1>
+  <p class="muted">직접 확인한 장소의 입구 정보를 알려주세요. 다른 주민의 확인이나 운영자 검토를 거쳐 지도에 반영됩니다.</p>
+
+  {% if form.non_field_errors %}
+    <div class="alert" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="form-stack">
+    {% csrf_token %}
+
+    <fieldset class="card">
+      <legend>장소 정보</legend>
+      {% if place %}
+        <input type="hidden" name="place" value="{{ place.pk }}">
+        <p><strong>{{ place.name }}</strong>{% if place.address %} <span class="muted">· {{ place.address }}</span>{% endif %}</p>
+      {% else %}
+        {% include "reports/_field.html" with field=form.suggested_name %}
+        {% include "reports/_field.html" with field=form.location_text %}
+        <button type="button" class="btn" id="use-location">현재 위치 넣기</button>
+        <span id="location-status" class="muted small" aria-live="polite"></span>
+        {{ form.lat }}{{ form.lng }}
+      {% endif %}
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>입구 사진</legend>
+      {% include "reports/_field.html" with field=form.photo %}
+      <p class="muted small">사진으로 값을 자동으로 채워 주는 AI 분석은 준비 중이에요.</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>입구 정보 <span class="muted small">(아는 것만)</span></legend>
+      {% include "reports/_field.html" with field=form.step_height_cm %}
+      {% include "reports/_field.html" with field=form.step_count %}
+      {% include "reports/_field.html" with field=form.has_ramp %}
+      {% include "reports/_field.html" with field=form.door_width_cm %}
+      {% include "reports/_field.html" with field=form.door_type %}
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>추가 정보</legend>
+      {% include "reports/_field.html" with field=form.note %}
+      {% include "reports/_field.html" with field=form.profiles %}
+    </fieldset>
+
+    <p class="notice small">📋 제보는 다른 주민의 확인 또는 운영자 검토 후 공개됩니다. 가게를 평가하는 곳이 아니라 입구 사실을 기록하는 곳이에요.</p>
+    <button type="submit" class="btn btn-primary btn-block">제보 제출하기</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // 새 장소 제보: 현재 위치를 좌표 칸에 넣는다 (HTTPS에서만 동작)
+  (function () {
+    const btn = document.getElementById("use-location");
+    if (!btn) return;
+    const status = document.getElementById("location-status");
+    btn.addEventListener("click", () => {
+      if (!navigator.geolocation) { status.textContent = "이 브라우저는 위치를 지원하지 않아요."; return; }
+      status.textContent = "위치 확인 중...";
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          document.getElementById("id_lat").value = coords.latitude.toFixed(6);
+          document.getElementById("id_lng").value = coords.longitude.toFixed(6);
+          status.textContent = "현재 위치를 넣었어요.";
+        },
+        () => { status.textContent = "위치를 가져오지 못했어요. 위치 설명을 적어 주세요."; },
+        { timeout: 8000 },
+      );
+    });
+  })();
+</script>
+{% endblock %}

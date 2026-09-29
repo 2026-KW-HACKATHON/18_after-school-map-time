@@ -1,10 +1,11 @@
 from django.db import connection
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect
 
 
 def home(request):
-    return render(request, "core/home.html")
+    """홈 = 지도 (와이어프레임 1번 '홈 지도 화면')"""
+    return redirect("places:map")
 
 
 def health(request):

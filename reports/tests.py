@@ -113,3 +113,33 @@ class ReviewServiceTests(ReportTestBase):
         with self.assertRaises(ValidationError):
             ReportConfirmation(report=report, user=self.user).clean()
         ReportConfirmation(report=report, user=User.objects.create_user(username="other")).clean()
+
+
+class NewPlaceReportTests(ReportTestBase):
+    def test_new_place_needs_name(self):
+        Report.objects.create(source=Report.Source.USER_REPORT, suggested_name="월계시장 입구 카페", location_text="시장 정문 옆")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Report.objects.create(source=Report.Source.USER_REPORT, location_text="이름 없음")
+
+    def test_new_place_takes_entrance_fields(self):
+        report = Report.objects.create(source=Report.Source.USER_REPORT, suggested_name="새 가게")
+        self.assertTrue(report.is_new_place)
+        self.assertEqual(report.target_label, "새 장소: 새 가게")
+        value = AccessibilityValue(report=report, field=FieldDefinition.objects.get(key="step_height_cm"))
+        value.set_value(3)
+        value.full_clean()  # 입구 필드는 가능
+        with self.assertRaises(ValidationError):
+            AccessibilityValue(report=report, field=FieldDefinition.objects.get(key="interior_step"), value_bool=True).full_clean()
+
+
+class ObservedAtTests(ReportTestBase):
+    def test_latest_observation_wins_not_latest_input(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        recent = self.report(step_height_cm=0)                 # 어제 현장 확인
+        old = self.report(step_height_cm=30)                   # 나중에 입력했지만 작년 답사 기록
+        Report.objects.filter(pk=recent.pk).update(observed_at=timezone.now() - timedelta(days=1))
+        Report.objects.filter(pk=old.pk).update(observed_at=timezone.now() - timedelta(days=365))
+        self.assertEqual(current_values(self.entrance)["step_height_cm"].value, Decimal("0"))

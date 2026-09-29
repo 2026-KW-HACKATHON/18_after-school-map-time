@@ -1,7 +1,7 @@
 """
 조회 함수 모음. "지금 화면·판정에 쓸 값"을 구하는 규칙을 한 곳에 둔다.
 
-현재 값 = 대상·필드별로 VERIFIED 제보 중 가장 최근에 작성된(관찰한) 값.
+현재 값 = 대상·필드별로 VERIFIED 제보 중 가장 최근에 확인한(observed_at) 값.
 PENDING 값은 판정에 쓰지 않고 "확인 중" 표시에만 쓴다 (기획 v2 OP-6).
 """
 
@@ -23,7 +23,7 @@ def current_values(target):
     values = (
         AccessibilityValue.objects.filter(report__status=Report.Status.VERIFIED, **_target_filter(target))
         .select_related("field", "report")
-        .order_by("field_id", "-report__created_at", "-id")
+        .order_by("field_id", "-report__observed_at", "-report__created_at", "-id")
     )
     result = {}
     for v in values:
@@ -36,7 +36,7 @@ def latest_photo(target):
     report = (
         Report.objects.filter(status=Report.Status.VERIFIED, **_target_filter(target, prefix=""))
         .exclude(photo="")
-        .order_by("-created_at", "-id")
+        .order_by("-observed_at", "-created_at", "-id")
         .first()
     )
     return report.photo if report else None

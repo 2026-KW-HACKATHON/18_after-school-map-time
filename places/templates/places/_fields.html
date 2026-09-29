@@ -3,7 +3,11 @@
     <div class="field-row">
       <dt>{{ f.label }}</dt>
       <dd>
-        {% if f.value is not None %}{{ f.value }}{{ f.unit }}{% else %}<span class="muted">정보 없음</span>{% endif %}
+        {% if f.value is not None %}
+          {{ f.value }}{{ f.unit }} <span class="badge-neutral">확인됨</span>
+        {% else %}
+          <span class="muted">정보 없음</span>
+        {% endif %}
         {% if f.pending %}<span class="badge-neutral">새 제보 확인 중</span>{% endif %}
       </dd>
     </div>
