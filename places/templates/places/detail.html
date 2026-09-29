@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 {% comment %}
-  장소 상세 (기획 v2)
-  - OP-1 평가하지 않고 사실만: 점수·순위 없음, 수치와 확인일만
-  - OP-2 방법 먼저: 판정 요약 바로 다음에 출입구(대체 출입구 포함)
+  장소 상세 (와이어프레임 7번 + 기획 v2)
+  - OP-1 평가하지 않고 사실만: 점수·순위 없음, 수치·출처·확인일
+  - OP-2 방법 먼저: 판단 근거 → 입구(대체 출입구 포함) → 건물 공용 → 가게 안
   - OP-4 건물 공용 입구와 가게 입구를 섹션으로 나눔
-  - OP-3 사장님 코멘트 영역 / OP-8 법 위반 판정이 아니라는 안내
+  - OP-3 사장님 코멘트 영역 / OP-6 확인 중 제보 / OP-8 법 위반 판정이 아니라는 안내
 {% endcomment %}
 
 {% block title %}{{ place.name }} | 턱없네{% endblock %}
@@ -17,28 +17,37 @@
     <p class="muted small"><a href="{% url 'places:map' %}">← 지도</a></p>
     <h1>{{ place.name }}</h1>
     <p class="muted">
-      {{ place.get_category_display }}{% if place.address %} · {{ place.address }}{% endif %}
+      {% if place.address %}{{ place.address }} · {% endif %}{{ place.get_category_display }}
       {% if place.floor != 1 %} · {% if place.floor < 0 %}지하 {{ place.floor|stringformat:"d"|slice:"1:" }}층{% else %}{{ place.floor }}층{% endif %}{% endif %}
     </p>
   </header>
 
-  <section class="card" aria-labelledby="summary-title">
-    <h2 id="summary-title">이동 조건별로 보면</h2>
-    <ul class="judgment-list">
+  {# 이동 조건 선택 → 판단 근거 (JS 없이도 전부 보이고, JS가 있으면 고른 조건만 보여줌) #}
+  <section class="card" aria-labelledby="judge-title">
+    <h2 id="judge-title">내 이동 조건으로 보면</h2>
+    <div class="chips" role="group" aria-label="이동 조건 선택" id="detail-chips">
       {% for row in judgments %}
-        <li>
-          <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
-          <span>
-            <strong>{{ row.profile.label }}</strong> · {{ row.judgment.label }}
-            {% if row.judgment.reason %}<span class="muted small">— {{ row.judgment.reason }}</span>{% endif %}
-            {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}
-          </span>
-        </li>
+        <button type="button" class="chip" data-profile="{{ row.profile.key }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}">{{ row.profile.label }}</button>
       {% endfor %}
-    </ul>
-    <p class="muted small">
-      마지막 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}
-    </p>
+    </div>
+    {% for row in judgments %}
+      <div class="judge-panel" data-profile="{{ row.profile.key }}">
+        <p class="judge-status">
+          <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
+          <strong>{{ row.judgment.label }}</strong>
+          <span class="muted small">{{ row.profile.label }} 기준</span>
+          {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}
+        </p>
+        <p class="small">{{ row.judgment.explanation }}</p>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="card" aria-labelledby="trust-title">
+    <h2 id="trust-title">정보 신뢰도</h2>
+    <p class="small">출처: {% if sources %}{{ sources|join:", " }}{% else %}아직 없음{% endif %}</p>
+    <p class="small">최근 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}</p>
+    {% if verified_user_reports %}<p class="small">💬 주민 제보 {{ verified_user_reports }}건이 반영됐어요.</p>{% endif %}
   </section>
 
   <section class="card" aria-labelledby="entrance-title">
@@ -53,9 +62,7 @@
   {% if building %}
   <section class="card section-building" aria-labelledby="building-title">
     <h2 id="building-title">건물 공용 입구 · 시설</h2>
-    <p class="muted small">
-      {{ building.building }} — 건물 공용 공간 정보예요. 가게가 아닌 건물의 구조입니다.
-    </p>
+    <p class="muted small">{{ building.building }} — 건물 공용 공간 정보예요. 가게가 아닌 건물의 구조입니다.</p>
     {% for entrance in building.entrances %}
       {% include "places/_entrance.html" %}
     {% endfor %}
@@ -64,9 +71,35 @@
   {% endif %}
 
   <section class="card" aria-labelledby="inside-title">
-    <h2 id="inside-title">가게 안</h2>
+    <h2 id="inside-title">가게 안 · 편의시설</h2>
     {% include "places/_fields.html" with fields=place_section.fields %}
   </section>
+
+  {% if pending_reports %}
+  <section class="card" aria-labelledby="pending-title">
+    <h2 id="pending-title">확인 중인 제보</h2>
+    <p class="muted small">주민이 알려준 새 정보예요. 확인되기 전까지 위의 판정에는 반영되지 않아요. 직접 보셨다면 확인해 주세요.</p>
+    {% for item in pending_reports %}
+      <div class="pending-report">
+        {% if item.report.photo %}<img class="entrance-photo" src="{{ item.report.photo.url }}" alt="제보 사진" loading="lazy">{% endif %}
+        <p class="small">{% for v in item.values %}{{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+        {% if item.report.note %}<p class="small">"{{ item.report.note }}"</p>{% endif %}
+        <p class="muted small">{{ item.report.created_at|date:"n월 j일" }} 제보 · 확인 {{ item.confirmations }}/{{ item.required }}명</p>
+        {% if user.is_authenticated %}
+          {% if user.pk != item.report.created_by_id %}
+            <form method="post" action="{% url 'reports:confirm' item.report.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn">맞아요, 저도 확인했어요</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <a class="small" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">로그인하고 확인하기</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 
   <section class="card owner-comment" aria-labelledby="owner-title">
     <h2 id="owner-title">사장님 한마디</h2>
@@ -74,11 +107,33 @@
     <p class="small">사장님이신가요? 도움 제공 여부, 다른 출입구, 이동식 경사로 같은 정보를 직접 보완할 수 있어요. (준비 중)</p>
   </section>
 
-  <p class="small"><a href="#" aria-disabled="true" class="link-disabled">정보가 달라요 · 알려주기 (준비 중)</a></p>
+  <a class="btn btn-primary btn-block" href="{% url 'reports:new' %}?place={{ place.pk }}">접근성 정보 제보하기</a>
 
   <footer class="notice small muted">
     이 안내는 「장애인·노인·임산부 등의 편의증진 보장에 관한 법률」 시행규칙의 수치를 <strong>참고한 기준</strong>이며,
     법 위반 여부를 판단한 것이 아니에요. 소규모 기존 건물은 경사로 등 설치 의무가 없는 경우가 많아요.
   </footer>
 </article>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // 이동 조건 칩: 고른 조건의 판단 근거만 보여줌 (지도에서 고른 조건을 기억해 둔 게 있으면 그걸로 시작)
+  (function () {
+    const chips = document.querySelectorAll("#detail-chips .chip");
+    const panels = document.querySelectorAll(".judge-panel");
+    function select(key) {
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.profile === key)));
+      panels.forEach((p) => { p.hidden = p.dataset.profile !== key; });
+    }
+    let saved = null;
+    try { saved = localStorage.getItem("teokeopne.profile"); } catch (e) {}
+    const keys = [...chips].map((c) => c.dataset.profile);
+    select(keys.includes(saved) ? saved : keys[0]);
+    chips.forEach((c) => c.addEventListener("click", () => {
+      select(c.dataset.profile);
+      try { localStorage.setItem("teokeopne.profile", c.dataset.profile); } catch (e) {}
+    }));
+  })();
+</script>
 {% endblock %}
