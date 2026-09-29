@@ -182,6 +182,7 @@ python manage.py runserver
 ├── places/                 # 장소 데이터 — 지역·건물·장소·출입구·접근성 필드 정의
 ├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인
 ├── judgments/              # 판정 — 규칙(데이터)·판정 엔진·판정 결과
+├── ops/                    # 운영자 화면 — 제보 검토·장소 등록 (관리자 계정만)
 ├── templates/              # 전역 템플릿 — base.html(공통 레이아웃), 404, 500
 ├── static/                 # 전역 정적 파일 — 공통 CSS(디자인 변수)·JS(api() fetch 헬퍼)
 ├── nginx/                  # 배포용 nginx 설정 — http(인증서 발급 전)·https·공통 스니펫
@@ -210,7 +211,8 @@ python manage.py runserver
 | `/report/new/` | 제보 작성 — 기존 장소 입구 정보 또는 새 장소 제안 (로그인·사진 필수) |
 | `/api/v1/places/?region=wolgye1&profile=WHEELCHAIR` | 공개 읽기 API (목록) |
 | `/api/v1/places.geojson?region=wolgye1` | GeoJSON 내보내기 |
-| `/admin/` | 관리자 — 장소·제보 반영·판정 규칙 관리 |
+| `/ops/` | 운영자 화면 — 대시보드, 제보 검토(판정 변화 미리보기·승인·반려·새 장소 등록), 장소 등록·수정 |
+| `/admin/` | 관리자 — 전체 데이터·판정 규칙·건물 정보 관리 |
 
 > **앱(폴더) 경계 = 기능 경계 = 담당자 경계.** 도메인 앱(장소·제보 등)은 팀 ERD 확정 후 추가합니다.
 > 파일 하나하나의 역할과 구성은 **[docs/structure.md](docs/structure.md)** 에 정리되어 있습니다.
