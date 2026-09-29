@@ -9,8 +9,9 @@ services:
   web:
     build: .
     # 개발 중에는 gunicorn 대신 runserver (자동 리로드, 에러 화면)
-    # 시작할 때 migrate를 먼저 돌려서 새로 받은 마이그레이션이 바로 반영되게 함
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    # 시작할 때 migrate → 기본 데이터(지역·필드 정의) 넣기 → runserver
+    # seed_base는 여러 번 실행해도 결과가 같음 (places/data/*.json 기준으로 갱신)
+    command: sh -c "python manage.py migrate && python manage.py seed_base && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app          # 내 PC의 코드를 컨테이너에 연결 → 수정 즉시 반영 (재빌드 불필요)
     ports:

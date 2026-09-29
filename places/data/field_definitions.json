@@ -1,0 +1,28 @@
+[
+  {"key": "step_height_cm", "label": "입구 단차", "unit": "cm", "scope": "ENTRANCE", "value_type": "NUMBER", "order": 10,
+   "help_text": "문 앞 바닥에서 문턱·계단 꼭대기까지 전체 높이. 턱이 없으면 0"},
+  {"key": "step_count", "label": "계단 수", "unit": "칸", "scope": "ENTRANCE", "value_type": "NUMBER", "order": 20,
+   "help_text": "계단 칸 수. 문턱 하나만 있으면 0"},
+  {"key": "has_ramp", "label": "고정 경사로", "unit": "", "scope": "ENTRANCE", "value_type": "BOOL", "order": 30,
+   "help_text": "입구에 설치된(치울 수 없는) 경사로가 있는지"},
+  {"key": "door_width_cm", "label": "출입문 폭", "unit": "cm", "scope": "ENTRANCE", "value_type": "NUMBER", "order": 40,
+   "help_text": "문을 끝까지 열었을 때 실제로 지나갈 수 있는 폭"},
+  {"key": "door_type", "label": "출입문 형태", "unit": "", "scope": "ENTRANCE", "value_type": "CHOICE", "order": 50,
+   "choices": ["자동문", "미닫이", "여닫이", "회전문", "문 없음"], "help_text": ""},
+
+  {"key": "interior_step", "label": "가게 안 단차", "unit": "", "scope": "PLACE", "value_type": "BOOL", "order": 10,
+   "help_text": "입구를 지난 뒤 가게 안에 턱·계단이 있는지"},
+  {"key": "accessible_toilet", "label": "장애인 화장실", "unit": "", "scope": "PLACE", "value_type": "BOOL", "order": 20,
+   "help_text": "가게 안에 휠체어로 쓸 수 있는 화장실이 있는지"},
+  {"key": "assistance_offered", "label": "입장 도움", "unit": "", "scope": "PLACE", "value_type": "BOOL", "order": 30,
+   "help_text": "직원이 입장을 도와주는지 (사장님 선언, 사진 확인 후 반영)"},
+  {"key": "portable_ramp", "label": "이동식 경사로", "unit": "", "scope": "PLACE", "value_type": "BOOL", "order": 40,
+   "help_text": "필요할 때 꺼내 쓰는 경사로가 있는지"},
+  {"key": "portable_ramp_length_cm", "label": "이동식 경사로 길이", "unit": "cm", "scope": "PLACE", "value_type": "NUMBER", "order": 50,
+   "help_text": "경사로 판의 길이. 올라갈 수 있는 단차 ≈ 길이 ÷ 8"},
+
+  {"key": "elevator", "label": "엘리베이터", "unit": "", "scope": "BUILDING", "value_type": "BOOL", "order": 10,
+   "help_text": "건물 공용 엘리베이터가 있는지"},
+  {"key": "building_accessible_toilet", "label": "공용 장애인 화장실", "unit": "", "scope": "BUILDING", "value_type": "BOOL", "order": 20,
+   "help_text": "건물 공용 공간에 장애인 화장실이 있는지"}
+]
