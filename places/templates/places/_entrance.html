@@ -1,0 +1,8 @@
+<div class="entrance">
+  <h3>{{ entrance.name }}{% if not entrance.is_main %} <span class="badge-neutral">다른 출입구</span>{% endif %}</h3>
+  {% if entrance.description %}<p class="small">{{ entrance.description }}</p>{% endif %}
+  {% if entrance.photo %}
+    <img class="entrance-photo" src="{{ entrance.photo.url }}" alt="{{ entrance.name }} 사진" loading="lazy">
+  {% endif %}
+  {% include "places/_fields.html" with fields=entrance.fields %}
+</div>

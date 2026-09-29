@@ -6,6 +6,7 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("core.urls")),
+    path("", include("places.urls")),                # /map/, /places/<id>/
     path("api/v1/", include("places.api_urls")),     # 공개 읽기 API
     # 로그인·로그아웃·카카오 콜백 (/accounts/kakao/login/callback/)
     path("accounts/", include("allauth.urls")),

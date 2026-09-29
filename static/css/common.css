@@ -65,6 +65,9 @@ input[type="text"], input[type="password"], input[type="email"], input[type="sea
   width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit;
 }
 
+/* 화면에는 안 보이지만 스크린리더는 읽는 글 */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
 /* ── 로그인 ── */
 .auth-card { max-width: 400px; margin: 40px auto; text-align: center; }
 .small { font-size: 13px; }
