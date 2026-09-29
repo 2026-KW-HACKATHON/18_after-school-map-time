@@ -8,7 +8,8 @@
         {% else %}
           <span class="muted">정보 없음</span>
         {% endif %}
-        {% if f.pending %}<span class="badge-neutral">새 제보 확인 중</span>{% endif %}
+        {% if f.pending_owner %}<span class="badge-neutral">사장님이 정정을 요청했어요 (확인 중)</span>
+        {% elif f.pending %}<span class="badge-neutral">새 제보 확인 중</span>{% endif %}
       </dd>
     </div>
   {% endfor %}

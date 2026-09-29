@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}사장님 화면 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>내 가게</h1>
+  <ul class="result-list">
+    {% for c in claims %}
+      <li class="card result-card">
+        <strong>{{ c.place|default:c.building }}</strong>
+        <span class="muted small">{{ c.get_role_display }} · {{ c.get_status_display }} · {{ c.created_at|date:"Y.m.d" }} 신청</span>
+        {% if c.status == "APPROVED" and c.place %}
+          <a class="btn btn-primary" href="{% url 'owners:dashboard' c.place.pk %}">사장님 화면 열기</a>
+        {% elif c.status == "PENDING" %}
+          <span class="small">운영진이 확인하고 있어요.</span>
+        {% elif c.status == "REJECTED" %}
+          <span class="small">반려됨: {{ c.reject_reason|default:"운영진에게 문의해 주세요." }}</span>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li class="muted">아직 인증한 가게가 없어요.</li>
+    {% endfor %}
+  </ul>
+  <a class="btn" href="{% url 'owners:claim' %}">인증 코드 입력하기</a>
+</section>
+{% endblock %}
