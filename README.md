@@ -176,6 +176,9 @@ python manage.py runserver
 18_after-school-map-time/
 ├── config/                 # Django 프로젝트 설정 (settings.py, urls.py, wsgi/asgi)
 ├── core/                   # 헬스체크(/health/), 홈, 공통 context processor
+├── accounts/               # 회원 — 커스텀 User, 카카오 로그인
+├── places/                 # 장소 데이터 — 지역·건물·장소·출입구·접근성 필드 정의
+├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인
 ├── templates/              # 전역 템플릿 — base.html(공통 레이아웃), 404, 500
 ├── static/                 # 전역 정적 파일 — 공통 CSS(디자인 변수)·JS(api() fetch 헬퍼)
 ├── nginx/                  # 배포용 nginx 설정 — http(인증서 발급 전)·https·공통 스니펫

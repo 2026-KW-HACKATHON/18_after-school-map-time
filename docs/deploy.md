@@ -202,6 +202,7 @@ sudo mkdir -p /var/www/certbot
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
 docker compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+docker compose -f docker-compose.prod.yml exec -T web python manage.py seed_base   # 지역·접근성 필드 정의 (처음 한 번)
 docker compose -f docker-compose.prod.yml ps        # nginx, web, db 모두 Up
 curl -i http://<도메인>/health/                     # 200 {"status": "ok", "db": true}
 ```
