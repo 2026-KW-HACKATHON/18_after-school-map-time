@@ -32,6 +32,17 @@
 │   ├── admin.py
 │   └── tests.py
 │
+├── places/                     ← 장소 데이터 (지역·건물·장소·출입구·접근성 필드 정의)
+│   ├── models.py
+│   ├── data/*.json             ←   기본 데이터 (월계1동, 필드 정의) — 코드 수정 없이 여기서 바꿈
+│   └── management/commands/seed_base.py  ← 기본 데이터 넣기
+│
+├── reports/                    ← 접근성 값과 그 출처 (제보 묶음·값·확인)
+│   ├── models.py
+│   ├── selectors.py            ←   "지금 쓸 값" 조회 규칙 (검증된 최신 값)
+│   ├── services.py             ←   제보 반영/반려 (처리 기록 + 신호)
+│   └── signals.py              ←   report_reviewed 신호 → 판정 앱이 받아서 재판정
+│
 ├── templates/                  ← 전역 템플릿
 │   ├── base.html               ←   공통 레이아웃 (모든 페이지가 상속, 상단 바 로그인/로그아웃)
 │   ├── account/login.html      ←   allauth 로그인 화면 덮어쓰기 (카카오 버튼만)
@@ -149,6 +160,42 @@
 - **관리자: `/admin/`** 에서 아이디·비밀번호 (`createsuperuser`로 만든 계정)
 - 로그인·로그아웃 요청은 모두 POST (링크만으로 로그인·로그아웃시키는 공격 방지)
 - 카카오 개발자센터 설정(Redirect URI, 동의 항목)은 `docs/deploy.md` 4-5 참고
+
+## 2-2. 장소 — `places/`
+
+데이터 구조 (기획 v2 5.1 · 8장)
+
+```
+Region(지역) ─┬─ Building(건물) ─── Entrance(건물 공용 출입구)
+              │        │
+              └─ Place(가게·시설) ── Entrance(가게 출입구, 대체 출입구 포함)
+
+FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리베이터 … 필드마다 대상(장소/건물/출입구)과 값 종류
+```
+
+| 모델 | 핵심 |
+| --- | --- |
+| `Region` | 서비스 지역. `Place.objects.in_region("wolgye1")`처럼 **모든 장소 조회는 지역을 거침** → 다른 동·구로 확장 가능 |
+| `Building` | 건물 공용 정보(공용 출입구·엘리베이터·공용 화장실)의 주인. 가게 책임과 건물 책임을 나눠 보여주기 위함 |
+| `Place` | 가게·시설. `building`(선택), `category`, `floor`, `is_closed`(삭제 대신 폐업 처리) |
+| `Entrance` | 장소 출입구 **또는** 건물 출입구 (둘 중 정확히 하나 — DB 제약). 출입구마다 따로 판정해 대체 출입구 안내 |
+| `FieldDefinition` | 필드 키를 자유 텍스트로 쓰지 않기 위한 정의 테이블. 대상(`PLACE`/`BUILDING`/`ENTRANCE`), 값 종류(`NUMBER`/`BOOL`/`CHOICE`/`TEXT`), 측정 방법 |
+
+기본 데이터는 `places/data/regions.json`, `field_definitions.json`에 있고 `python manage.py seed_base`로 넣습니다 (여러 번 실행해도 결과 같음). 개발용 compose는 시작할 때 자동 실행.
+
+## 2-3. 제보·접근성 값 — `reports/`
+
+**모든 접근성 값은 제보(`Report`)에 속합니다.** 팀 답사·이용자 제보·사장님 선언·AI 판별 모두 같은 구조이고 `source`로 구분합니다.
+
+| 모델·파일 | 핵심 |
+| --- | --- |
+| `Report` | 제보 묶음 1건 = 사진 1장 + 값 여러 개. 대상은 장소·건물·출입구 중 정확히 하나(DB 제약). 상태 `PENDING`(확인 중) → `VERIFIED`(반영) / `REJECTED`(반려) |
+| `AccessibilityValue` | 값 하나. 값 종류에 맞는 칸(`value_number`/`value_bool`/`value_text`) 하나만 채움. 대상과 필드의 범위가 다르면 저장 불가 |
+| `ReportConfirmation` | 다른 이용자의 "맞아요" 확인 (1인 1회, 본인 제보 확인 불가) |
+| `selectors.py` | `current_values(대상)`: 필드별로 **VERIFIED 제보 중 가장 최근 값**만 → 판정에 사용. `pending_fields(대상)`: "확인 중" 표시용 |
+| `services.py` | `verify_report` / `reject_report`: 처리자·시각 기록 후 `report_reviewed` 신호 발송 (관리자 화면 액션도 이걸 사용) |
+
+관리자 화면: 제보 목록에서 선택 → "반영" / "반려" 액션.
 
 ## 3. 템플릿·정적 파일 — `templates/`, `static/`
 
