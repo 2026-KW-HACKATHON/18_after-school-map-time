@@ -249,6 +249,15 @@ sudo certbot renew --dry-run   # "Congratulations, all simulated renewals succee
 [카카오 개발자센터](https://developers.kakao.com) → 앱 선택 → **앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인**에 `https://<도메인>` 추가.
 개발용 `http://localhost:8000`은 그대로 둡니다. (등록하지 않으면 배포 사이트에서 지도가 안 뜸)
 
+**카카오 로그인 Redirect URI**: 카카오 로그인 설정의 Redirect URI에 아래 두 개를 등록합니다. (없으면 로그인 시 `KOE006` 에러)
+
+```
+http://localhost:8000/accounts/kakao/login/callback/
+https://<도메인>/accounts/kakao/login/callback/
+```
+
+동의 항목은 **닉네임**만 켭니다. (이메일·전화번호는 받지 않음) Client Secret을 '사용함'으로 켰다면 서버 `.env`의 `KAKAO_CLIENT_SECRET`에도 넣습니다.
+
 ---
 
 ## 5. GitHub Secrets 등록 · 자동 배포

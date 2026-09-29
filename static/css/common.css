@@ -65,6 +65,12 @@ input[type="text"], input[type="password"], input[type="email"], input[type="sea
   width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit;
 }
 
+/* ── 로그인 ── */
+.auth-card { max-width: 400px; margin: 40px auto; text-align: center; }
+.small { font-size: 13px; }
+/* 카카오 로그인 버튼: 카카오 디자인 가이드 색 (배경 #FEE500, 글자 85% 검정) */
+.btn-kakao { background: #fee500; border-color: #fee500; color: rgba(0, 0, 0, 0.85); font-weight: 600; margin: 8px 0; }
+
 /* ── 폼 에러 ── */
 .errorlist { color: var(--color-error); font-size: 13px; padding-left: 16px; }
 

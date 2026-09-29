@@ -12,6 +12,14 @@ dj-database-url==3.1.2     # DATABASE_URL 문자열 → Django DB 설정으로 �
 psycopg2-binary==2.9.13    # PostgreSQL 드라이버 (바이너리 휠이라 컴파일 불필요)
 gunicorn==26.2.0           # 배포용 WSGI 서버 (옵션은 Dockerfile CMD 참고)
 
+# ── 카카오 로그인 (django-allauth, 소셜 로그인 전용) ──
+django-allauth[socialaccount]==65.19.5
+PyJWT==2.15.1              # allauth 의존성
+cryptography==50.0.1       # allauth 의존성 (PyJWT 서명 검증)
+cffi==2.1.1                # cryptography 의존성
+pycparser==3.0             # cffi 의존성
+oauthlib==3.3.1            # allauth 의존성 (OAuth2)
+
 # ── API (지도 데이터는 DRF JSON API로 제공) ──
 djangorestframework==3.18.1
 

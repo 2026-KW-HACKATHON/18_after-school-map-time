@@ -117,7 +117,8 @@ docker compose exec web python manage.py createsuperuser
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres 컨테이너 초기값. 배포는 강한 비밀번호 | `teokeopne` |
 | `DATABASE_URL` | DB 접속 정보 (비우면 SQLite) | `postgres://teokeopne:teokeopne@db:5432/teokeopne` |
 | `KAKAO_JAVASCRIPT_KEY` | 카카오맵 JS 키 (브라우저 노출 → 카카오 개발자센터에 허용 도메인 등록 필수) | (발급값) |
-| `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**) | (발급값) |
+| `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**, 카카오 로그인 client_id로도 사용) | (발급값) |
+| `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (보안 설정에서 '사용함'일 때만) | |
 | `AI_VISION_API_KEY` | AI 사진 판별 API 키 (서비스 미정) | |
 | `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
 | `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
@@ -233,6 +234,8 @@ python manage.py runserver
 | --- | --- | --- |
 | [Django](https://www.djangoproject.com/) | 웹 프레임워크 | BSD-3-Clause |
 | [Django REST Framework](https://www.django-rest-framework.org/) | JSON API | BSD-3-Clause |
+| [django-allauth](https://allauth.org/) | 카카오 로그인 | MIT |
+| [PyJWT](https://github.com/jpadilla/pyjwt) · [cryptography](https://cryptography.io/) · [oauthlib](https://github.com/oauthlib/oauthlib) | allauth 의존성 (토큰 처리) | MIT · Apache-2.0/BSD · BSD-3-Clause |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | `.env` 로드 | BSD-3-Clause |
 | [dj-database-url](https://github.com/jazzband/dj-database-url) | DB URL 파싱 | BSD-3-Clause |
 | [psycopg2](https://www.psycopg.org/) | PostgreSQL 드라이버 | LGPL-3.0 |
