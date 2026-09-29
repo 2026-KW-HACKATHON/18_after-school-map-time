@@ -26,7 +26,7 @@
       <ul class="result-list">
         {% for r in results %}
           <li>
-            <a class="card result-card" href="{% url 'places:detail' r.place.pk %}">
+            <a class="card result-card" href="{% url 'places:detail' r.place.pk %}?profile={{ profile.key }}">
               <strong>{{ r.place.name }}</strong>
               <span class="result-status">
                 <span class="judge-dot judge-{{ r.judgment.code }}" aria-hidden="true">{% if r.judgment.icon == "hand" %}✋{% endif %}</span>

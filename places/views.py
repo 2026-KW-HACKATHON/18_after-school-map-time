@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 
 from judgments.models import ConditionProfile, Judgment
 
@@ -50,7 +51,33 @@ def search_page(request):
     })
 
 
+def _record_view(request, place):
+    """
+    조건별 조회 수 (사장님 대시보드용, 기획 v2 4.5). 지도·검색에서 넘어올 때 붙는 ?profile= 로 센다.
+    같은 사람이 같은 날 새로고침해도 한 번만 (세션에 기록). 누가 봤는지는 저장하지 않는다.
+    """
+    from owners.models import PlaceViewStat
+
+    profile = ConditionProfile.objects.filter(key=request.GET.get("profile", ""), is_active=True).first()
+    if profile is None:
+        return
+    key = f"viewed:{place.pk}:{profile.key}:{timezone.localdate().isoformat()}"
+    if request.session.get(key):
+        return
+    request.session[key] = True
+    PlaceViewStat.record(place, profile)
+
+
 def detail_page(request, pk):
-    """장소 상세 (와이어프레임 7번)"""
+    """장소 상세 (와이어프레임 7번 + 사장님 정보)"""
+    from owners.models import OwnerClaim, OwnerResponse, VisitWish
+
     place = get_object_or_404(Place.objects.select_related("building", "region"), pk=pk, is_closed=False)
-    return render(request, "places/detail.html", place_detail(place))
+    _record_view(request, place)
+    context = place_detail(place)
+    context["owner_response"] = OwnerResponse.objects.filter(place=place).first()
+    context["is_owner"] = OwnerClaim.is_owner(request.user, place)
+    context["wished"] = set(
+        VisitWish.objects.filter(user=request.user, place=place).values_list("profile_id", flat=True)
+    ) if request.user.is_authenticated else set()
+    return render(request, "places/detail.html", context)

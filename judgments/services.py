@@ -16,6 +16,13 @@ DOWN, UP, SAME = "DOWN", "UP", "SAME"
 # 반영에 필요한 주민 확인 수 (운영자 승인은 언제나 가능)
 REQUIRED_CONFIRMATIONS = {DOWN: 2, UP: 1, SAME: 1}
 
+# 사장님 제보 (기획 v2 4.2·4.3)
+#  - 도움 제공·이동식 경사로 '선언'만 담긴 제보: 사진 확인 1명
+#  - 그 밖의 값을 고치는 '정정 요청': 다른 사용자 2명
+OWNER_DECLARATION_FIELDS = {"assistance_offered", "portable_ramp", "portable_ramp_length_cm"}
+OWNER_DECLARATION_CONFIRMATIONS = 1
+OWNER_CORRECTION_CONFIRMATIONS = 2
+
 
 @dataclass
 class Change:
@@ -69,5 +76,14 @@ def report_direction(report, changes=None):
     return SAME
 
 
+def is_owner_declaration(report):
+    keys = set(report.values.values_list("field_id", flat=True))
+    return bool(keys) and keys <= OWNER_DECLARATION_FIELDS
+
+
 def required_confirmations(report):
+    from reports.models import Report
+
+    if report.source == Report.Source.OWNER:
+        return OWNER_DECLARATION_CONFIRMATIONS if is_owner_declaration(report) else OWNER_CORRECTION_CONFIRMATIONS
     return REQUIRED_CONFIRMATIONS[report_direction(report)]

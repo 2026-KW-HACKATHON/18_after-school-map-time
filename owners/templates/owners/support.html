@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% comment %}지원사업 안내 (기획 v2 6장). 정보는 관리자 화면에서 수정 (매년 바뀜){% endcomment %}
+
+{% block title %}경사로 설치 지원사업 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>경사로 설치 지원사업</h1>
+  <p class="muted">법적 설치 의무가 없는 작은 가게도 구청 지원으로 경사로를 설치할 수 있어요. 턱없네는 신청을 대신하지 않고 안내만 해요.</p>
+  {% for p in programs %}
+    <section class="card">
+      <h2>{{ p.title }}</h2>
+      <p>{{ p.target_desc|linebreaksbr }}</p>
+      {% if p.period %}<p class="small">신청 기간: {{ p.period }}</p>{% endif %}
+      {% if p.contact %}<p class="small">문의: {{ p.contact }}</p>{% endif %}
+      {% if p.url %}<a class="btn" href="{{ p.url }}" target="_blank" rel="noopener">자세히 보기</a>{% endif %}
+      <p class="muted small">{{ p.updated_at|date:"Y년 n월 j일" }} 기준 정보예요. 최신 공고는 구청 누리집에서 확인해 주세요.</p>
+    </section>
+  {% empty %}
+    <div class="card"><p class="muted">지금 안내 중인 지원사업이 없어요. 구청 누리집이나 주민센터에 문의해 보세요.</p></div>
+  {% endfor %}
+  <p class="small"><a href="{% url 'owners:claim' %}">사장님이신가요? 가게 정보 직접 보완하기 →</a></p>
+</section>
+{% endblock %}

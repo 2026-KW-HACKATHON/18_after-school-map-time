@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}정정 요청 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <p class="muted small"><a href="{% url 'owners:dashboard' place.pk %}">← {{ place.name }} 사장님 화면</a></p>
+  <h1>잘못된 정보 정정 요청</h1>
+  <p class="muted">항목 하나와 올바른 값, 증빙 사진을 보내 주세요. 확인되기 전까지는 기존 값이 그대로 보이고, 해당 항목에 "사장님이 정정을 요청했어요 (확인 중)"이 표시돼요. 반려되면 사유를 알려드려요.</p>
+  <form method="post" enctype="multipart/form-data" class="card form-stack">
+    {% csrf_token %}
+    {% for field in form %}{% include "reports/_field.html" %}{% endfor %}
+    <p class="muted small">가게 정보 삭제는 받지 않아요 (입구 구조는 누구나 보는 정보예요). 폐업했다면 운영진에게 알려주세요.</p>
+    <button type="submit" class="btn btn-primary btn-block">정정 요청 보내기</button>
+  </form>
+</section>
+{% endblock %}

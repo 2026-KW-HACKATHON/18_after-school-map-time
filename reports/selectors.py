@@ -42,9 +42,20 @@ def latest_photo(target):
     return report.photo if report else None
 
 
+def pending_field_sources(target):
+    """{필드 키: 출처} — 확인 중인 제보가 있는 필드. 사장님 정정이면 '사장님이 정정을 요청했어요' 표시 (기획 v2 4.3)"""
+    rows = (
+        AccessibilityValue.objects.filter(report__status=Report.Status.PENDING, **_target_filter(target))
+        .values_list("field_id", "report__source")
+    )
+    out = {}
+    for key, source in rows:
+        # 사장님 정정이 하나라도 있으면 그걸 우선 표시
+        if out.get(key) != Report.Source.OWNER:
+            out[key] = source
+    return out
+
+
 def pending_fields(target):
     """확인 중인 제보가 있는 필드 키 집합 — "새 제보 확인 중" 표시용"""
-    return set(
-        AccessibilityValue.objects.filter(report__status=Report.Status.PENDING, **_target_filter(target))
-        .values_list("field_id", flat=True)
-    )
+    return set(pending_field_sources(target))

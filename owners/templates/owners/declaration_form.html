@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}도움 제공 알리기 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <p class="muted small"><a href="{% url 'owners:dashboard' place.pk %}">← {{ place.name }} 사장님 화면</a></p>
+  <h1>도움 제공 · 이동식 경사로 알리기</h1>
+  <p class="muted">사진이 확인되면(주민 1명 또는 운영진) 지도에 반영돼요. 이동식 경사로가 있고 직원이 도와드리면 입구 단차가 경사로 길이 ÷ 8 이하일 때 "도움 받으면 들어갈 수 있어요"로 바뀌어요.</p>
+  {% if form.non_field_errors %}<div class="alert" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="card form-stack">
+    {% csrf_token %}
+    {% for field in form %}{% include "reports/_field.html" %}{% endfor %}
+    <p class="muted small">계단에서 휠체어를 들어 올려 주는 도움은 안전 문제로 판정에 넣지 않아요. 대신 상세 화면에 도움 요청 방법으로 안내돼요.</p>
+    <button type="submit" class="btn btn-primary btn-block">보내기</button>
+  </form>
+</section>
+{% endblock %}

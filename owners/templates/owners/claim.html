@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% comment %}사장님 인증 (기획 v2 4.1): 답사 때 받은 6자리 코드 입력 → 운영진 확인. 사업자등록번호 등은 받지 않음{% endcomment %}
+
+{% block title %}사장님 인증 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>사장님이신가요?</h1>
+  <p class="muted">턱없네 팀이 가게를 방문했을 때 전해드린 <strong>6자리 인증 코드</strong>를 입력해 주세요. 운영진이 확인하면 사장님 화면을 쓸 수 있어요.</p>
+
+  <form method="post" class="card form-stack">
+    {% csrf_token %}
+    {% include "reports/_field.html" with field=form.code %}
+    <button type="submit" class="btn btn-primary btn-block">인증 신청</button>
+  </form>
+
+  <div class="card">
+    <h2>인증하면 할 수 있는 것</h2>
+    <ul class="steps">
+      <li>도움 요청 방법·다른 출입구·사장님 한마디 남기기 (바로 공개)</li>
+      <li>"직원이 도와드려요", "이동식 경사로 있어요" 알리기 (사진 확인 후 반영)</li>
+      <li>잘못된 정보 정정 요청</li>
+      <li>이 가게에 "가고 싶어요"를 누른 손님 수, 조건별 조회 수 보기</li>
+      <li>경사로 무료 설치 지원사업 안내 받기</li>
+    </ul>
+    <p class="muted small">코드가 없으면 운영진에게 문의해 주세요. 사업자등록번호 같은 정보는 받지 않아요.</p>
+  </div>
+</section>
+{% endblock %}

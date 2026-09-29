@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}사장님 한마디 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <p class="muted small"><a href="{% url 'owners:dashboard' place.pk %}">← {{ place.name }} 사장님 화면</a></p>
+  <h1>사장님 한마디 · 도움 요청 방법</h1>
+  <p class="muted">여기 적은 내용은 저장하면 가게 상세 화면에 바로 보여요. 판정(들어갈 수 있는지)은 바뀌지 않아요.</p>
+  <form method="post" class="card form-stack">
+    {% csrf_token %}
+    {% for field in form %}{% include "reports/_field.html" %}{% endfor %}
+    <button type="submit" class="btn btn-primary btn-block">저장</button>
+  </form>
+</section>
+{% endblock %}

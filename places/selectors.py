@@ -7,7 +7,7 @@ from django.db.models import Max, Q
 from judgments.constants import display
 from judgments.models import ConditionProfile, Judgment, Outcome
 from reports.models import Report
-from reports.selectors import current_values, latest_photo, pending_fields
+from reports.selectors import current_values, latest_photo, pending_field_sources
 
 from .models import FieldDefinition, Place
 
@@ -101,7 +101,7 @@ def _fields_section(target, scope):
     if target is None:
         return []
     values = current_values(target)
-    pending = pending_fields(target)
+    pending = pending_field_sources(target)
     rows = []
     for f in FieldDefinition.objects.filter(scope=scope, is_active=True):
         v = values.get(f.key)
@@ -112,6 +112,7 @@ def _fields_section(target, scope):
             "unit": f.unit if v and f.unit else "",
             "checked_at": v.report.observed_at if v else None,
             "pending": f.key in pending,  # "새 제보 확인 중" (기획 v2 7장)
+            "pending_owner": pending.get(f.key) == Report.Source.OWNER,  # "사장님이 정정을 요청했어요"
         })
     return rows
 
@@ -136,7 +137,7 @@ def _pending_reports(place):
 
     reports = (
         _place_reports(place)
-        .filter(status=Report.Status.PENDING, source=Report.Source.USER_REPORT)
+        .filter(status=Report.Status.PENDING, source__in=[Report.Source.USER_REPORT, Report.Source.OWNER])
         .select_related("entrance", "created_by")
         .prefetch_related("values__field")
         .order_by("-created_at")
@@ -189,6 +190,8 @@ def place_detail(place):
         "place_section": place_section,
         "last_checked": max(checked) if checked else None,
         "sources": sources,  # 정보 신뢰도: 출처 (와이어프레임 7번)
+        # 긍정 배지 '도움 제공 가게' (OP-5): 확인된 사장님 선언이 있을 때만
+        "assistance_badge": getattr(current_values(place).get("assistance_offered"), "value", None) is True,
         "verified_user_reports": verified.filter(source=Report.Source.USER_REPORT).count(),
         "pending_reports": _pending_reports(place),
     }
