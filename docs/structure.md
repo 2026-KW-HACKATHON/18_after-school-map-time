@@ -26,8 +26,16 @@
 │   ├── apps.py
 │   └── templates/core/home.html
 │
+├── accounts/                   ← 회원 (커스텀 User, 카카오 로그인)
+│   ├── models.py               ←   User (닉네임, 가입 7일 규칙)
+│   ├── adapters.py             ←   카카오 첫 로그인 시 자동 가입 + 닉네임 저장
+│   ├── admin.py
+│   └── tests.py
+│
 ├── templates/                  ← 전역 템플릿
-│   ├── base.html               ←   공통 레이아웃 (모든 페이지가 상속)
+│   ├── base.html               ←   공통 레이아웃 (모든 페이지가 상속, 상단 바 로그인/로그아웃)
+│   ├── account/login.html      ←   allauth 로그인 화면 덮어쓰기 (카카오 버튼만)
+│   ├── allauth/layouts/base.html ← allauth 기본 화면을 base.html 안에 보여주는 연결 파일
 │   ├── 404.html
 │   └── 500.html
 │
@@ -126,6 +134,21 @@
 | `templates/core/home.html` | 홈 화면 (`base.html` 상속) |
 
 ---
+
+## 2-1. 회원 — `accounts/`
+
+| 파일 | 역할 |
+| --- | --- |
+| `models.py` | `User`(Django `AbstractUser` 확장). 화면 표시용 `nickname`, `display_name`, `is_new_account()`(가입 7일 미만 → 하향 제보 검수 규칙). 식별번호는 저장하지 않음 |
+| `adapters.py` | 카카오 첫 로그인 때 추가 입력 없이 가입(`is_open_for_signup`), 카카오 닉네임 저장(`populate_user`). 카카오 닉네임이 한글이면 `username`은 allauth가 영문으로 자동 생성 |
+| `admin.py` | 관리자 화면 회원 목록 (닉네임 검색) |
+| `tests.py` | 7일 경계값, 로그인 화면에 카카오만 있는지, 카카오 인증 페이지로 보내는지, 닉네임 저장, 로그아웃 |
+
+로그인 구조 (`settings.py` "회원·로그인" 구역)
+- **일반 회원: 카카오 로그인만** (`SOCIALACCOUNT_ONLY`). 아이디·비밀번호 가입 화면 없음. 이메일 받지 않음, 카카오 토큰 저장 안 함
+- **관리자: `/admin/`** 에서 아이디·비밀번호 (`createsuperuser`로 만든 계정)
+- 로그인·로그아웃 요청은 모두 POST (링크만으로 로그인·로그아웃시키는 공격 방지)
+- 카카오 개발자센터 설정(Redirect URI, 동의 항목)은 `docs/deploy.md` 4-5 참고
 
 ## 3. 템플릿·정적 파일 — `templates/`, `static/`
 
