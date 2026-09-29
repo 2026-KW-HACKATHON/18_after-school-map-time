@@ -176,3 +176,17 @@ class PageSmokeTests(OpsTestBase):
         ]:
             with self.subTest(url=url):
                 self.assertContains(self.client.get(url), text)
+
+
+class ListLabelTests(OpsTestBase):
+    def test_processed_report_label_and_no_flags(self):
+        _, door = self.cafe_with_door()
+        report = self.user_report(door, step_height_cm=30)
+        Report.objects.filter(pk=report.pk).update(status="VERIFIED")
+        res = self.client.get(reverse("ops:reports"), {"status": ""})
+        self.assertContains(res, "승인됨")
+        self.assertNotContains(res, "반영됨")
+        self.assertNotContains(res, "가입 7일 미만")     # 처리된 제보에는 검토용 배지 없음
+
+    def test_place_form_has_picker(self):
+        self.assertContains(self.client.get(reverse("ops:place-new")), 'id="picker-map"')

@@ -60,11 +60,12 @@
 │   ├── views.py / urls.py      ←   /ops/ 대시보드·제보 검토·장소 등록
 │   ├── services.py             ←   장소 답사 저장, 제보 승인(새 장소 생성)·반려, 기존 정보와 차이, 반복 하향 제보 확인
 │   ├── forms.py
-│   └── static/ops/js/location-picker.js ← 지도 클릭으로 위치 선택
+│   └── templatetags/ops_tags.py ←   제보 상태 문구(대기 중·승인됨·반려됨)
 │
 ├── templates/                  ← 전역 템플릿
 │   ├── base.html               ←   공통 레이아웃 (모든 페이지가 상속, 상단 바 로그인/로그아웃)
 │   ├── account/login.html      ←   allauth 로그인 화면 덮어쓰기 (카카오 버튼만)
+│   ├── includes/location_picker*.html ← 위치 고르기 지도 조각 (include 해서 사용)
 │   ├── allauth/layouts/base.html ← allauth 기본 화면을 base.html 안에 보여주는 연결 파일
 │   ├── 404.html
 │   └── 500.html
@@ -73,6 +74,7 @@
 │   ├── css/common.css          ←   디자인 변수(색·간격)와 공통 컴포넌트
 │   ├── js/common.js            ←   api() fetch 헬퍼 (CSRF 자동 처리)
 │   ├── js/map/kakao-adapter.js ←   카카오맵 호출은 여기 한 곳만 (지도 SDK 교체 대비)
+│   ├── js/map/location-picker.js ← 지도를 눌러 위치 고르기 (새 장소 제보·운영자 공용)
 │   └── img/
 │
 ├── nginx/                      ← 배포용 nginx 설정
@@ -296,6 +298,8 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 | `/ops/reports/<id>/done/` | 18 | 처리 완료 안내 |
 | `/ops/places/`, `/ops/places/new/`, `/ops/places/<id>/edit/` | 12·13 | 장소 목록·등록·수정. 이름·위치 필수(누락 시 안내 상자), 입구·가게 안 값, 출처·확인일. 저장하면 **'팀 답사' 기록을 새로 추가**(이전 값은 이력으로 남음)하고 재판정 |
 | `/ops/places/<id>/saved/` | 14 | 저장 완료 안내 |
+
+**위치 고르기** (`templates/includes/location_picker.html` + `static/js/map/location-picker.js`): 지도를 누르면 표시하고 같은 폼의 `lat`/`lng`에 좌표를 넣음. "내 위치로"는 보조. 처음 중심은 지역 설정. 주민 새 장소 제보·운영자 새 장소 승인·장소 등록에서 공용. 새 장소 제보는 지도 위치 또는 위치 설명 중 하나 필수.
 
 확인일: 비우거나 오늘이면 지금 시각, 지난 날짜면 그날 정오로 기록 → 예전 답사를 나중에 입력해도 최신 값이 뒤바뀌지 않음.
 

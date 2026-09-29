@@ -6,7 +6,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from judgments.services import required_confirmations
-from places.models import Entrance, Place
+from places.models import Entrance, Place, Region
 
 from .forms import ReportForm
 from .models import AccessibilityValue, Report
@@ -56,7 +56,8 @@ def report_new(request):
                 value.save()
         return redirect("reports:done")
 
-    return render(request, "reports/report_form.html", {"form": form, "place": place})
+    region = Region.objects.filter(is_active=True).order_by("id").first()  # 위치 선택 지도의 처음 중심
+    return render(request, "reports/report_form.html", {"form": form, "place": place, "region": region})
 
 
 def report_done(request):

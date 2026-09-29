@@ -14,13 +14,19 @@ from django.utils import timezone
 
 from judgments.constants import display
 from judgments.services import report_direction, report_effect
-from places.models import Place
+from places.models import Place, Region
 from reports.models import Report
 
 from . import services
+from .templatetags.ops_tags import OPS_STATUS_LABELS
 from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceForm, ReviewForm
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
+
+
+def _region():
+    """위치 선택 지도의 처음 중심"""
+    return Region.objects.filter(is_active=True).order_by("id").first()
 
 
 class OpsLoginView(auth_views.LoginView):
@@ -50,7 +56,7 @@ def dashboard(request):
     })
 
 
-STATUS_TABS = [("", "전체"), ("PENDING", "대기 중"), ("VERIFIED", "승인됨"), ("REJECTED", "반려됨")]
+STATUS_TABS = [("", "전체")] + list(OPS_STATUS_LABELS.items())
 
 
 @staff_required
@@ -65,10 +71,12 @@ def report_list(request):
         reports = reports.filter(status=status)
     rows = []
     for r in reports[:100]:
+        pending = r.status == Report.Status.PENDING
         rows.append({
             "report": r,
-            "downgrade": r.status == Report.Status.PENDING and report_direction(r) == "DOWN",
-            "new_account": r.created_by is not None and r.created_by.is_new_account(),
+            # 검토 판단에 쓰는 표시라 대기 중 제보에만
+            "downgrade": pending and report_direction(r) == "DOWN",
+            "new_account": pending and r.created_by is not None and r.created_by.is_new_account(),
         })
     return render(request, "ops/report_list.html", {
         "rows": rows, "status": status, "tabs": STATUS_TABS, "counts": counts,
@@ -108,6 +116,7 @@ def report_review(request, pk):
         "downgrade_places": services.recent_downgrade_places(report.created_by),
         "abuse_threshold": services.ABUSE_PLACE_COUNT,
         "confirmations": report.confirmations.select_related("user"),
+        "region": _region(),
     })
 
 
@@ -140,6 +149,7 @@ def place_edit(request, pk=None):
         "entrance_fields": [form[k] for k in ENTRANCE_KEYS],
         "place_fields": [form[k] for k in PLACE_KEYS],
         "missing": form.missing_required() if form.is_bound else [],
+        "region": _region(),
     })
 
 

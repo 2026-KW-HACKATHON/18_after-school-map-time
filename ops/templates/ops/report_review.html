@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ops_tags %}
 {% load static %}
 {% comment %}
   와이어프레임 16번 "제보 상세 검토" + 17번 "충돌 정보 확인" (한 화면).
@@ -16,7 +17,7 @@
   <h1>제보 상세 검토</h1>
 
   <section class="card">
-    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report.get_status_display }}</span></h2>
+    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report|ops_status }}</span></h2>
     {% if report.is_new_place %}<p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
     <p class="small">제출자: {{ report.created_by|default:"알 수 없음" }} · 제출 {{ report.created_at|date:"Y년 n월 j일 H:i" }}</p>
     {% if report.created_by and report.created_by.is_new_account %}<p><span class="badge-warn">가입 7일 미만 계정</span></p>{% endif %}
@@ -79,8 +80,9 @@
         <legend>새 장소로 등록</legend>
         {% include "reports/_field.html" with field=form.place_name %}
         {% include "reports/_field.html" with field=form.category %}
-        <p class="small">지도를 눌러 위치를 정하세요. {% if report.lat %}(제보자가 보낸 위치가 먼저 찍혀 있어요){% endif %}</p>
-        <div id="picker-map" class="picker-map"></div>
+        {% if report.lat %}<p class="small muted">제보자가 표시한 위치가 먼저 찍혀 있어요. 사진과 위치 설명을 보고 맞는지 확인해 주세요.</p>
+        {% else %}<p class="small muted">제보자가 지도 위치를 표시하지 않았어요. 위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
+        {% include "includes/location_picker.html" %}
         <div class="coord-row">
           {% include "reports/_field.html" with field=form.lat %}
           {% include "reports/_field.html" with field=form.lng %}
@@ -103,7 +105,7 @@
   {% else %}
   <section class="card">
     <h2>처리 기록</h2>
-    <p class="small">{{ report.get_status_display }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
+    <p class="small">{{ report|ops_status }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
     {% if report.review_note %}<p class="small">검토 의견: {{ report.review_note }}</p>{% endif %}
     {% if report.reject_reason %}<p class="small">반려 사유: {{ report.reject_reason }}</p>{% endif %}
   </section>
@@ -113,6 +115,6 @@
 
 {% block extra_js %}
 {% if report.status == "PENDING" and report.is_new_place %}
-  {% include "ops/_picker_js.html" %}
+  {% include "includes/location_picker_js.html" %}
 {% endif %}
 {% endblock %}

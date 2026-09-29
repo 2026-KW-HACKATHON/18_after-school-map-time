@@ -25,7 +25,7 @@ class ReportForm(forms.Form):
     # 새 장소 제안 (장소를 고르지 않고 들어왔을 때만 사용)
     suggested_name = forms.CharField(label="장소 이름", max_length=100, required=False,
                                      widget=forms.TextInput(attrs={"placeholder": "예: 월계 약국, 1번 출구 카페"}))
-    location_text = forms.CharField(label="위치 설명 (선택)", max_length=200, required=False,
+    location_text = forms.CharField(label="위치 설명 (지도에 표시하기 어려우면 꼭 적어 주세요)", max_length=200, required=False,
                                     widget=forms.TextInput(attrs={"placeholder": "예: 월계역 2번 출구 앞 건물 1층"}))
     lat = forms.DecimalField(required=False, widget=forms.HiddenInput, max_digits=9, decimal_places=6)
     lng = forms.DecimalField(required=False, widget=forms.HiddenInput, max_digits=9, decimal_places=6)
@@ -58,6 +58,10 @@ class ReportForm(forms.Form):
         data = super().clean()
         if self.place is None and not data.get("suggested_name"):
             self.add_error("suggested_name", "장소 이름을 입력해 주세요.")
+        if self.place is None:
+            has_point = data.get("lat") is not None and data.get("lng") is not None
+            if not has_point and not data.get("location_text"):
+                self.add_error("lat", "지도를 눌러 위치를 표시하거나, 위치 설명을 적어 주세요.")
         values = {k: data.get(k) for k in ENTRANCE_FIELDS}
         if all(v in (None, UNKNOWN) for v in values.values()) and not data.get("note"):
             raise forms.ValidationError("입구 정보를 하나 이상 고르거나, 추가 설명을 적어 주세요.")

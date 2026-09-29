@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ops_tags %}
 {% comment %}와이어프레임 15번 "제보 검토 목록"{% endcomment %}
 
 {% block title %}제보 검토 목록 | 턱없네{% endblock %}
@@ -26,13 +27,13 @@
       {% with r=row.report %}
       <li>
         <a class="card result-card" href="{% url 'ops:report-review' r.pk %}">
-          <span class="muted small">{{ r.created_at|date:"Y.m.d H:i" }} · {{ r.get_status_display }}</span>
+          <span class="muted small">{{ r.created_at|date:"Y.m.d H:i" }} · {{ r|ops_status }}{% if r.created_by %} · {{ r.created_by }}{% endif %}</span>
           <strong>{{ r.target_label }}</strong>
           <span class="small">
             {% for v in r.values.all %}{{ v }}{% if not forloop.last %} · {% endif %}{% empty %}값 없음{% endfor %}
             {% if r.photo %} · 사진 포함{% endif %}{% if r.note %} · 설명 포함{% endif %}
           </span>
-          <span>
+          <span class="result-meta">
             {% if row.downgrade %}<span class="badge-warn">판정 하향 제보</span>{% endif %}
             {% if r.is_new_place %}<span class="badge-neutral">새 장소</span>{% endif %}
             {% if row.new_account %}<span class="badge-warn">가입 7일 미만</span>{% endif %}

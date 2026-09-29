@@ -1,0 +1,17 @@
+{% load l10n %}
+{% comment %}
+  지도에서 위치 고르기 (주민 새 장소 제보, 운영자 제보 승인·장소 등록에서 공용).
+  지도를 누르면 같은 폼의 #id_lat / #id_lng 칸에 좌표가 들어간다. "내 위치로"는 보조 기능.
+  사용: {% include "includes/location_picker.html" %}  +  extra_js 블록에 {% include "includes/location_picker_js.html" %}
+  지도 중심: 이미 입력된 좌표 → 없으면 지역(region) 중심
+{% endcomment %}
+<div class="location-picker">
+  <p class="small"><strong>지도를 눌러 위치를 표시해 주세요.</strong> 지도를 움직이고 확대해서 정확한 입구 위치를 누르면 돼요.</p>
+  <div id="picker-map" class="picker-map"
+       {% if region %}data-lat="{{ region.center_lat|unlocalize }}" data-lng="{{ region.center_lng|unlocalize }}"{% endif %}
+       role="application" aria-label="위치 선택 지도"></div>
+  <div class="picker-tools">
+    <button type="button" class="btn" id="picker-locate">내 위치로</button>
+    <span id="picker-status" class="muted small" aria-live="polite">아직 위치를 표시하지 않았어요.</span>
+  </div>
+</div>

@@ -128,7 +128,27 @@ legend { font-weight: 700; padding: 0 4px; }
 .diff-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .diff-table th, .diff-table td { padding: 8px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
 .diff-table tr.conflict { background: #fffbeb; }
-.picker-map { height: 260px; border-radius: 8px; background: #eef1f5; }
+.picker-map { height: 280px; border-radius: 8px; background: #eef1f5; margin: 8px 0; }
+.picker-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* 위치 선택 표시: 파란 원 + 흰 테두리 (운영자 화면은 places.css를 안 불러오므로 여기서 완성) */
+.picker-marker {
+  width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: default;
+  background: var(--color-primary); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--color-primary), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* 칩 버튼 (이동 조건 선택, 운영자 상태 탭 공용) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); font: inherit; cursor: pointer; min-height: 40px;
+}
+.chip[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+/* 카드 목록 (주민 검색 결과, 운영자 제보·장소 목록 공용) */
+.result-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.result-card { display: grid; gap: 4px; color: var(--color-text); padding: 16px; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .field input[type="text"], .field input[type="tel"] { width: 100%; }
 

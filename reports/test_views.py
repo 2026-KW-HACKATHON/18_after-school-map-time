@@ -132,3 +132,36 @@ class ConfirmViewTests(TestCase):
         self.client.force_login(self.author)
         self.client.post(reverse("reports:confirm", args=[self.report.pk]), {"next": self.detail})
         self.assertEqual(self.report.confirmations.count(), 0)
+
+
+class NewPlaceLocationTests(TempMediaMixin, TestCase):
+    """새 장소 제보는 지도에서 고른 위치 또는 위치 설명이 있어야 함"""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_base", stdout=StringIO())
+
+    def setUp(self):
+        self.use_temp_media()
+        self.client.force_login(User.objects.create_user(username="jumin"))
+        self.url = reverse("reports:new")
+
+    def post(self, **data):
+        return self.client.post(self.url, {"photo": photo(), "suggested_name": "새 가게", "step_height_cm": "0", **data})
+
+    def test_location_required(self):
+        self.assertContains(self.post(), "지도를 눌러 위치를 표시하거나")
+        self.assertFalse(Report.objects.exists())
+
+    def test_map_point_only_is_enough(self):
+        self.assertEqual(self.post(lat="37.626100", lng="127.058800").status_code, 302)
+
+    def test_location_text_only_is_enough(self):
+        self.assertEqual(self.post(location_text="월계역 2번 출구 앞").status_code, 302)
+
+    def test_picker_only_for_new_place(self):
+        res = self.client.get(self.url)
+        self.assertContains(res, 'id="picker-map"')
+        self.assertContains(res, 'data-lat="37.626200"')   # 지역 중심에서 시작
+        place = make_place(make_region("test"))
+        self.assertNotContains(self.client.get(self.url, {"place": place.pk}), 'id="picker-map"')
