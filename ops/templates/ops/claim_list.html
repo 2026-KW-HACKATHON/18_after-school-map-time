@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% comment %}사장님·건물주 인증 신청 확인 (기획 v2 4.1){% endcomment %}
+
+{% block title %}사장님 인증 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page">
+  {% include "ops/_nav.html" %}
+  <h1>사장님 인증 신청</h1>
+  <p class="muted small">코드는 답사 때 해당 가게에 직접 전달한 것이에요. 신청자가 그 가게 사장님이 맞는지(답사 때 만난 분인지) 확인하고 승인해 주세요.</p>
+  <ul class="result-list">
+    {% for c in claims %}
+      <li class="card result-card">
+        <strong>{{ c.place|default:c.building }}</strong>
+        <span class="small">{{ c.user }} · {{ c.get_role_display }} · 코드 {{ c.code.code|default:"-" }} · {{ c.created_at|date:"Y.m.d H:i" }}</span>
+        <span class="small">상태: <strong>{{ c.get_status_display }}</strong>{% if c.reject_reason %} — {{ c.reject_reason }}{% endif %}</span>
+        {% if c.status == "PENDING" %}
+          <form method="post" class="actions" style="justify-content:flex-start">
+            {% csrf_token %}
+            <input type="hidden" name="claim" value="{{ c.pk }}">
+            <button type="submit" name="action" value="approve" class="btn btn-primary"
+                    onclick="return confirm('{{ c.user }}님을 사장님으로 승인할까요?')">승인</button>
+            <input type="text" name="reason" placeholder="반려 사유" aria-label="반려 사유" style="max-width:240px">
+            <button type="submit" name="action" value="reject" class="btn">반려</button>
+          </form>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li class="muted">인증 신청이 없어요.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

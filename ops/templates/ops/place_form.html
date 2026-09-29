@@ -53,10 +53,22 @@
       {% include "reports/_field.html" with field=form.memo %}
     </fieldset>
 
+    {% if place %}
+    <fieldset class="card">
+      <legend>사장님 인증 코드</legend>
+      <p class="small muted">답사 때 사장님께 전달하는 1회용 6자리 코드예요. 사장님이 입력하면 '사장님 인증'에서 승인해 주세요.</p>
+      <ul class="plain-list">
+        {% for c in claim_codes %}<li class="small"><strong>{{ c.code }}</strong> · {{ c.created_at|date:"n월 j일" }} 발급 · {% if c.is_used %}사용됨{% else %}미사용{% endif %}</li>{% empty %}<li class="muted small">발급한 코드가 없어요.</li>{% endfor %}
+      </ul>
+      <button type="submit" class="btn" form="claim-code-form">새 코드 발급</button>
+    </fieldset>
+    {% endif %}
+
     <p class="notice small">저장하면 입력한 값이 '팀 답사' 기록으로 바로 공개 지도에 반영되고 판정이 다시 계산돼요. 이전 값은 기록으로 남아요.</p>
     <button type="submit" class="btn btn-primary btn-block">장소 저장</button>
   </form>
 </section>
 {% endblock %}
 
-{% block extra_js %}{% include "includes/location_picker_js.html" %}{% endblock %}
+{% block extra_js %}
+{% if place %}<form id="claim-code-form" method="post" action="{% url 'ops:claim-code' place.pk %}">{% csrf_token %}</form>{% endif %}{% include "includes/location_picker_js.html" %}{% endblock %}
