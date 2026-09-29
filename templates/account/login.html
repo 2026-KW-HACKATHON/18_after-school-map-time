@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load socialaccount %}
+{% comment %}
+  allauth 로그인 화면을 덮어씀. 일반 회원은 카카오 로그인만 사용 (SOCIALACCOUNT_ONLY).
+  카카오 로그인 요청은 POST로 보냄 → 다른 사이트가 링크만으로 로그인을 시키는 공격(login CSRF) 방지
+{% endcomment %}
+
+{% block title %}로그인 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="card auth-card">
+  <h1>로그인</h1>
+  <p class="muted">장소 정보를 알려주거나 확인하려면 로그인이 필요해요.<br>지도 보기는 로그인 없이도 할 수 있어요.</p>
+
+  <form method="post" action="{% provider_login_url 'kakao' process='login' %}">
+    {% csrf_token %}
+    {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+    <button type="submit" class="btn btn-kakao btn-block">카카오로 시작하기</button>
+  </form>
+
+  <p class="muted small">카카오 계정의 닉네임만 받아요. 이메일·전화번호는 받지 않아요.</p>
+</section>
+{% endblock %}

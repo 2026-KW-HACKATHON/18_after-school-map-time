@@ -47,9 +47,15 @@ INSTALLED_APPS = [
     # DRF (지도 데이터는 JSON API로 제공)
     "rest_framework",
 
+    # 카카오 로그인 (django-allauth)
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.kakao",
+
     # 우리 앱 (python manage.py startapp <앱이름> 후 여기에 추가)
     "core",      # 헬스체크, 홈, 공통 템플릿
-    "accounts",  # 회원 (커스텀 User)
+    "accounts",  # 회원 (커스텀 User, 카카오 로그인)
 ]
 
 MIDDLEWARE = [
@@ -60,6 +66,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",  # allauth 필수
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -99,6 +106,35 @@ else:
 # ── 회원·로그인 ──
 # 커스텀 User: 닉네임·가입일 규칙 등을 넣기 위해 프로젝트 초기에 지정 (나중에 바꾸면 DB를 다시 만들어야 함)
 AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",            # 관리자 /admin/ 아이디·비밀번호 로그인
+    "allauth.account.auth_backends.AuthenticationBackend",  # 카카오 로그인
+]
+
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "/"
+ACCOUNT_LOGOUT_REDIRECT_URL = "/"
+
+# 일반 회원은 카카오 로그인만 사용 (아이디·비밀번호 가입/로그인 화면 없음)
+SOCIALACCOUNT_ONLY = True
+ACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_ADAPTER = "accounts.adapters.SocialAccountAdapter"
+SOCIALACCOUNT_AUTO_SIGNUP = True       # 첫 카카오 로그인 때 추가 입력 없이 바로 가입
+SOCIALACCOUNT_EMAIL_REQUIRED = False   # 이메일은 받지 않음 (동의 항목: 닉네임만)
+SOCIALACCOUNT_STORE_TOKENS = False     # 카카오 액세스 토큰은 쓸 일이 없으므로 저장하지 않음
+SOCIALACCOUNT_PROVIDERS = {
+    "kakao": {
+        # 카카오 개발자센터 앱 키. client_id = REST API 키, secret = 보안 > Client Secret (사용 안 하면 빈 값)
+        "APPS": [
+            {
+                "client_id": os.getenv("KAKAO_REST_API_KEY", ""),
+                "secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
+                "key": "",
+            }
+        ],
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
