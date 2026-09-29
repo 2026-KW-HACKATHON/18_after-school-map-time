@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "core",      # 헬스체크, 홈, 공통 템플릿
     "accounts",  # 회원 (커스텀 User, 카카오 로그인)
     "places",    # 지역·건물·장소·출입구·접근성 필드 정의
+    "reports",   # 제보(접근성 값의 출처)·확인
 ]
 
 MIDDLEWARE = [
