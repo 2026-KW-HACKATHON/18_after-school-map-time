@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     # 우리 앱 (python manage.py startapp <앱이름> 후 여기에 추가)
     "core",      # 헬스체크, 홈, 공통 템플릿
     "accounts",  # 회원 (커스텀 User, 카카오 로그인)
+    "places",    # 지역·건물·장소·출입구·접근성 필드 정의
 ]
 
 MIDDLEWARE = [
