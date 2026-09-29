@@ -178,3 +178,66 @@ class RecomputeTests(JudgmentTestBase):
         call_command("recompute_judgments", "--region", "test", stdout=out)
         self.assertIn("1곳", out.getvalue())
         self.assertEqual(Judgment.objects.filter(place=self.place).count(), ConditionProfile.objects.count())
+
+
+class ReportEffectTests(JudgmentTestBase):
+    """제보 반영 효과와 주민 확인 규칙 (기획 v2 7장: 하향 2명, 그 외 1명)"""
+
+    def setUp(self):
+        super().setUp()
+        from accounts.models import User
+
+        self.values(self.door, step_height_cm="0", door_width_cm=90, has_ramp=False)  # 휠체어 가능
+        recompute_place(self.place)
+        self.reporter = User.objects.create_user(username="reporter")
+        self.neighbors = [User.objects.create_user(username=f"n{i}") for i in range(2)]
+
+    def pending(self, **values):
+        report = self.values(self.door, status=Report.Status.PENDING, **values)
+        report.created_by = self.reporter
+        report.save()
+        return report
+
+    def test_downgrade_detected_and_needs_two_confirmations(self):
+        from reports.services import confirm_report
+
+        from .services import DOWN, report_direction, report_effect, required_confirmations
+
+        report = self.pending(step_height_cm="30")  # 계단이 생겼다는 제보
+        change = next(c for c in report_effect(report) if c.profile == self.wheelchair)
+        self.assertEqual((change.before, change.after), (Outcome.ACCESSIBLE, Outcome.DIFFICULT))
+        self.assertEqual((report_direction(report), required_confirmations(report)), (DOWN, 2))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertFalse(confirm_report(report, self.neighbors[0], required=2))  # 1명으로는 반영 안 됨
+        self.assertEqual(Judgment.objects.get(place=self.place, profile=self.wheelchair).result, Outcome.ACCESSIBLE)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertTrue(confirm_report(report, self.neighbors[1], required=2))
+        report.refresh_from_db()
+        self.assertEqual(report.status, Report.Status.VERIFIED)
+        self.assertEqual(Judgment.objects.get(place=self.place, profile=self.wheelchair).result, Outcome.DIFFICULT)
+
+    def test_upgrade_needs_one_confirmation(self):
+        from .services import UP, report_direction, required_confirmations
+
+        self.values(self.door, step_height_cm="30", door_width_cm=90, has_ramp=False)
+        recompute_place(self.place)
+        report = self.pending(has_ramp=True)  # 경사로가 생겼다는 제보
+        self.assertEqual((report_direction(report), required_confirmations(report)), (UP, 1))
+
+    def test_own_or_duplicate_confirmation_rejected(self):
+        from reports.services import ConfirmationError, confirm_report
+
+        report = self.pending(step_height_cm="30")
+        with self.assertRaises(ConfirmationError):
+            confirm_report(report, self.reporter, required=2)
+        confirm_report(report, self.neighbors[0], required=2)
+        with self.assertRaises(ConfirmationError):
+            confirm_report(report, self.neighbors[0], required=2)
+
+    def test_new_place_has_no_effect(self):
+        from .services import SAME, report_direction, report_effect
+
+        report = Report.objects.create(source=Report.Source.USER_REPORT, suggested_name="새 가게")
+        self.assertEqual((report_effect(report), report_direction(report)), ([], SAME))
