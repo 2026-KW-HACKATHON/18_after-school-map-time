@@ -163,6 +163,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# 배포에서는 정적 파일 이름에 내용 해시를 붙여 브라우저 캐시 문제를 막는다 (config/storage.py)
+# 개발(DEBUG=True)에서는 runserver가 원래 이름으로 바로 서빙
+if not DEBUG:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "config.storage.CacheBustingStaticStorage"},
+    }
+
 # 폰 사진(3~8MB)을 받기 위해 nginx client_max_body_size(10M)와 맞춤
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 요청 본문(파일 제외) 최대 크기
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 이보다 큰 업로드 파일은 메모리 대신 임시 파일로 처리
