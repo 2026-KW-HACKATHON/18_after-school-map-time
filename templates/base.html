@@ -26,6 +26,7 @@
       <a class="nav-wide" href="{% url 'places:search' %}">검색</a>
       <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
       {% block nav %}{% endblock %}
+      {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
       {% if user.is_authenticated %}
         <span class="muted">{{ user.display_name }}님</span>
         {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지) #}

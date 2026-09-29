@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "places",    # 지역·건물·장소·출입구·접근성 필드 정의
     "reports",   # 제보(접근성 값의 출처)·확인
     "judgments", # 판정 규칙(데이터)·판정 엔진·판정 결과
+    "ops",       # 운영자 화면 (제보 검토·장소 등록)
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 18번 "제보 처리 완료 안내"{% endcomment %}
+
+{% block title %}처리 완료 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page narrow center">
+  <p class="done-mark" aria-hidden="true">✓</p>
+  <h1>제보가 정상적으로 처리되었습니다</h1>
+  <div class="card">
+    {% if report.status == "VERIFIED" %}
+      <p>승인된 정보는 공개 지도와 장소 상세에 바로 반영됐고, 판정도 다시 계산됐어요.</p>
+      {% if report.target_place %}<p><a href="{% url 'places:detail' report.target_place.pk %}">공개 화면에서 확인하기 →</a></p>{% endif %}
+    {% else %}
+      <p>반려했어요. 반려 사유: {{ report.reject_reason }}</p>
+    {% endif %}
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'ops:reports' %}?status=PENDING">제보 검토 목록으로</a>
+    <a class="btn" href="{% url 'ops:report-review' report.pk %}">처리 기록 보기</a>
+  </div>
+</section>
+{% endblock %}
