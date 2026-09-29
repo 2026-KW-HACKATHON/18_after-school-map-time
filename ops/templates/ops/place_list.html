@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}장소 관리 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page">
+  {% include "ops/_nav.html" %}
+  <h1>장소 관리</h1>
+  <form method="get" class="search-bar" role="search" style="display:flex;gap:8px">
+    <input type="search" name="q" value="{{ q }}" placeholder="장소명·주소 검색" aria-label="장소명·주소 검색">
+    <button type="submit" class="btn">검색</button>
+    <a class="btn btn-primary" href="{% url 'ops:place-new' %}">장소 등록</a>
+  </form>
+  <ul class="result-list">
+    {% for p in places %}
+      <li>
+        <a class="card result-card" href="{% url 'ops:place-edit' p.pk %}">
+          <strong>{{ p.name }}{% if p.is_closed %} <span class="badge-neutral">폐업</span>{% endif %}</strong>
+          <span class="muted small">{{ p.get_category_display }}{% if p.address %} · {{ p.address }}{% endif %} · {{ p.updated_at|date:"n월 j일" }} 수정</span>
+        </a>
+      </li>
+    {% empty %}
+      <li class="muted">등록된 장소가 없어요.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

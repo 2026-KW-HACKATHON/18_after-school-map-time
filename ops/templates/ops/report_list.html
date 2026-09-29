@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 15번 "제보 검토 목록"{% endcomment %}
+
+{% block title %}제보 검토 목록 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page">
+  {% include "ops/_nav.html" %}
+  <h1>제보 검토 목록</h1>
+
+  <div class="stat-grid">
+    <div class="card stat"><span class="muted small">대기 중</span><strong>{{ counts.PENDING }}건</strong></div>
+    <div class="card stat"><span class="muted small">승인됨</span><strong>{{ counts.VERIFIED }}건</strong></div>
+    <div class="card stat"><span class="muted small">반려됨</span><strong>{{ counts.REJECTED }}건</strong></div>
+  </div>
+
+  <nav class="chips" aria-label="상태로 거르기">
+    {% for key, label in tabs %}
+      <a class="chip" href="?status={{ key }}" aria-pressed="{% if key == status %}true{% else %}false{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <ul class="result-list">
+    {% for row in rows %}
+      {% with r=row.report %}
+      <li>
+        <a class="card result-card" href="{% url 'ops:report-review' r.pk %}">
+          <span class="muted small">{{ r.created_at|date:"Y.m.d H:i" }} · {{ r.get_status_display }}</span>
+          <strong>{{ r.target_label }}</strong>
+          <span class="small">
+            {% for v in r.values.all %}{{ v }}{% if not forloop.last %} · {% endif %}{% empty %}값 없음{% endfor %}
+            {% if r.photo %} · 사진 포함{% endif %}{% if r.note %} · 설명 포함{% endif %}
+          </span>
+          <span>
+            {% if row.downgrade %}<span class="badge-warn">판정 하향 제보</span>{% endif %}
+            {% if r.is_new_place %}<span class="badge-neutral">새 장소</span>{% endif %}
+            {% if row.new_account %}<span class="badge-warn">가입 7일 미만</span>{% endif %}
+            {% if r.status == "REJECTED" and r.reject_reason %}<span class="muted small">반려: {{ r.reject_reason }}</span>{% endif %}
+          </span>
+        </a>
+      </li>
+      {% endwith %}
+    {% empty %}
+      <li class="muted">해당하는 제보가 없어요.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

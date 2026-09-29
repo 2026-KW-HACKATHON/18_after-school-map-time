@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 11번 "운영자 대시보드"{% endcomment %}
+
+{% block title %}운영자 대시보드 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page">
+  {% include "ops/_nav.html" %}
+  <h1>운영 현황</h1>
+
+  <div class="stat-grid">
+    <a class="card stat" href="{% url 'ops:reports' %}?status=PENDING"><span class="muted small">검토 대기 제보</span><strong>{{ pending }}건</strong></a>
+    <div class="card stat"><span class="muted small">오늘 승인</span><strong>{{ approved_today }}건</strong></div>
+    <div class="card stat"><span class="muted small">오늘 반려</span><strong>{{ rejected_today }}건</strong></div>
+  </div>
+  <a class="btn btn-primary" href="{% url 'ops:reports' %}?status=PENDING">제보 검토 목록 보기</a>
+
+  <section class="card">
+    <h2>최근 접수 제보</h2>
+    <ul class="plain-list">
+      {% for r in recent_reports %}
+        <li>
+          <a href="{% url 'ops:report-review' r.pk %}">{{ r.target_label }}</a>
+          <span class="muted small">· {{ r.created_at|timesince }} 전 · {{ r.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="muted">아직 접수된 제보가 없어요.</li>
+      {% endfor %}
+    </ul>
+    <a href="{% url 'ops:reports' %}?status=">제보 전체 목록 보기 →</a>
+  </section>
+
+  <section class="card">
+    <h2>공개 장소 데이터</h2>
+    <div class="stat-grid">
+      <div class="stat"><span class="muted small">공개 장소</span><strong>{{ public_places }}곳</strong></div>
+      <div class="stat"><span class="muted small">이번 주 등록</span><strong>{{ new_places_week }}곳</strong></div>
+    </div>
+    <ul class="plain-list">
+      {% for p in recent_places %}
+        <li><a href="{% url 'ops:place-edit' p.pk %}">{{ p.name }}</a> <span class="muted small">· {{ p.updated_at|date:"n월 j일 H:i" }} 수정</span></li>
+      {% endfor %}
+    </ul>
+    <div class="actions" style="justify-content:flex-start">
+      <a class="btn btn-primary" href="{% url 'ops:place-new' %}">장소 등록</a>
+      <a class="btn" href="{% url 'ops:places' %}">장소 목록·수정</a>
+    </div>
+  </section>
+</section>
+{% endblock %}

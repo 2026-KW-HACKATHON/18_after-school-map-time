@@ -24,11 +24,6 @@
   background: var(--color-primary); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(59, 108, 246, 0.25);
 }
 
-.badge-positive, .badge-neutral {
-  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px;
-}
-.badge-positive { background: #dcfce7; color: #166534; }   /* 긍정 배지만 있음 (OP-5) */
-.badge-neutral  { background: #eef2f7; color: var(--color-muted); }
 
 /* ── 지도 화면: 데스크톱 [패널 | 지도], 모바일 [지도 위 / 패널 아래] ── */
 .map-layout { padding: 0; }

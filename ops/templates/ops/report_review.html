@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+  와이어프레임 16번 "제보 상세 검토" + 17번 "충돌 정보 확인" (한 화면).
+  승인·반려는 브라우저 확인 창을 한 번 더 거친다 (되돌릴 수 없는 작업)
+{% endcomment %}
+
+{% block title %}제보 검토 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  {% include "ops/_nav.html" %}
+  <p><a href="{% url 'ops:reports' %}">← 제보 검토 목록</a></p>
+  <h1>제보 상세 검토</h1>
+
+  <section class="card">
+    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report.get_status_display }}</span></h2>
+    {% if report.is_new_place %}<p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
+    <p class="small">제출자: {{ report.created_by|default:"알 수 없음" }} · 제출 {{ report.created_at|date:"Y년 n월 j일 H:i" }}</p>
+    {% if report.created_by and report.created_by.is_new_account %}<p><span class="badge-warn">가입 7일 미만 계정</span></p>{% endif %}
+    {% if downgrade_places >= abuse_threshold %}
+      <p class="alert small">이 제보자는 최근 7일 동안 서로 다른 장소 {{ downgrade_places }}곳에 판정을 내리는 제보를 했어요. 악의적인 제보인지 확인해 주세요. (기획 v2 7장)</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>제보 사진 및 주민 설명</h2>
+    {% if report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="제보 사진">{% else %}<p class="muted">사진 없음</p>{% endif %}
+    <p>{{ report.note|default:"설명 없음" }}</p>
+    {% if report.profiles %}<p class="muted small">제보자가 고른 이동 조건: {{ report.profiles|join:", " }}</p>{% endif %}
+    <p class="muted small">사진에 얼굴·차량 번호판이 보이면 반려하고 다시 찍어 달라고 안내해 주세요. (기획 v2 4.4)</p>
+  </section>
+
+  <section class="card">
+    <h2>기존 공개 정보와 차이</h2>
+    <table class="diff-table">
+      <thead><tr><th>항목</th><th>현재 공개 정보</th><th>제보 내용</th></tr></thead>
+      <tbody>
+        {% for row in diff %}
+          <tr{% if row.conflict %} class="conflict"{% endif %}>
+            <th scope="row">{{ row.label }}</th>
+            <td>{% if row.current %}{{ row.current }}<br><span class="muted small">{{ row.current_at|date:"Y년 n월" }} 확인</span>{% else %}<span class="muted">정보 없음</span>{% endif %}</td>
+            <td>{{ row.proposed }}{% if row.conflict %}<br><span class="badge-warn">값이 달라요</span>{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="muted">입구 값 없이 설명만 있는 제보예요.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% if report.status == "PENDING" and not report.is_new_place %}
+  <section class="card">
+    <h2>승인하면 판정이 이렇게 바뀌어요</h2>
+    {% if changes %}
+      <ul class="plain-list">
+        {% for c in changes %}
+          <li>{{ c.profile }}: {{ c.before_label }} → <strong>{{ c.after_label }}</strong>{% if c.direction == "DOWN" %} <span class="badge-warn">하향</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% if direction == "DOWN" %}<p class="small muted">판정을 내리는 제보는 주민 2명 확인 또는 운영자 승인이 있어야 반영돼요. 사진으로 사실인지 꼭 확인해 주세요.</p>{% endif %}
+    {% else %}
+      <p class="muted">판정은 바뀌지 않아요. (값만 더 정확해짐)</p>
+    {% endif %}
+    <p class="muted small">주민 확인 {{ confirmations|length }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+  </section>
+  {% endif %}
+
+  {% if report.status == "PENDING" %}
+  <form method="post" class="card form-stack">
+    {% csrf_token %}
+    <h2>검토 의견 및 처리</h2>
+    {% if form.non_field_errors %}<div class="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+    {% if report.is_new_place %}
+      <fieldset>
+        <legend>새 장소로 등록</legend>
+        {% include "reports/_field.html" with field=form.place_name %}
+        {% include "reports/_field.html" with field=form.category %}
+        <p class="small">지도를 눌러 위치를 정하세요. {% if report.lat %}(제보자가 보낸 위치가 먼저 찍혀 있어요){% endif %}</p>
+        <div id="picker-map" class="picker-map"></div>
+        <div class="coord-row">
+          {% include "reports/_field.html" with field=form.lat %}
+          {% include "reports/_field.html" with field=form.lng %}
+        </div>
+      </fieldset>
+    {% endif %}
+
+    {% include "reports/_field.html" with field=form.review_note %}
+    {% include "reports/_field.html" with field=form.reject_reason %}
+
+    <div class="actions" style="justify-content:flex-start">
+      <button type="submit" name="action" value="approve" class="btn btn-primary"
+              onclick="return confirm('제보를 승인하시겠습니까? 승인하면 공개 지도에 바로 반영되고 판정이 다시 계산됩니다.')">
+        {% if report.is_new_place %}새 장소로 등록하고 승인{% else %}승인 및 공개 반영{% endif %}
+      </button>
+      <button type="submit" name="action" value="reject" class="btn"
+              onclick="return confirm('제보를 반려하시겠습니까? 반려 사유가 제출자에게 전달됩니다.')">반려 처리</button>
+    </div>
+  </form>
+  {% else %}
+  <section class="card">
+    <h2>처리 기록</h2>
+    <p class="small">{{ report.get_status_display }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
+    {% if report.review_note %}<p class="small">검토 의견: {{ report.review_note }}</p>{% endif %}
+    {% if report.reject_reason %}<p class="small">반려 사유: {{ report.reject_reason }}</p>{% endif %}
+  </section>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+{% if report.status == "PENDING" and report.is_new_place %}
+  {% include "ops/_picker_js.html" %}
+{% endif %}
+{% endblock %}
