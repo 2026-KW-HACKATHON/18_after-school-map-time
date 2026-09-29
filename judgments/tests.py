@@ -114,6 +114,11 @@ class UnknownAndRoutesTests(JudgmentTestBase):
         self.values(self.door, step_height_cm="30", step_count=2, door_width_cm=90, has_ramp=False)
         self.assertEqual(self.judge().reason, "입구 단차 30cm · 계단 수 2칸")
 
+    def test_fact_line_excludes_values_that_passed(self):
+        # 문 폭 85cm는 어떤 기준에도 걸리지 않으므로 이유에 넣지 않음
+        self.values(self.door, step_height_cm="15", step_count=1, door_width_cm=85, has_ramp=False)
+        self.assertEqual(self.judge(self.stroller).reason, "입구 단차 15cm")
+
     def test_profiles_differ(self):
         # 계단 한 칸 15cm: 휠체어 어려움, 유아차는 들어 올리면 가능 (조건부)
         self.values(self.door, step_height_cm="15", step_count=1, door_width_cm=90, has_ramp=False)
