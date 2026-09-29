@@ -35,12 +35,6 @@
 .map-unavailable, .map:empty { display: flex; align-items: center; justify-content: center; padding: 16px; color: var(--color-muted); background: #eef1f5; text-align: center; }
 
 .panel-label { margin: 0 0 8px; font-weight: 600; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.chip {
-  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--color-border);
-  background: var(--color-surface); color: var(--color-text); font: inherit; cursor: pointer; min-height: 40px;
-}
-.chip[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 .toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
 
 .legend { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; font-size: 13px; }
@@ -97,9 +91,7 @@
   .map-wrap { height: 50dvh; flex: none; }
 }
 
-/* ── 검색 결과 (와이어프레임 4·5번) ── */
-.result-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.result-card { display: grid; gap: 4px; color: var(--color-text); padding: 16px; }
+/* ── 검색 결과 (와이어프레임 4·5번). 카드 목록 기본은 common.css ── */
 .result-status { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 
 /* ── 상세: 판단 근거·확인 중 제보 (와이어프레임 7번) ── */

@@ -136,7 +136,19 @@ legend { font-weight: 700; padding: 0 4px; }
   background: var(--color-primary); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--color-primary), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+/* 칩 버튼 (이동 조건 선택, 운영자 상태 탭 공용) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); font: inherit; cursor: pointer; min-height: 40px;
+}
+.chip[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
+/* 카드 목록 (주민 검색 결과, 운영자 제보·장소 목록 공용) */
+.result-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.result-card { display: grid; gap: 4px; color: var(--color-text); padding: 16px; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .field input[type="text"], .field input[type="tel"] { width: 100%; }
 

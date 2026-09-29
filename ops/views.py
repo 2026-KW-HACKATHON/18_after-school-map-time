@@ -18,6 +18,7 @@ from places.models import Place, Region
 from reports.models import Report
 
 from . import services
+from .templatetags.ops_tags import OPS_STATUS_LABELS
 from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceForm, ReviewForm
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
@@ -55,7 +56,7 @@ def dashboard(request):
     })
 
 
-STATUS_TABS = [("", "전체"), ("PENDING", "대기 중"), ("VERIFIED", "승인됨"), ("REJECTED", "반려됨")]
+STATUS_TABS = [("", "전체")] + list(OPS_STATUS_LABELS.items())
 
 
 @staff_required
@@ -70,10 +71,12 @@ def report_list(request):
         reports = reports.filter(status=status)
     rows = []
     for r in reports[:100]:
+        pending = r.status == Report.Status.PENDING
         rows.append({
             "report": r,
-            "downgrade": r.status == Report.Status.PENDING and report_direction(r) == "DOWN",
-            "new_account": r.created_by is not None and r.created_by.is_new_account(),
+            # 검토 판단에 쓰는 표시라 대기 중 제보에만
+            "downgrade": pending and report_direction(r) == "DOWN",
+            "new_account": pending and r.created_by is not None and r.created_by.is_new_account(),
         })
     return render(request, "ops/report_list.html", {
         "rows": rows, "status": status, "tabs": STATUS_TABS, "counts": counts,

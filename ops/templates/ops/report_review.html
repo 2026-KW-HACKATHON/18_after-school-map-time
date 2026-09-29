@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ops_tags %}
 {% load static %}
 {% comment %}
   와이어프레임 16번 "제보 상세 검토" + 17번 "충돌 정보 확인" (한 화면).
@@ -16,7 +17,7 @@
   <h1>제보 상세 검토</h1>
 
   <section class="card">
-    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report.get_status_display }}</span></h2>
+    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report|ops_status }}</span></h2>
     {% if report.is_new_place %}<p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
     <p class="small">제출자: {{ report.created_by|default:"알 수 없음" }} · 제출 {{ report.created_at|date:"Y년 n월 j일 H:i" }}</p>
     {% if report.created_by and report.created_by.is_new_account %}<p><span class="badge-warn">가입 7일 미만 계정</span></p>{% endif %}
@@ -104,7 +105,7 @@
   {% else %}
   <section class="card">
     <h2>처리 기록</h2>
-    <p class="small">{{ report.get_status_display }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
+    <p class="small">{{ report|ops_status }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
     {% if report.review_note %}<p class="small">검토 의견: {{ report.review_note }}</p>{% endif %}
     {% if report.reject_reason %}<p class="small">반려 사유: {{ report.reject_reason }}</p>{% endif %}
   </section>

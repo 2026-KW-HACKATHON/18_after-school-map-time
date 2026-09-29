@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ops_tags %}
 {% comment %}와이어프레임 11번 "운영자 대시보드"{% endcomment %}
 
 {% block title %}운영자 대시보드 | 턱없네{% endblock %}
@@ -22,7 +23,7 @@
       {% for r in recent_reports %}
         <li>
           <a href="{% url 'ops:report-review' r.pk %}">{{ r.target_label }}</a>
-          <span class="muted small">· {{ r.created_at|timesince }} 전 · {{ r.get_status_display }}</span>
+          <span class="muted small">· {{ r.created_at|timesince }} 전 · {{ r|ops_status }}</span>
         </li>
       {% empty %}
         <li class="muted">아직 접수된 제보가 없어요.</li>
