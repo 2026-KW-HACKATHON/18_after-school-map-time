@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "accounts",  # 회원 (커스텀 User, 카카오 로그인)
     "places",    # 지역·건물·장소·출입구·접근성 필드 정의
     "reports",   # 제보(접근성 값의 출처)·확인
+    "judgments", # 판정 규칙(데이터)·판정 엔진·판정 결과
 ]
 
 MIDDLEWARE = [
