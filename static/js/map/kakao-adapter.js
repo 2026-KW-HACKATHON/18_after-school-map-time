@@ -24,6 +24,10 @@
         let myLocation = null;
 
         resolve({
+          /** 지도를 클릭하면 handler({ lat, lng }) — 운영자 장소 등록의 위치 선택 */
+          onMapClick(handler) {
+            kakao.maps.event.addListener(map, "click", (e) => handler({ lat: e.latLng.getLat(), lng: e.latLng.getLng() }));
+          },
           /** items: [{ id, lat, lng, className, label, icon }] */
           setMarkers(items, onClick) {
             this.clearMarkers();
