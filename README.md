@@ -58,7 +58,9 @@
 
 > ✅ = 1차 구현 완료. 판정 기준 수치는 초안(`judgments/data/rules_v1.json`)이며 판정 기준표 확정 후 교체합니다.
 
-**사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
+**사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드 + QR 안내 쪽지, 상단 "내 가게" 메뉴), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, 입구 사진 교체 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
+
+**건물주 기능 (Could, ✅):** 건물주 인증, 건물 공용 정보 정정 요청, 건물 입구 **개선 시뮬레이션**(판정 엔진으로 재계산)과 로그인 없이 보는 공유 페이지
 
 ---
 
@@ -225,7 +227,8 @@ python manage.py runserver
 | `/report/new/` | 제보 작성 — 기존 장소 입구 정보 또는 새 장소 제안 (로그인·사진 필수) |
 | `/api/v1/places/?region=wolgye1&profile=WHEELCHAIR` | 공개 읽기 API (목록) |
 | `/api/v1/places.geojson?region=wolgye1` | GeoJSON 내보내기 |
-| `/owner/` | 사장님 화면 — 인증 코드 입력, 대시보드(조건별 조회 수·가고 싶어요·경사로 가이드·지원사업), 한마디·도움 제공 선언·정정 요청 |
+| `/owner/` | 사장님·건물주 화면 — 인증 코드 입력, 대시보드(지금 판정·조건별 조회 수·가고 싶어요·경사로 가이드·지원사업), 한마디·도움 제공 선언·정정 요청·사진 교체 요청, 건물주 화면(`/owner/buildings/<id>/`) |
+| `/buildings/<id>/improve/` | 건물 입구 개선 효과 공유 페이지 (로그인 없이) |
 | `/support/` | 경사로 설치 지원사업 안내 |
 | `/ops/` | 운영자 화면 — 대시보드, 제보 검토(판정 변화 미리보기·승인·반려·새 장소 등록), 장소 등록·수정, 사장님 인증 코드 발급·승인 |
 | `/admin/` | 관리자 — 전체 데이터·판정 규칙·건물 정보 관리 |
@@ -278,6 +281,7 @@ python manage.py runserver
 | [Gunicorn](https://gunicorn.org/) | WSGI 서버 | MIT |
 | [Pillow](https://python-pillow.org/) | 이미지 처리 | MIT-CMU |
 | [Requests](https://requests.readthedocs.io/) | 외부 API 호출 | Apache-2.0 |
+| [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (cdnjs) | 사장님 인증 안내 쪽지의 QR 코드 | MIT |
 | [PostgreSQL](https://www.postgresql.org/) | 데이터베이스 | PostgreSQL License |
 | [Nginx](https://nginx.org/) | 리버스 프록시 (배포) | BSD-2-Clause |
 | [Pretendard](https://github.com/orioncactus/pretendard) | 웹폰트 | SIL OFL 1.1 |
