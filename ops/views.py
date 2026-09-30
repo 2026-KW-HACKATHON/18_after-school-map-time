@@ -165,7 +165,7 @@ def report_done(request, pk):
 
 @staff_required
 def place_list(request):
-    q = request.GET.get("q", "").strip()
+    q = request.GET.get("q", "").replace("\x00", "").strip()  # NUL 문자는 PostgreSQL이 거부 → 500 방지
     places = Place.objects.order_by("-updated_at")
     if q:
         places = places.filter(Q(name__icontains=q) | Q(address__icontains=q))
@@ -247,7 +247,7 @@ def district_csv(request):
     """지원사업 검토 목록 CSV (구청 전달용, 엑셀에서 한글이 깨지지 않게 BOM)"""
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="support-candidates-{timezone.localdate():%Y%m%d}.csv"'
-    response.write("﻿")
+    response.write("\ufeff")
     writer = csv.writer(response)
     writer.writerow(district_data.CSV_HEADER)
     writer.writerows(district_data.candidate_csv_rows(district_data.support_candidates(_region())))
@@ -287,7 +287,8 @@ def issue_building_claim_code(request, pk):
     building = get_object_or_404(Building, pk=pk)
     code = ClaimCode.issue(building=building)
     messages.success(request, f"건물주 인증 코드 {code.code} 를 발급했어요. 건물주님께 전달해 주세요.")
-    place = building.places.filter(pk=request.POST.get("place") or 0).first()
+    place_id = request.POST.get("place", "")
+    place = building.places.filter(pk=place_id).first() if place_id.isdigit() else None
     return redirect("ops:place-edit", pk=place.pk) if place else redirect("ops:places")
 
 

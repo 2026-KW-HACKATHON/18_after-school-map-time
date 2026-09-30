@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
@@ -26,8 +27,11 @@ def report_new(request):
     모든 주민 제보는 '확인 중'으로 들어가고, 주민 확인 또는 운영자 승인 후 지도에 반영된다 (기획 v2 7장).
     """
     place = None
-    if request.GET.get("place") or request.POST.get("place"):
-        place = get_object_or_404(Place, pk=request.GET.get("place") or request.POST.get("place"), is_closed=False)
+    place_id = request.GET.get("place") or request.POST.get("place")
+    if place_id:
+        if not place_id.isdigit():  # ?place=abc 같은 잘못된 주소는 500이 아니라 404
+            raise Http404("장소를 찾을 수 없어요.")
+        place = get_object_or_404(Place, pk=place_id, is_closed=False)
 
     form = ReportForm(request.POST or None, request.FILES or None, place=place, user=request.user)
     if request.method == "POST" and form.is_valid():
@@ -97,8 +101,8 @@ def report_confirm(request, pk):
     if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         back = "/"
     required = required_confirmations(report)
-    if required is None:  # 사진 교체 요청처럼 운영자만 처리하는 제보
-        messages.error(request, "이 요청은 운영진이 확인해요.")
+    if required is None:  # 사진 교체 요청·새 계정의 하향 제보처럼 운영자만 처리하는 제보
+        messages.error(request, "이 제보는 운영진이 확인해요.")
         return redirect(back)
     try:
         applied = confirm_report(report, request.user, required)

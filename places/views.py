@@ -24,7 +24,7 @@ def search_page(request):
     정렬은 이름순 — 접근성 낮은 순 정렬은 만들지 않는다 (기획 v2 3.2)
     """
     region = _region()
-    q = request.GET.get("q", "").strip()
+    q = request.GET.get("q", "").replace("\x00", "").strip()  # NUL 문자는 PostgreSQL이 거부 → 500 방지
     profiles = list(ConditionProfile.objects.filter(is_active=True))
     profile = next((p for p in profiles if p.key == request.GET.get("profile")), profiles[0] if profiles else None)
 
