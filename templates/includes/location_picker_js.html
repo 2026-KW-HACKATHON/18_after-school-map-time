@@ -1,7 +1,7 @@
 {% load static %}
-{# 위치 선택 지도용 스크립트 (templates/includes/location_picker.html 과 짝). 지도 키가 없으면 좌표·위치 설명으로 대신 입력 #}
+{# 공용 위치 선택 UI. 장소 검색에 필요한 services 라이브러리도 함께 로드한다. #}
 {% if KAKAO_JAVASCRIPT_KEY %}
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ KAKAO_JAVASCRIPT_KEY }}&autoload=false"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ KAKAO_JAVASCRIPT_KEY }}&autoload=false&libraries=services"></script>
 {% endif %}
 <script src="{% static 'js/map/kakao-adapter.js' %}"></script>
 <script src="{% static 'js/map/location-picker.js' %}"></script>

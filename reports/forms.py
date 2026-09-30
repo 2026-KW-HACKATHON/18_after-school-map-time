@@ -9,7 +9,7 @@ from django import forms
 from django.utils import timezone
 
 from judgments.models import ConditionProfile
-from places.models import FieldDefinition
+from places.models import FieldDefinition, Place
 
 from .models import Report
 
@@ -27,8 +27,18 @@ class ReportForm(forms.Form):
                                      widget=forms.TextInput(attrs={"placeholder": "예: 월계 약국, 1번 출구 카페"}))
     location_text = forms.CharField(label="위치 설명 (지도에 표시하기 어려우면 꼭 적어 주세요)", max_length=200, required=False,
                                     widget=forms.TextInput(attrs={"placeholder": "예: 월계역 2번 출구 앞 건물 1층"}))
-    lat = forms.DecimalField(required=False, widget=forms.HiddenInput, max_digits=9, decimal_places=6)
-    lng = forms.DecimalField(required=False, widget=forms.HiddenInput, max_digits=9, decimal_places=6)
+    lat = forms.DecimalField(label="위도", required=False, min_value=-90, max_value=90,
+                             max_digits=9, decimal_places=6, widget=forms.NumberInput(attrs={"step": "0.000001"}))
+    lng = forms.DecimalField(label="경도", required=False, min_value=-180, max_value=180,
+                             max_digits=9, decimal_places=6, widget=forms.NumberInput(attrs={"step": "0.000001"}))
+
+    suggested_category = forms.ChoiceField(label="업종 (선택)", required=False,
+                                           choices=[("", "모름")] + list(Place.Category.choices))
+    suggested_address = forms.CharField(label="주소 (선택)", max_length=200, required=False)
+    suggested_floor = forms.IntegerField(label="층 (선택)", required=False, min_value=-32768, max_value=32767,
+                                         help_text="예: 1 = 1층, -1 = 지하 1층. 모르면 비워 주세요.")
+    suggested_phone = forms.CharField(label="전화번호 (선택)", max_length=20, required=False,
+                                      widget=forms.TextInput(attrs={"type": "tel"}))
 
     photo = forms.ImageField(label="입구 사진", help_text="입구, 계단, 경사로가 잘 보이게 찍어 주세요. 사람 얼굴·차 번호판은 나오지 않게 해 주세요.")
 
@@ -51,11 +61,13 @@ class ReportForm(forms.Form):
         self.fields["door_type"].choices = [(UNKNOWN, "모름")] + [(c, c) for c in choices]
         self.fields["profiles"].choices = [(p.key, p.label) for p in ConditionProfile.objects.filter(is_active=True)]
         if place is not None:
-            for name in ("suggested_name", "location_text"):
+            for name in ("suggested_name", "location_text", "suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
                 del self.fields[name]
 
     def clean(self):
         data = super().clean()
+        if (data.get("lat") is None) != (data.get("lng") is None):
+            self.add_error("lat" if data.get("lat") is None else "lng", "위도와 경도를 함께 입력해 주세요.")
         if self.place is None and not data.get("suggested_name"):
             self.add_error("suggested_name", "장소 이름을 입력해 주세요.")
         if self.place is None:

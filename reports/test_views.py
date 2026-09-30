@@ -3,6 +3,7 @@
 import shutil
 import tempfile
 from datetime import timedelta
+from decimal import Decimal
 from io import StringIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
-from places.models import Entrance
+from places.models import Entrance, Place
 from places.tests import make_place, make_region
 
 from .models import Report
@@ -101,6 +102,127 @@ class ReportFormTests(TempMediaMixin, TestCase):
 
     def test_done_page(self):
         self.assertContains(self.client.get(reverse("reports:done")), "제보가 접수되었습니다")
+
+    def test_new_place_details_remain_pending_until_review(self):
+        res = self.post(suggested_name="새 약국", suggested_category="PHARMACY",
+                        suggested_address="서울 노원구 광운로 20", suggested_floor="-1",
+                        suggested_phone="02-123-4567", lat="37.626123", lng="127.058789", note="입구 확인")
+        self.assertRedirects(res, reverse("reports:done"))
+        report = Report.objects.get()
+        self.assertEqual(report.status, "PENDING")
+        self.assertIsNone(report.target)
+        self.assertEqual((report.suggested_category, report.suggested_floor), ("PHARMACY", -1))
+        self.assertEqual(report.suggested_address, "서울 노원구 광운로 20")
+        self.assertEqual(report.suggested_phone, "02-123-4567")
+        self.assertEqual(str(report.lat), "37.626123")
+
+    def test_invalid_coordinates_and_details_do_not_create_report(self):
+        for invalid in ({"lat": "91", "lng": "127"}, {"lat": "37", "lng": "181"},
+                        {"lat": "37"}, {"lng": "127"}, {"suggested_category": "INVALID"},
+                        {"suggested_floor": "32768"}):
+            with self.subTest(invalid=invalid):
+                res = self.post(suggested_name="새 가게", location_text="월계역 앞", note="입구 확인", **invalid)
+                self.assertEqual(res.status_code, 200)
+                self.assertTrue(res.context["form"].errors)
+                self.assertFalse(Report.objects.exists())
+
+    def test_map_and_details_preserved_after_validation_error(self):
+        res = self.client.post(self.url, {"suggested_name": "새 카페", "suggested_category": "CAFE",
+                                        "suggested_floor": "2", "lat": "37.626100", "lng": "127.058800"})
+        self.assertContains(res, 'id="picker-map"')
+        self.assertContains(res, 'value="37.626100"')
+        self.assertEqual(res.context["form"]["suggested_floor"].value(), "2")
+
+    def test_invalid_entrance_values_are_rejected_before_saving(self):
+        for key, value in (("step_height_cm", "-1"), ("step_count", "51"), ("has_ramp", "invalid"),
+                           ("door_width_cm", "1001"), ("door_type", "창문"), ("profiles", ["INVALID"])):
+            with self.subTest(field=key):
+                res = self.post(suggested_name="새 가게", location_text="월계역 앞", note="입구 확인",
+                                **{key: value})
+                self.assertEqual(res.status_code, 200)
+                self.assertIn(key, res.context["form"].errors)
+                self.assertFalse(Report.objects.exists())
+
+    def test_existing_place_has_no_new_place_fields(self):
+        res = self.client.get(self.url, {"place": self.place.pk})
+        self.assertNotContains(res, 'id="picker-map"')
+        self.assertNotIn("suggested_category", res.context["form"].fields)
+
+    def test_new_place_needs_point_or_location_text(self):
+        res = self.post(suggested_name="위치 없는 가게", note="입구 확인")
+        self.assertContains(res, "지도를 눌러 위치를 표시하거나")
+        self.assertFalse(Report.objects.exists())
+
+    def test_location_text_only_is_saved_without_coordinates(self):
+        res = self.post(suggested_name="새 가게", location_text="월계역 정문 옆", step_height_cm="0")
+        self.assertRedirects(res, reverse("reports:done"))
+        report = Report.objects.get()
+        self.assertEqual(report.location_text, "월계역 정문 옆")
+        self.assertIsNone(report.lat)
+        self.assertIsNone(report.lng)
+
+    def test_all_entrance_inputs_and_both_coordinates_are_saved_to_their_fields(self):
+        res = self.post(suggested_name="새 가게", lat="0", lng="0", step_height_cm="0",
+                        step_count="0", has_ramp="false", door_width_cm="90.5", door_type="자동문",
+                        profiles=["WHEELCHAIR"], note="직접 확인")
+        self.assertRedirects(res, reverse("reports:done"))
+        report = Report.objects.get()
+        self.assertEqual((report.lat, report.lng), (Decimal("0"), Decimal("0")))
+        self.assertEqual({v.field_id: v.value for v in report.values.all()}, {
+            "step_height_cm": Decimal("0"), "step_count": Decimal("0"), "has_ramp": False,
+            "door_width_cm": Decimal("90.5"), "door_type": "자동문",
+        })
+        self.assertEqual((report.profiles, report.note), (["WHEELCHAIR"], "직접 확인"))
+
+    def test_new_place_uses_shared_picker_region_and_search_sdk(self):
+        with override_settings(KAKAO_JAVASCRIPT_KEY="test-key"):
+            res = self.client.get(self.url)
+        self.assertContains(res, 'data-lat="37.626200"')
+        self.assertContains(res, 'id="picker-locate"')
+        self.assertContains(res, 'id="place-search"')
+        self.assertContains(res, "libraries=services")
+        self.assertTemplateUsed(res, "includes/location_picker.html")
+        self.assertTemplateUsed(res, "includes/location_picker_js.html")
+        self.assertTemplateNotUsed(res, "ops/_picker_js.html")
+
+    def test_existing_place_ignores_suggestion_and_owner_fields(self):
+        res = self.client.get(self.url, {"place": self.place.pk})
+        for key in ("assistance_offered", "portable_ramp", "portable_ramp_length_cm", "suggested_phone"):
+            self.assertNotIn(key, res.context["form"].fields)
+        res = self.post(place=self.place.pk, has_ramp="false", suggested_name="덮어쓴 이름",
+                        suggested_phone="02-000", assistance_offered="true", portable_ramp="true")
+        self.assertRedirects(res, reverse("reports:done"))
+        report = Report.objects.get()
+        self.assertEqual(report.suggested_name, "")
+        self.assertEqual(report.suggested_phone, "")
+        self.assertEqual(set(report.values.values_list("field_id", flat=True)), {"has_ramp"})
+        self.place.refresh_from_db()
+        self.assertEqual(self.place.name, "월계 약국")
+
+    def test_suggestion_to_operator_review_preserves_details_and_recomputes_judgment(self):
+        from judgments.models import Judgment
+
+        self.post(suggested_name="제안 약국", suggested_category="PHARMACY", suggested_floor="-1",
+                  suggested_address="광운로 20", suggested_phone="02-123", lat="37.626123", lng="127.058789",
+                  step_height_cm="0", door_width_cm="90", has_ramp="false")
+        self.assertFalse(Place.objects.filter(name="제안 약국").exists())
+        report = Report.objects.get()
+        staff = User.objects.create_user(username="reviewer", is_staff=True)
+        self.client.force_login(staff)
+        url = reverse("ops:report-review", args=[report.pk])
+        res = self.client.get(url)
+        data = {key: res.context["form"][key].value() for key in
+                ("place_name", "category", "address", "floor", "phone", "lat", "lng")}
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(url, {"action": "approve", **data})
+        self.assertRedirects(res, reverse("ops:report-done", args=[report.pk]))
+        report.refresh_from_db()
+        place = report.entrance.place
+        self.assertEqual((place.name, place.category, place.address, place.floor, place.phone),
+                         ("제안 약국", "PHARMACY", "광운로 20", -1, "02-123"))
+        self.assertEqual((place.lat, place.lng), (Decimal("37.626123"), Decimal("127.058789")))
+        self.assertEqual(report.status, Report.Status.VERIFIED)
+        self.assertTrue(Judgment.objects.filter(place=place).exists())
 
 
 class ConfirmViewTests(TestCase):

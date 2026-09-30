@@ -149,6 +149,7 @@ legend { font-weight: 700; padding: 0 4px; }
 .result-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .result-card { display: grid; gap: 4px; color: var(--color-text); padding: 16px; }
 .result-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.place-result { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .field input[type="text"], .field input[type="tel"] { width: 100%; }
 

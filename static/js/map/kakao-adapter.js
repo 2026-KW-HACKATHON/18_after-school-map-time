@@ -24,6 +24,20 @@
         let myLocation = null;
 
         resolve({
+          /** 장소 검색 결과는 화면에서 textContent로 표시한다. */
+          searchPlaces(query) {
+            return new Promise((resolveSearch, rejectSearch) => {
+              if (!kakao.maps.services) {
+                rejectSearch(new Error("장소 검색을 불러오지 못했어요."));
+                return;
+              }
+              new kakao.maps.services.Places().keywordSearch(query, (items, status) => {
+                if (status === kakao.maps.services.Status.ZERO_RESULT) resolveSearch([]);
+                else if (status === kakao.maps.services.Status.OK) resolveSearch(items);
+                else rejectSearch(new Error("장소 검색에 실패했어요. 잠시 후 다시 시도해 주세요."));
+              }, { location: map.getCenter(), size: 10 });
+            });
+          },
           /** 지도를 클릭하면 handler({ lat, lng }) — 운영자 장소 등록의 위치 선택 */
           onMapClick(handler) {
             kakao.maps.event.addListener(map, "click", (e) => handler({ lat: e.latLng.getLat(), lng: e.latLng.getLng() }));

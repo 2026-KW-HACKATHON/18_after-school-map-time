@@ -40,6 +40,10 @@ class Report(models.Model):
 
     # 새 장소 제안: 대상이 없을 때만 사용 (운영자가 승인하면서 장소를 만든다)
     suggested_name = models.CharField("새 장소 이름", max_length=100, blank=True)
+    suggested_category = models.CharField("제안 업종", max_length=20, choices=Place.Category.choices, blank=True)
+    suggested_address = models.CharField("제안 주소", max_length=200, blank=True)
+    suggested_floor = models.SmallIntegerField("제안 층", null=True, blank=True)
+    suggested_phone = models.CharField("제안 전화번호", max_length=20, blank=True)
     location_text = models.CharField("위치 설명", max_length=200, blank=True, help_text="예: 월계역 2번 출구 앞 건물 1층")
     lat = models.DecimalField("제보 위치 위도", max_digits=9, decimal_places=6, null=True, blank=True)
     lng = models.DecimalField("제보 위치 경도", max_digits=9, decimal_places=6, null=True, blank=True)

@@ -80,8 +80,12 @@ class ReviewForm(forms.Form):
     # 새 장소 제안을 승인할 때 만들 장소 정보
     place_name = forms.CharField(label="장소명", max_length=100, required=False)
     category = forms.ChoiceField(label="유형", choices=Place.Category.choices, required=False)
-    lat = forms.DecimalField(label="위도", max_digits=9, decimal_places=6, required=False)
-    lng = forms.DecimalField(label="경도", max_digits=9, decimal_places=6, required=False)
+    address = forms.CharField(label="주소", max_length=200, required=False)
+    floor = forms.IntegerField(label="층", required=False, min_value=-32768, max_value=32767,
+                               help_text="1 = 1층, -1 = 지하 1층")
+    phone = forms.CharField(label="전화번호", max_length=20, required=False)
+    lat = forms.DecimalField(label="위도", max_digits=9, decimal_places=6, required=False, min_value=-90, max_value=90)
+    lng = forms.DecimalField(label="경도", max_digits=9, decimal_places=6, required=False, min_value=-180, max_value=180)
 
     def __init__(self, *args, report=None, **kwargs):
         super().__init__(*args, **kwargs)

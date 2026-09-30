@@ -110,12 +110,18 @@ def report_review(request, pk):
     report = get_object_or_404(Report.objects.select_related("created_by", "entrance__place"), pk=pk)
     form = ReviewForm(request.POST or None, report=report, initial={
         "place_name": report.suggested_name, "lat": report.lat, "lng": report.lng,
+        "category": report.suggested_category,
+        "address": report.suggested_address or report.location_text,
+        "floor": report.suggested_floor, "phone": report.suggested_phone,
     })
     if request.method == "POST" and report.status == Report.Status.PENDING and form.is_valid():
         data = form.cleaned_data
         if data["action"] == "approve":
             services.approve_report(report, request.user, data["review_note"], new_place={
                 "name": data["place_name"], "category": data["category"], "lat": data["lat"], "lng": data["lng"],
+                # 이전 화면에서 보낸 요청도 제보의 주소를 잃지 않도록 한다.
+                "address": data["address"] if "address" in request.POST else report.suggested_address or report.location_text,
+                "floor": data["floor"], "phone": data["phone"],
             })
         else:
             services.reject(report, request.user, data["reject_reason"], data["review_note"])
