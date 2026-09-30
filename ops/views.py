@@ -11,14 +11,14 @@ from django.db.models import Max, Q
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from judgments.constants import display
-from judgments.services import is_owner_declaration, report_direction, report_effect, required_confirmations
+from judgments.services import is_owner_declaration, is_photo_request, report_direction, report_effect, required_confirmations
 from owners.models import ClaimCode, OwnerClaim
 from owners.services import CORRECTION_OVERDUE_DAYS
-from places.models import Place, Region
+from places.models import Building, Place, Region
 from reports.models import Report
 
 from . import services
@@ -73,9 +73,13 @@ STATUS_TABS = [("", "전체")] + list(OPS_STATUS_LABELS.items())
 
 
 def _owner_kind(report):
-    """사장님 요청 종류 표시 (선언은 확인 1명, 정정은 2명 — 기획 v2 4.2·4.3)"""
+    """사장님·건물주 요청 종류 표시 (선언은 확인 1명, 정정은 2명, 사진 교체는 운영자만 — 기획 v2 4.2~4.4)"""
     if report.source != Report.Source.OWNER:
         return ""
+    if is_photo_request(report):
+        return "사장님 사진 교체 요청"
+    if report.target_place is None:  # 건물·건물 출입구 대상
+        return "건물주 정정 요청"
     return "사장님 선언" if is_owner_declaration(report) else "사장님 정정 요청"
 
 
@@ -177,6 +181,8 @@ def place_edit(request, pk=None):
         "form": form,
         "place": place,
         "claim_codes": place.claim_codes.order_by("-created_at")[:5] if place else [],
+        "building_claim_codes": place.building.claim_codes.order_by("-created_at")[:5]
+        if place and place.building_id else [],
         "entrance_fields": [form[k] for k in ENTRANCE_KEYS],
         "place_fields": [form[k] for k in PLACE_KEYS],
         "missing": form.missing_required() if form.is_bound else [],
@@ -230,3 +236,25 @@ def issue_claim_code(request, pk):
     code = ClaimCode.issue(place=place)
     messages.success(request, f"인증 코드 {code.code} 를 발급했어요. 사장님께 전달해 주세요.")
     return redirect("ops:place-edit", pk=place.pk)
+
+
+@staff_required
+@require_POST
+def issue_building_claim_code(request, pk):
+    """건물주 인증 코드 발급 (기획 v2 5.2). 장소 수정 화면의 건물 칸에서 누른다"""
+    building = get_object_or_404(Building, pk=pk)
+    code = ClaimCode.issue(building=building)
+    messages.success(request, f"건물주 인증 코드 {code.code} 를 발급했어요. 건물주님께 전달해 주세요.")
+    place = building.places.filter(pk=request.POST.get("place") or 0).first()
+    return redirect("ops:place-edit", pk=place.pk) if place else redirect("ops:places")
+
+
+@staff_required
+def claim_code_print(request, pk):
+    """
+    인증 코드 안내 쪽지 (인쇄용). 답사 때 가게에 두고 오면 사장님이 QR이나 주소로 바로 들어와
+    코드가 채워진 화면에서 로그인만 하면 된다.
+    """
+    code = get_object_or_404(ClaimCode.objects.select_related("place", "building"), pk=pk)
+    claim_url = request.build_absolute_uri(reverse("owners:claim")) + f"?code={code.code}"
+    return render(request, "ops/claim_code_print.html", {"code": code, "claim_url": claim_url})

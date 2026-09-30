@@ -16,5 +16,7 @@ urlpatterns = [
     path("places/<int:pk>/delete/", views.place_delete, name="place-delete"),
     path("places/<int:pk>/saved/", views.place_saved, name="place-saved"),
     path("places/<int:pk>/claim-code/", views.issue_claim_code, name="claim-code"),
+    path("buildings/<int:pk>/claim-code/", views.issue_building_claim_code, name="building-claim-code"),
+    path("claim-codes/<int:pk>/print/", views.claim_code_print, name="claim-code-print"),
     path("claims/", views.claim_list, name="claims"),
 ]

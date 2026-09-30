@@ -4,9 +4,14 @@
 
 {% block content %}
 <section class="page narrow">
-  <p class="muted small"><a href="{% url 'owners:dashboard' place.pk %}">← {{ place.name }} 사장님 화면</a></p>
-  <h1>잘못된 정보 정정 요청</h1>
-  <p class="muted">항목 하나와 올바른 값, 증빙 사진을 보내 주세요. 확인되기 전까지는 기존 값이 그대로 보이고, 해당 항목에 "사장님이 정정을 요청했어요 (확인 중)"이 표시돼요. 반려되면 사유를 알려드려요.</p>
+  {% if building %}
+    <p class="muted small"><a href="{% url 'owners:building' building.pk %}">← {{ building }} 건물주 화면</a></p>
+    <h1>건물 공용 정보 정정 요청</h1>
+  {% else %}
+    <p class="muted small"><a href="{% url 'owners:dashboard' place.pk %}">← {{ place.name }} 사장님 화면</a></p>
+    <h1>잘못된 정보 정정 요청</h1>
+  {% endif %}
+  <p class="muted">항목 하나와 올바른 값, 증빙 사진을 보내 주세요. 확인되기 전까지는 기존 값이 그대로 보이고, 해당 항목에 "정정을 요청했어요 (확인 중)"이 표시돼요. 주민 2명이 확인하거나 운영진이 승인하면 반영되고, 반려되면 사유를 알려드려요.</p>
   <form method="post" enctype="multipart/form-data" class="card form-stack">
     {% csrf_token %}
     {% for field in form %}{% include "reports/_field.html" %}{% endfor %}

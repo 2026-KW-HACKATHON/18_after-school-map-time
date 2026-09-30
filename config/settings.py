@@ -87,6 +87,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.kakao_keys",  # 모든 템플릿에서 {{ KAKAO_JAVASCRIPT_KEY }} 사용
+                "owners.context_processors.owner_nav",  # 상단 메뉴 '내 가게' (인증한 사장님·건물주)
             ],
         },
     },

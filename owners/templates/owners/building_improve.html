@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% comment %}
+  건물 개선 효과 공유 페이지 (기획 v2 5.2 Could). 로그인 없이 볼 수 있음.
+  사장님이 건물주에게, 건물주가 구청에 보여 줄 수 있게. 지도에 이미 공개된 정보로만 계산한다.
+{% endcomment %}
+
+{% block title %}{{ building }} 개선 효과 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>{{ building }} 입구가 좋아지면</h1>
+  <p class="muted">건물 공용 입구를 개선하면 건물 안 가게에 들어갈 수 있는 손님이 얼마나 늘어나는지 턱없네 판정 기준으로 계산했어요.</p>
+
+  {% include "owners/_building_simulation.html" %}
+
+  <section class="card">
+    <h2>건물 안 가게</h2>
+    <ul class="plain-list">
+      {% for row in places %}
+        <li><a href="{% url 'places:detail' row.place.pk %}">{{ row.place.name }}</a></li>
+      {% empty %}
+        <li class="muted">등록된 가게가 없어요.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>비용이 걱정된다면</h2>
+    <p>노원구는 소규모 생활밀착 시설의 경사로 설치를 지원하고 있어요.</p>
+    <a class="btn btn-primary" href="{% url 'owners:support' %}">경사로 설치 지원사업 안내</a>
+    <p class="muted small">턱없네는 신청을 대신하지 않고 안내만 해요. 가게에 과금하거나 돈을 받고 노출을 바꾸는 일은 없어요.</p>
+  </section>
+
+  <p class="notice small muted">판정 기준은 편의증진법 시행규칙의 수치를 참고한 것이며, 법 위반 여부를 판단한 것이 아니에요.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,9 @@
+<ul class="plain-list">
+  {% for c in codes %}
+    <li class="small">
+      <strong>{{ c.code }}</strong> · {{ c.created_at|date:"n월 j일" }} 발급 · {% if c.is_used %}사용됨{% else %}미사용 · <a href="{% url 'ops:claim-code-print' c.pk %}" target="_blank" rel="noopener">안내 쪽지 인쇄</a>{% endif %}
+    </li>
+  {% empty %}
+    <li class="muted small">발급한 코드가 없어요.</li>
+  {% endfor %}
+</ul>

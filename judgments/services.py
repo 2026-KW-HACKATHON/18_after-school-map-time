@@ -81,9 +81,22 @@ def is_owner_declaration(report):
     return bool(keys) and keys <= OWNER_DECLARATION_FIELDS
 
 
-def required_confirmations(report):
+def is_photo_request(report):
+    """사장님 입구 사진 교체 요청 (값 없이 사진만 — 기획 v2 4.4)"""
     from reports.models import Report
 
+    return report.source == Report.Source.OWNER and not report.values.exists()
+
+
+def required_confirmations(report):
+    """
+    반영에 필요한 주민 확인 수. None = 주민 확인으로는 반영하지 않고 운영자만 처리
+    (사진 교체 요청: 얼굴·번호판이 없는지 운영자가 봐야 함 — 기획 v2 4.4)
+    """
+    from reports.models import Report
+
+    if is_photo_request(report):
+        return None
     if report.source == Report.Source.OWNER:
         return OWNER_DECLARATION_CONFIRMATIONS if is_owner_declaration(report) else OWNER_CORRECTION_CONFIRMATIONS
     return REQUIRED_CONFIRMATIONS[report_direction(report)]

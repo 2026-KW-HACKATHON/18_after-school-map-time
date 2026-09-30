@@ -142,15 +142,27 @@ def _pending_reports(place):
         .prefetch_related("values__field")
         .order_by("-created_at")
     )
-    return [
-        {
+    rows = []
+    for r in reports:
+        required = required_confirmations(r)
+        if required is None:
+            continue  # 운영자만 처리하는 요청(사진 교체)은 주민 확인 목록에 넣지 않음
+        rows.append({
             "report": r,
             "values": list(r.values.all()),
             "confirmations": r.confirmations.count(),
-            "required": required_confirmations(r),
-        }
-        for r in reports
-    ]
+            "required": required,
+        })
+    return rows
+
+
+def building_common_section(building):
+    """건물 공용 입구·시설 (장소 상세와 건물주 화면에서 같이 씀)"""
+    return {
+        "building": building,
+        "entrances": _entrances_section(building.entrances.all()),
+        "fields": _fields_section(building, FieldDefinition.Scope.BUILDING),
+    }
 
 
 def place_detail(place):
@@ -161,11 +173,7 @@ def place_detail(place):
     profiles = ConditionProfile.objects.filter(is_active=True)
     building = place.building
 
-    building_section = {
-        "building": building,
-        "entrances": _entrances_section(building.entrances.all()),
-        "fields": _fields_section(building, FieldDefinition.Scope.BUILDING),
-    } if building else None
+    building_section = building_common_section(building) if building else None
     place_section = {
         "entrances": _entrances_section(place.entrances.all()),
         "fields": _fields_section(place, FieldDefinition.Scope.PLACE),

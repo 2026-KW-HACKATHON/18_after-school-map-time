@@ -5,6 +5,7 @@ from places.models import FieldDefinition
 from reports.models import AccessibilityValue
 
 from .models import OwnerResponse
+from .services import PHOTO_REASONS
 
 YES_NO = [("", "선택 안 함"), ("true", "있음"), ("false", "없음")]
 
@@ -63,15 +64,17 @@ class CorrectionForm(forms.Form):
     photo = forms.ImageField(label="증빙 사진")
     note = forms.CharField(label="이유 (선택)", max_length=200, required=False, widget=forms.Textarea(attrs={"rows": 2}))
 
-    SCOPES = [FieldDefinition.Scope.ENTRANCE, FieldDefinition.Scope.PLACE]
+    # 고칠 수 있는 항목의 대상과 화면 이름. 가게 사장님: 입구·가게 안 / 건물주: 건물 입구·건물 공용
+    PLACE_SCOPES = {FieldDefinition.Scope.ENTRANCE: "입구", FieldDefinition.Scope.PLACE: "가게 안"}
+    BUILDING_SCOPES = {FieldDefinition.Scope.ENTRANCE: "건물 입구", FieldDefinition.Scope.BUILDING: "건물 공용"}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scopes=None, **kwargs):
         super().__init__(*args, **kwargs)
-        fields = FieldDefinition.objects.filter(scope__in=self.SCOPES, is_active=True).order_by("scope", "order")
+        scopes = scopes or self.PLACE_SCOPES
+        fields = FieldDefinition.objects.filter(scope__in=scopes, is_active=True).order_by("scope", "order")
         self.definitions = {f.key: f for f in fields}
         self.fields["field"].choices = [
-            (f.key, f"{'입구' if f.scope == FieldDefinition.Scope.ENTRANCE else '가게 안'} · {f.label}"
-                    + (f" ({'/'.join(f.choices)})" if f.choices else ""))
+            (f.key, f"{scopes[f.scope]} · {f.label}" + (f" ({'/'.join(f.choices)})" if f.choices else ""))
             for f in fields
         ]
 
@@ -94,3 +97,11 @@ class CorrectionForm(forms.Form):
         data["definition"] = definition
         data["parsed"] = probe.value
         return data
+
+
+class PhotoRequestForm(forms.Form):
+    """입구 사진 교체 요청 (기획 v2 4.4). 운영자가 얼굴·번호판을 확인하고 바꾼다. 정보 삭제 요청은 받지 않음"""
+
+    reason = forms.ChoiceField(label="바꾸고 싶은 이유", choices=PHOTO_REASONS, widget=forms.RadioSelect)
+    photo = forms.ImageField(label="새 입구 사진", help_text="입구 정면, 문턱·계단이 보이게. 사람 얼굴·차량 번호판은 나오지 않게 찍어 주세요")
+    note = forms.CharField(label="덧붙일 말 (선택)", max_length=200, required=False)

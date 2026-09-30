@@ -7,7 +7,17 @@
 <section class="page narrow">
   <p class="muted small"><a href="{% url 'owners:home' %}">← 내 가게</a></p>
   <h1>{{ place.name }}</h1>
-  <p class="muted">이 화면은 사장님께만 보여요.</p>
+  <p class="muted">이 화면은 사장님께만 보여요. <a href="{% url 'places:detail' place.pk %}">손님에게 보이는 상세 화면 →</a></p>
+
+  <section class="card">
+    <h2>지금 지도에 이렇게 보여요</h2>
+    <ul class="plain-list">
+      {% for j in judgments %}
+        <li><strong>{{ j.profile.label }}</strong>: {{ j.display.label }}{% if j.reason %} <span class="muted small">— {{ j.reason }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">점수나 순위가 아니라, 입구 수치로 이동 조건별 안내 문구를 정해요. 정보가 다르면 아래에서 정정을 요청해 주세요.</p>
+  </section>
 
   <section class="card">
     <h2>이번 달 우리 가게를 찾아본 손님</h2>
@@ -35,8 +45,22 @@
       <a class="btn btn-primary" href="{% url 'owners:declaration' place.pk %}">도움 제공·경사로 알리기</a>
       <a class="btn" href="{% url 'owners:response' place.pk %}">사장님 한마디·도움 요청 방법</a>
       <a class="btn" href="{% url 'owners:correction' place.pk %}">잘못된 정보 정정 요청</a>
+      {% if photo_pending %}
+        <span class="btn" aria-disabled="true">입구 사진 교체 확인 중</span>
+      {% else %}
+        <a class="btn" href="{% url 'owners:photo' place.pk %}">입구 사진 교체 요청</a>
+      {% endif %}
     </div>
   </section>
+
+  {% if place.building %}
+  <section class="card">
+    <h2>건물 공용 입구 개선</h2>
+    <p>우리 가게는 <strong>{{ place.building }}</strong> 건물에 있어요. 건물 공용 입구는 건물주님이 개선할 수 있어요.</p>
+    <p class="muted small">건물 입구가 좋아지면 건물 안 가게들이 어떻게 달라지는지 계산한 페이지예요. 건물주님께 보여 드리세요.</p>
+    <a class="btn" href="{% url 'owners:building-improve' place.building.pk %}">건물 개선 효과 보기 · 공유</a>
+  </section>
+  {% endif %}
 
   <section class="card">
     <h2>경사로 설치 지원사업</h2>
@@ -56,10 +80,12 @@
   <section class="card">
     <h2>보낸 요청</h2>
     <ul class="plain-list">
-      {% for r in my_reports %}
+      {% for item in my_reports %}
         <li class="small">
-          {{ r.created_at|date:"n월 j일" }} · {% for v in r.values.all %}{{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}
+          {% with r=item.report %}
+          {{ r.created_at|date:"n월 j일" }} · {% if item.kind %}{{ item.kind }}{% else %}{% for v in r.values.all %}{{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
           · <strong>{{ r.get_status_display }}</strong>{% if r.reject_reason %} — 반려 사유: {{ r.reject_reason }}{% endif %}
+          {% endwith %}
         </li>
       {% empty %}
         <li class="muted small">아직 보낸 요청이 없어요.</li>
