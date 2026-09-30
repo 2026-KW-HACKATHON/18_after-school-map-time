@@ -2,11 +2,11 @@
 화면·API가 같이 쓰는 장소 조회 함수. 표시 정책(기획 v2 3장)은 여기서 한 번만 적용한다.
 """
 
-from django.db.models import Max, Q
 
 from judgments.constants import display
 from judgments.models import ConditionProfile, Judgment, Outcome
 from reports.models import Report
+from reports.services import last_checked_at, place_report_filter, recent_reconfirmations
 from reports.selectors import conflicting_fields, current_values, latest_photo, pending_field_sources
 
 from .models import FieldDefinition, Place
@@ -76,10 +76,7 @@ def map_places(region, profile=None, show_all=False):
 
 def _place_reports(place):
     """이 장소 화면에 관련된 제보: 장소·장소 출입구·건물·건물 출입구"""
-    q = Q(place=place) | Q(entrance__place=place)
-    if place.building_id:
-        q |= Q(building_id=place.building_id) | Q(entrance__building_id=place.building_id)
-    return Report.objects.filter(q)
+    return Report.objects.filter(place_report_filter(place))
 
 
 def place_summary(place):
@@ -92,8 +89,7 @@ def place_summary(place):
             v = values.get(key)
             if v is not None:
                 facts.append(f"{v.field.label} {v.display_value}{v.field.unit if v.field.unit else ''}")
-    last = _place_reports(place).filter(status=Report.Status.VERIFIED).aggregate(last=Max("observed_at"))["last"]
-    return {"facts": " · ".join(facts), "last_checked": last}
+    return {"facts": " · ".join(facts), "last_checked": last_checked_at(place)}
 
 
 def _fields_section(target, scope):
@@ -184,6 +180,9 @@ def place_detail(place):
     all_fields = [f for s in sections for f in s["fields"]]
     all_fields += [f for s in sections for e in s["entrances"] for f in e["fields"]]
     checked = [f["checked_at"] for f in all_fields if f["checked_at"]]
+    latest_reconfirm = place.reconfirmations.order_by("-created_at").values_list("created_at", flat=True).first()
+    if latest_reconfirm and checked:  # 정보가 있을 때만 '지금도 맞아요'가 확인일을 갱신 (services.last_checked_at 과 같은 규칙)
+        checked.append(latest_reconfirm)
 
     verified = _place_reports(place).filter(status=Report.Status.VERIFIED)
     sources = [Report.Source(s).label for s in verified.values_list("source", flat=True).distinct().order_by("source")]
@@ -203,6 +202,8 @@ def place_detail(place):
         "verified_user_reports": verified.filter(source=Report.Source.USER_REPORT).count(),
         "pending_reports": _pending_reports(place),
         "conflicts": place_conflicts(place),
+        "reconfirm_count": recent_reconfirmations(place),
+        "can_reconfirm": bool(checked),
     }
 
 

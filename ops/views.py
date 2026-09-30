@@ -238,6 +238,7 @@ def district(request):
         "summary": district_data.summary(region),
         "distribution": district_data.outcome_distribution(region),
         "candidates": district_data.support_candidates(region),
+        "recheck": district_data.recheck_targets(region),
     })
 
 

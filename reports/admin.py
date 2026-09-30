@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import AccessibilityValue, Report, ReportConfirmation
+from .models import AccessibilityValue, Reconfirmation, Report, ReportConfirmation
 from .services import reject_report, verify_report
 
 
@@ -43,3 +43,12 @@ class ReportAdmin(admin.ModelAdmin):
         for report in queryset.exclude(status=Report.Status.REJECTED):
             reject_report(report, by=request.user, reason="관리자 반려")
         messages.success(request, "반려했습니다.")
+
+
+@admin.register(Reconfirmation)
+class ReconfirmationAdmin(admin.ModelAdmin):
+    # "지금도 맞아요" 기록 — 신뢰도 표시에만 쓰므로 조회만
+    list_display = ["place", "user", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["place__name"]
+    readonly_fields = ["place", "user", "created_at"]

@@ -17,8 +17,10 @@ from owners.models import OwnerClaim, PlaceViewStat, VisitWish
 from owners.services import RAMP_RATIO
 from places.models import Place
 from reports.selectors import current_values
+from reports.services import last_checked_at
 
 OUTCOME_ORDER = [Outcome.ACCESSIBLE, Outcome.CONDITIONAL, Outcome.DIFFICULT, Outcome.UNKNOWN]
+STALE_DAYS = 180  # 이만큼 확인(답사·제보·지금도 맞아요)이 없으면 재답사 대상
 
 
 def _open_places(region):
@@ -92,6 +94,23 @@ def support_candidates(region, today=None):
         })
     rows.sort(key=lambda r: (-(r["owner"] or r["building_owner"]), -r["wishes"], -r["views"], r["place"].name))
     return rows
+
+
+def recheck_targets(region, now=None, limit=20):
+    """
+    재답사 우선순위: 확인된 정보가 없는 가게 수 + STALE_DAYS 넘게 확인이 없는 가게(오래된 순).
+    최근 확인 = 반영된 값의 확인 시각과 '지금도 맞아요' 중 늦은 쪽 (reports.services.last_checked_at)
+    """
+    now = now or timezone.now()
+    never, stale = 0, []
+    for place in _open_places(region):
+        last = last_checked_at(place)
+        if last is None:
+            never += 1
+        elif (now - last).days >= STALE_DAYS:
+            stale.append({"place": place, "last": last, "days": (now - last).days})
+    stale.sort(key=lambda r: r["last"])
+    return {"never": never, "stale_count": len(stale), "stale": stale[:limit], "days": STALE_DAYS}
 
 
 def summary(region):

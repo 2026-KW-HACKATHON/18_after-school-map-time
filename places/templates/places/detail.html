@@ -72,6 +72,20 @@
     <p class="small">출처: {% if sources %}{{ sources|join:", " }}{% else %}아직 없음{% endif %}</p>
     <p class="small">최근 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}</p>
     {% if verified_user_reports %}<p class="small">💬 주민 제보 {{ verified_user_reports }}건이 반영됐어요.</p>{% endif %}
+    {% if reconfirm_count %}<p class="small">👍 최근 30일 동안 주민 {{ reconfirm_count }}명이 "지금도 맞아요"라고 확인했어요.</p>{% endif %}
+    {% if can_reconfirm %}
+      {# 지금도 맞아요 (Should): 판정은 그대로, 최근 확인일만 갱신. 다르면 제보로 #}
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'reports:reconfirm' place.pk %}" class="inline">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn">지금도 맞아요</button>
+        </form>
+      {% else %}
+        <a class="btn" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">지금도 맞아요</a>
+      {% endif %}
+      <p class="muted small">가게에 다녀오셨나요? 위 정보가 지금도 같다면 눌러 주세요. 다르면 아래 "접근성 정보 제보하기"로 알려 주세요.</p>
+    {% endif %}
   </section>
 
   {% if owner_response.assistance_contact or owner_response.assistance_hours or owner_response.alt_entrance %}

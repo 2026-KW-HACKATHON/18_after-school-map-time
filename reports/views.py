@@ -10,7 +10,7 @@ from places.models import Entrance, Place, Region
 
 from .forms import ReportForm
 from .models import AccessibilityValue, Report
-from .services import ConfirmationError, confirm_report
+from .services import ConfirmationError, confirm_report, reconfirm_place
 
 
 def _main_entrance(place):
@@ -64,6 +64,27 @@ def report_new(request):
 
 def report_done(request):
     return render(request, "reports/report_done.html")
+
+
+def _safe_next(request):
+    back = request.POST.get("next") or "/"
+    if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        back = "/"
+    return back
+
+
+@login_required
+@require_POST
+def place_reconfirm(request, pk):
+    """"지금도 맞아요" — 판정은 그대로, 최근 확인일만 갱신"""
+    place = get_object_or_404(Place, pk=pk, is_closed=False)
+    try:
+        reconfirm_place(place, request.user)
+    except ConfirmationError as e:
+        messages.error(request, str(e))
+    else:
+        messages.success(request, "확인해 주셔서 고마워요. 최근 확인일이 오늘로 바뀌었어요.")
+    return redirect(_safe_next(request))
 
 
 @login_required
