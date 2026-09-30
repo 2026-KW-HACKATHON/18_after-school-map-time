@@ -65,11 +65,17 @@
     <fieldset class="card">
       <legend>사장님 인증 코드</legend>
       <p class="small muted">답사 때 사장님께 전달하는 1회용 6자리 코드예요. 사장님이 입력하면 '사장님 인증'에서 승인해 주세요.</p>
-      <ul class="plain-list">
-        {% for c in claim_codes %}<li class="small"><strong>{{ c.code }}</strong> · {{ c.created_at|date:"n월 j일" }} 발급 · {% if c.is_used %}사용됨{% else %}미사용{% endif %}</li>{% empty %}<li class="muted small">발급한 코드가 없어요.</li>{% endfor %}
-      </ul>
+      {% include "ops/_claim_codes.html" with codes=claim_codes %}
       <button type="submit" class="btn" form="claim-code-form">새 코드 발급</button>
     </fieldset>
+    {% if place.building %}
+    <fieldset class="card">
+      <legend>건물주 인증 코드 · {{ place.building }}</legend>
+      <p class="small muted">건물 공용 입구·엘리베이터는 건물주님이 관리해요. 건물주님이 인증하면 건물 정보 정정 요청과 개선 효과 시뮬레이션을 볼 수 있어요.</p>
+      {% include "ops/_claim_codes.html" with codes=building_claim_codes %}
+      <button type="submit" class="btn" form="building-claim-code-form">건물주 코드 발급</button>
+    </fieldset>
+    {% endif %}
     {% endif %}
 
     <p class="notice small">저장하면 입력한 값이 '팀 답사' 기록으로 바로 공개 지도에 반영되고 판정이 다시 계산돼요. 이전 값은 기록으로 남아요.</p>
@@ -86,4 +92,5 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if place %}<form id="claim-code-form" method="post" action="{% url 'ops:claim-code' place.pk %}">{% csrf_token %}</form>{% endif %}{% include "includes/location_picker_js.html" %}{% endblock %}
+{% if place %}<form id="claim-code-form" method="post" action="{% url 'ops:claim-code' place.pk %}">{% csrf_token %}</form>{% endif %}
+{% if place.building %}<form id="building-claim-code-form" method="post" action="{% url 'ops:building-claim-code' place.building.pk %}">{% csrf_token %}<input type="hidden" name="place" value="{{ place.pk }}"></form>{% endif %}{% include "includes/location_picker_js.html" %}{% endblock %}

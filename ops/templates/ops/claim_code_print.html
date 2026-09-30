@@ -1,0 +1,67 @@
+{% load static %}<!doctype html>
+{% comment %}
+  인증 코드 안내 쪽지 (인쇄용 A4 한 장에 2장). 답사 때 가게·건물에 두고 온다.
+  QR·주소로 들어오면 코드가 채워진 인증 화면이 열리고, 카카오 로그인만 하면 된다.
+  QR은 qrcode-generator(MIT, cdnjs)로 브라우저에서 그린다 — 주소는 이 화면에서만 만들고 외부로 보내지 않음.
+{% endcomment %}
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>인증 코드 안내 쪽지 | 턱없네</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <style>
+    body { font-family: Pretendard, system-ui, sans-serif; margin: 0; padding: 24px; color: #1f2937; background: #fff; }
+    .toolbar { margin-bottom: 16px; display: flex; gap: 8px; }
+    .slip { border: 2px dashed #9ca3af; border-radius: 12px; padding: 24px; max-width: 640px; margin: 0 auto 24px;
+            display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+    .slip h1 { font-size: 22px; margin: 0 0 8px; }
+    .slip p { margin: 4px 0; line-height: 1.5; }
+    .code { font-size: 40px; font-weight: 800; letter-spacing: 8px; margin: 12px 0; }
+    .url { font-size: 13px; word-break: break-all; color: #4b5563; }
+    .qr { width: 150px; height: 150px; }
+    .qr img, .qr svg { width: 150px; height: 150px; }
+    .small { font-size: 13px; color: #4b5563; }
+    ol { padding-left: 20px; margin: 8px 0; }
+    @media print { .toolbar { display: none; } body { padding: 0; } }
+    @media (max-width: 480px) { .slip { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">인쇄하기</button>
+    <span class="small">{% if code.is_used %}이미 사용된 코드예요. 새 코드를 발급해 주세요.{% else %}같은 쪽지가 두 장 인쇄돼요. 한 장은 가게에, 한 장은 팀 기록용으로.{% endif %}</span>
+  </div>
+
+  {% for copy in "12" %}
+  <section class="slip">
+    <div>
+      <h1>{% if code.place %}{{ code.place }} 사장님께{% else %}{{ code.building }} 건물주님께{% endif %}</h1>
+      <p>턱없네는 휠체어·유아차로 <strong>들어갈 수 있는 방법</strong>을 알려주는 월계1동 지도예요. 가게를 평가하지 않아요.</p>
+      <p>인증하시면 도움 요청 방법을 직접 알리고, 잘못된 정보를 고치고, 우리 가게를 찾아본 손님 수와 경사로 설치 지원사업을 볼 수 있어요.</p>
+      <div class="code">{{ code.code }}</div>
+      <ol class="small">
+        <li>휴대폰 카메라로 QR을 찍거나 아래 주소로 들어가요</li>
+        <li>카카오로 로그인하고 <strong>인증 신청</strong>을 눌러요</li>
+        <li>운영진이 확인하면 위쪽 메뉴에 <strong>내 가게</strong>가 생겨요</li>
+      </ol>
+      <p class="url">{{ claim_url }}</p>
+      <p class="small">사업자등록번호 같은 정보는 받지 않아요. 1회용 코드예요.</p>
+    </div>
+    <div class="qr" data-qr="{{ claim_url }}" aria-label="인증 화면 QR 코드"></div>
+  </section>
+  {% endfor %}
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script>
+    // QR 라이브러리를 못 불러와도 주소·코드는 그대로 보이므로 쪽지로 쓸 수 있다
+    document.querySelectorAll("[data-qr]").forEach(function (el) {
+      if (typeof qrcode === "undefined") return;
+      var qr = qrcode(0, "M");
+      qr.addData(el.dataset.qr);
+      qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+    });
+  </script>
+</body>
+</html>
