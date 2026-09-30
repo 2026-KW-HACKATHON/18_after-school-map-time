@@ -17,8 +17,8 @@ class RuleConditionInline(admin.TabularInline):
 
 @admin.register(Rule)
 class RuleAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "profile", "priority", "outcome", "basis", "conditions_text"]
-    list_filter = ["rule_set", "profile", "basis"]
+    list_display = ["__str__", "profile", "stage", "priority", "outcome", "basis", "conditions_text"]
+    list_filter = ["rule_set", "profile", "stage", "basis"]
     inlines = [RuleConditionInline]
 
     @admin.display(description="조건 (모두 만족)")

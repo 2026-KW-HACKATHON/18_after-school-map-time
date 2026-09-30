@@ -72,8 +72,18 @@ class Rule(models.Model):
         APPLIED = "APPLIED", "법령 준용"
         TEAM = "TEAM", "팀 기준"
 
+    class Stage(models.TextChoices):
+        """
+        규칙을 적용하는 경로 단계. 2층 이상·지하 가게는 "건물 입구 → 층 이동 → 가게 입구"를 모두 지나야 한다.
+        이동 조건에 층 이동 규칙이 하나도 없으면 층 이동 단계는 판정에 넣지 않는다 (예전 규칙 버전과 같은 결과)
+        """
+
+        ENTRANCE = "ENTRANCE", "출입구"
+        FLOOR = "FLOOR", "층 이동 (엘리베이터 등)"
+
     rule_set = models.ForeignKey(RuleSet, verbose_name="규칙 버전", on_delete=models.CASCADE, related_name="rules")
     profile = models.ForeignKey(ConditionProfile, verbose_name="이동 조건", on_delete=models.CASCADE, related_name="rules")
+    stage = models.CharField("적용 단계", max_length=10, choices=Stage.choices, default=Stage.ENTRANCE)
     outcome = models.CharField(
         "결과", max_length=12,
         choices=[(o.value, o.label) for o in Outcome if o != Outcome.UNKNOWN],  # 미확인은 규칙이 아니라 "정보 부족"의 결과
