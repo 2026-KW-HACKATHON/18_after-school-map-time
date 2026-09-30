@@ -1,5 +1,5 @@
 """
-판정 엔진 테스트. 기준값은 judgments/data/rules_v1.json(초안)에서 읽는다.
+판정 엔진 테스트. 기준값은 judgments/data/rules_v2.json(초안, load_rules 기본 파일)에서 읽는다.
 판정 기준표가 확정돼 수치가 바뀌면 경계값 테스트의 숫자도 같이 바꾼다.
 """
 
@@ -126,6 +126,74 @@ class UnknownAndRoutesTests(JudgmentTestBase):
         self.assertEqual(self.judge(self.stroller).outcome, Outcome.CONDITIONAL)
 
 
+class FloorChangeTests(JudgmentTestBase):
+    """2층 이상·지하 가게: 건물 입구 → 층 이동(엘리베이터) → 가게 입구 (rules_v2 층 이동 규칙)"""
+
+    def setUp(self):
+        super().setUp()
+        self.building = Building.objects.create(region=self.region, address="월계동 2", lat=Decimal("37.62"), lng=Decimal("127.05"))
+        self.place.building, self.place.floor = self.building, 2
+        self.place.save()
+        lobby = Entrance.objects.create(building=self.building, name="건물 입구")
+        self.values(lobby, step_height_cm="0", step_count=0, door_width_cm=120, has_ramp=False)
+        self.values(self.door, step_height_cm="0", door_width_cm=90, has_ramp=False)
+
+    def test_elevator_yes_no_unknown(self):
+        self.assertEqual(self.judge().outcome, Outcome.UNKNOWN)           # 엘리베이터 정보 없음
+        self.values(self.building, elevator=True)
+        self.assertEqual(self.judge().outcome, Outcome.ACCESSIBLE)
+        self.values(self.building, elevator=False)
+        result = self.judge()
+        self.assertEqual(result.outcome, Outcome.DIFFICULT)
+        self.assertEqual(facts(result), "2층 · 엘리베이터 없음")
+
+    def test_crutch_can_take_stairs_with_help(self):
+        self.values(self.building, elevator=False)
+        crutch = ConditionProfile.objects.get(key="CRUTCH")
+        self.assertEqual(self.judge(crutch).outcome, Outcome.CONDITIONAL)
+
+    def test_first_floor_in_building_ignores_elevator(self):
+        self.place.floor = 1
+        self.place.save()
+        self.values(self.building, elevator=False)
+        self.assertEqual(self.judge().outcome, Outcome.ACCESSIBLE)
+
+    def test_basement_without_building_is_unknown(self):
+        self.place.building, self.place.floor = None, -1
+        self.place.save()
+        result = self.judge()
+        self.assertEqual(result.outcome, Outcome.UNKNOWN)               # 층 이동 방법을 알 수 없음
+
+    def test_basement_fact_label(self):
+        self.place.floor = -1
+        self.place.save()
+        self.values(self.building, elevator=False)
+        self.assertEqual(facts(self.judge()), "지하 1층 · 엘리베이터 없음")
+
+    def test_entrance_still_checked_on_upper_floor(self):
+        self.values(self.building, elevator=True)
+        self.values(self.door, step_height_cm="15", step_count=1, door_width_cm=90, has_ramp=False)
+        result = self.judge()
+        self.assertEqual((result.outcome, facts(result)), (Outcome.DIFFICULT, "입구 단차 15cm"))
+
+    def test_ruleset_without_floor_rules_behaves_like_v1(self):
+        """층 이동 규칙이 없는 이동 조건은 층 이동 단계를 넣지 않는다 (예전 버전과 같은 결과)"""
+        RuleSet.active().rules.filter(stage=Rule.Stage.FLOOR).delete()
+        self.values(self.building, elevator=False)
+        self.assertEqual(self.judge().outcome, Outcome.ACCESSIBLE)
+
+    def test_recompute_saves_floor_reason(self):
+        self.values(self.building, elevator=False)
+        recompute_place(self.place)
+        j = Judgment.objects.get(place=self.place, profile=self.wheelchair)
+        self.assertEqual((j.result, j.reason), (Outcome.DIFFICULT, "2층 · 엘리베이터 없음"))
+
+
+def facts(result):
+    """judge()가 어려움·조건부에 붙이는 사실 한 줄"""
+    return result.reason
+
+
 class ExtensibilityTests(JudgmentTestBase):
     def test_new_profile_by_data_only(self):
         """새 이동 조건(캐리어)을 코드 수정 없이 DB 행 추가만으로 판정 (기획 v2 8장)"""
@@ -150,7 +218,8 @@ class RecomputeTests(JudgmentTestBase):
         self.values(self.door, step_height_cm="30", door_width_cm=90, has_ramp=False)
         recompute_place(self.place)
         j = Judgment.objects.get(place=self.place, profile=self.wheelchair)
-        self.assertEqual((j.result, j.rule_version, j.has_improved_badge), (Outcome.DIFFICULT, 1, False))
+        self.assertEqual((j.result, j.rule_version, j.has_improved_badge),
+                         (Outcome.DIFFICULT, RuleSet.active().version, False))
 
         # 경사로 설치 후 재답사 → 판정 상승 → "개선 완료" 배지
         self.values(self.door, step_height_cm="30", door_width_cm=90, has_ramp=True)

@@ -19,12 +19,9 @@
         {% endfor %}
       </tbody>
     </table>
-    <p class="muted small">건물 안 가게 {{ places|length }}곳 중 "들어갈 수 있어요" 가게 수예요. 가게 입구 정보는 그대로 두고 건물 공용 입구만 바꿔서 턱없네 판정 기준으로 다시 계산했어요.</p>
+    <p class="muted small">건물 안 가게 {{ places|length }}곳 중 "들어갈 수 있어요" 가게 수예요. 가게 입구 정보는 그대로 두고 건물 공용 입구·엘리베이터만 바꿔서 턱없네 판정 기준으로 다시 계산했어요.</p>
   {% else %}
-    <p class="muted">건물 공용 입구 정보가 아직 없어서 계산할 수 없어요.</p>
+    <p class="muted">건물 공용 입구 정보나 건물 안 가게가 아직 없어서 계산할 수 없어요.</p>
   {% endif %}
 </section>
 {% endfor %}
-{% if has_upper_floor %}
-  <p class="notice small muted">2층 이상 가게의 층 이동(엘리베이터·계단)은 아직 판정에 넣지 않았어요. 실제로는 엘리베이터가 없으면 결과가 달라질 수 있어요.</p>
-{% endif %}
