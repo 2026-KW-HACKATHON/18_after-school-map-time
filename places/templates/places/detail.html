@@ -59,6 +59,14 @@
     {% endfor %}
   </section>
 
+  {% if conflicts %}
+  {# 사장님 정보와 주민 제보가 다를 때 (기획 v2 7장): 운영진 판단 전까지 방문 전 확인을 권함 #}
+  <section class="notice" role="note">
+    <p><strong>정보가 서로 달라요</strong> — {{ conflicts|join:", " }}</p>
+    <p class="small">사장님이 알려준 정보와 주민 제보가 달라 운영진이 확인하고 있어요. 방문 전에 전화로 확인해 보세요.{% if place.phone %} <a href="tel:{{ place.phone }}">{{ place.phone }}</a>{% endif %}</p>
+  </section>
+  {% endif %}
+
   <section class="card" aria-labelledby="trust-title">
     <h2 id="trust-title">정보 신뢰도</h2>
     <p class="small">출처: {% if sources %}{{ sources|join:", " }}{% else %}아직 없음{% endif %}</p>

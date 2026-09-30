@@ -56,6 +56,32 @@ def pending_field_sources(target):
     return out
 
 
+# 서로 다른 쪽의 정보 (기획 v2 7장 "사장님 선언과 사용자 제보가 충돌")
+OWNER_SIDE = {Report.Source.OWNER}
+RESIDENT_SIDE = {Report.Source.USER_REPORT}
+
+
+def conflicting_fields(target):
+    """
+    사장님 정보와 주민 제보가 서로 다른 필드 [FieldDefinition] (기획 v2 7장).
+    반영된 최신 값과 확인 중인 값을 모아, 한 필드에 사장님 쪽 값과 주민 쪽 값이 있고 서로 다르면 충돌.
+    운영진이 판단하기 전까지 화면에 "정보가 서로 달라요, 방문 전 전화 확인을 권해요"를 띄우는 데 쓴다.
+    """
+    by_field = {}
+    for key, v in current_values(target).items():
+        by_field.setdefault(key, []).append((v.report.source, v.value, v.field))
+    pending = AccessibilityValue.objects.filter(report__status=Report.Status.PENDING, **_target_filter(target))
+    for v in pending.select_related("field", "report"):
+        by_field.setdefault(v.field_id, []).append((v.report.source, v.value, v.field))
+    conflicts = []
+    for entries in by_field.values():
+        owner = {value for source, value, _ in entries if source in OWNER_SIDE}
+        resident = {value for source, value, _ in entries if source in RESIDENT_SIDE}
+        if owner and resident and owner != resident:
+            conflicts.append(entries[0][2])
+    return sorted(conflicts, key=lambda f: f.order)
+
+
 def pending_fields(target):
     """확인 중인 제보가 있는 필드 키 집합 — "새 제보 확인 중" 표시용"""
     return set(pending_field_sources(target))
