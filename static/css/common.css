@@ -162,3 +162,20 @@ legend { font-weight: 700; padding: 0 4px; }
 .message { margin-top: 12px; padding: 12px 16px; border-radius: 8px; background: var(--color-surface); border: 1px solid var(--color-border); }
 .message.error { border-color: var(--color-error); color: var(--color-error); }
 .message.success { border-color: var(--color-success); color: var(--color-success); }
+
+/* ── 큰 글씨 모드 (어르신 친화, 상단 "큰 글씨" 버튼) ──
+   <html class="large-text"> 일 때만 적용. 글자 크기가 px로 정해진 곳을 여기서 한 번에 키운다.
+   (Figma 디자인 CSS로 바꿀 때도 이 블록만 옮기면 됨. 지도 화면 크기는 places.css 끝) */
+.text-size-toggle { border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); padding: 4px 8px; font: inherit; cursor: pointer; }
+.text-size-toggle[aria-pressed="true"] { border-color: var(--color-primary); color: var(--color-primary); font-weight: 700; }
+html.large-text body { font-size: 20px; line-height: 1.6; }
+html.large-text .nav,
+html.large-text .ops-nav,
+html.large-text .diff-table { font-size: 18px; }
+html.large-text .small,
+html.large-text .errorlist { font-size: 17px; }
+html.large-text .badge-positive,
+html.large-text .badge-neutral,
+html.large-text .badge-warn { font-size: 15px; }
+html.large-text .btn { padding: 14px 22px; }
+html.large-text .tabbar a { font-size: 18px; }

@@ -313,6 +313,7 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 | `/ops/reports/<id>/done/` | 18 | 처리 완료 안내 |
 | `/ops/places/`, `/ops/places/new/`, `/ops/places/<id>/edit/` | 12·13 | 장소 목록·등록·수정. 이름·위치 필수(누락 시 안내 상자), 입구·가게 안 값, 출처·확인일. 저장하면 **'팀 답사' 기록을 새로 추가**(이전 값은 이력으로 남음)하고 재판정 |
 | `/ops/places/<id>/saved/` | 14 | 저장 완료 안내 |
+| `/ops/poster/` | — | **전시·주민투표용 QR 포스터** (A4 인쇄, 지도 QR·사용법 3단계·지도 표시 설명). 표시 문구·색은 판정 상수 그대로 |
 | `/ops/district/` | — | **지역 집계** (기획 v2 8장 구청 대시보드, 운영자만): 이동 조건별 판정 분포, 개선 완료·가고 싶어요·인증 수, **경사로 지원사업 검토 목록**(어려움 가게를 개선 의지 → 가고 싶어요 → 조회 순, 필요한 경사로 길이) + CSV 내려받기. 공개 화면에는 순위·목록을 보여 주지 않음 (`ops/district.py`) |
 
 **위치 고르기** (`templates/includes/location_picker.html` + `static/js/map/location-picker.js`): 지도를 누르면 표시하고 같은 폼의 `lat`/`lng`에 좌표를 넣음. "내 위치로"는 보조. 처음 중심은 지역 설정. 주민 새 장소 제보·운영자 새 장소 승인·장소 등록에서 공용. 새 장소 제보는 지도 위치 또는 위치 설명 중 하나 필수.
@@ -359,7 +360,8 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 | `templates/404.html` | 없는 페이지 (`DEBUG=False`일 때만 보임) |
 | `templates/500.html` | 서버 오류. 오류 상황에서도 뜰 수 있게 `base.html`·`url` 태그 없이 단독 HTML |
 | `static/css/common.css` | 맨 위 `:root`의 **디자인 변수**(`--color-primary` 등)만 바꾸면 전체 색이 바뀜. 레이아웃·버튼·입력창·메시지 공통 스타일 |
-| `static/js/common.js` | `api(url, {method, body})` — 우리 API 호출 헬퍼. POST 등에는 CSRF 토큰을 자동으로 붙이고, 실패하면 서버의 `detail` 메시지로 에러를 던짐 |
+| `static/js/common.js` | `api(url, {method, body})` — 우리 API 호출 헬퍼. POST 등에는 CSRF 토큰을 자동으로 붙이고, 실패하면 서버의 `detail` 메시지로 에러를 던짐. **큰 글씨 모드** 버튼 처리(선택은 브라우저 localStorage에 저장) |
+| 큰 글씨 모드 | 상단 "큰 글씨" 버튼 → `<html class="large-text">`. 크기는 `common.css`·`places.css` 끝의 `html.large-text` 블록에서만 키움. `base.html` `<head>`의 한 줄 스크립트가 화면을 그리기 전에 저장된 선택을 적용 (깜빡임 없음) |
 | `static/img/` | 공통 이미지 (아이콘·로고 등) |
 
 > 앱 전용 템플릿·정적 파일은 앱 폴더 안에 둡니다: `places/templates/places/...`, `places/static/places/...`

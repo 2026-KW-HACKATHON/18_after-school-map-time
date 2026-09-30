@@ -97,3 +97,11 @@
 /* ── 상세: 판단 근거·확인 중 제보 (와이어프레임 7번) ── */
 .judge-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
 .pending-report { padding: 12px 0; border-top: 1px dashed var(--color-border); }
+
+/* ── 큰 글씨 모드 (common.css 의 html.large-text 와 짝) ── */
+html.large-text .legend,
+html.large-text .summary,
+html.large-text .result-status { font-size: 18px; }
+html.large-text .place-detail h2 { font-size: 23px; }
+html.large-text .place-detail h3 { font-size: 20px; }
+html.large-text .judge-dot { width: 26px; height: 26px; }
