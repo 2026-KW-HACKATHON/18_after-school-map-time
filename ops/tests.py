@@ -86,6 +86,35 @@ class DashboardAndListTests(OpsTestBase):
 
 
 class ReviewTests(OpsTestBase):
+    def test_review_prefills_and_saves_corrected_place_details(self):
+        report = self.user_report(step_height_cm=0)
+        report.suggested_category = "CAFE"
+        report.suggested_address = "서울 노원구 광운로 20"
+        report.suggested_floor = -1
+        report.suggested_phone = "02-123-4567"
+        report.save()
+        url = reverse("ops:report-review", args=[report.pk])
+        form = self.client.get(url).context["form"]
+        self.assertEqual(form.initial["category"], "CAFE")
+        self.assertEqual(form.initial["floor"], -1)
+        self.assertEqual(form.initial["phone"], report.suggested_phone)
+        self.assertEqual(form.initial["address"], report.suggested_address)
+        res = self.client.post(url, {"action": "approve", "place_name": "확인한 카페", "category": "CAFE",
+                                    "address": "서울 노원구 광운로 21", "floor": "2", "phone": "02-987-6543",
+                                    "lat": "37.626100", "lng": "127.058800"})
+        self.assertRedirects(res, reverse("ops:report-done", args=[report.pk]))
+        report.refresh_from_db()
+        place = report.target_place
+        self.assertEqual((place.floor, place.phone, place.address), (2, "02-987-6543", "서울 노원구 광운로 21"))
+        self.assertEqual(report.suggested_floor, -1)  # 원본 제보는 유지
+
+    def test_new_place_review_rejects_out_of_range_coordinates(self):
+        report = self.user_report(step_height_cm=0)
+        res = self.client.post(reverse("ops:report-review", args=[report.pk]),
+                               {"action": "approve", "place_name": "새 가게", "lat": "91", "lng": "127"})
+        self.assertIn("lat", res.context["form"].errors)
+        self.assertFalse(Place.objects.exists())
+
     def test_review_shows_diff_and_judgment_change(self):
         _, door = self.cafe_with_door()
         report = self.user_report(door, step_height_cm=30)

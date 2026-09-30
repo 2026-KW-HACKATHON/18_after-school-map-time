@@ -48,6 +48,8 @@ def report_new(request):
             else:
                 report.suggested_name = data["suggested_name"]
                 report.location_text = data["location_text"]
+                for key in ("suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
+                    setattr(report, key, data[key])
             report.save()
             for key, raw in form.entrance_values().items():
                 value = AccessibilityValue(report=report, field_id=key)

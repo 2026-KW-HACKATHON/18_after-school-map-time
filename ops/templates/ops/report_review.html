@@ -80,6 +80,9 @@
         <legend>새 장소로 등록</legend>
         {% include "reports/_field.html" with field=form.place_name %}
         {% include "reports/_field.html" with field=form.category %}
+        {% include "reports/_field.html" with field=form.address %}
+        {% include "reports/_field.html" with field=form.floor %}
+        {% include "reports/_field.html" with field=form.phone %}
         {% if report.lat %}<p class="small muted">제보자가 표시한 위치가 먼저 찍혀 있어요. 사진과 위치 설명을 보고 맞는지 확인해 주세요.</p>
         {% else %}<p class="small muted">제보자가 지도 위치를 표시하지 않았어요. 위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
         {% include "includes/location_picker.html" %}

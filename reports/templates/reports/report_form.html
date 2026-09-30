@@ -22,10 +22,17 @@
         <p><strong>{{ place.name }}</strong>{% if place.address %} <span class="muted">· {{ place.address }}</span>{% endif %}</p>
       {% else %}
         {% include "reports/_field.html" with field=form.suggested_name %}
-        {% include "includes/location_picker.html" %}
-        {{ form.lat }}{{ form.lng }}
-        {% for e in form.lat.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
+        {% include "includes/location_picker.html" with search_enabled=True %}
+        <div class="coord-row">
+          {% include "reports/_field.html" with field=form.lat %}
+          {% include "reports/_field.html" with field=form.lng %}
+        </div>
+        <noscript><p class="notice">지도를 사용하려면 JavaScript를 켜 주세요. 위도·경도나 위치 설명을 직접 입력할 수도 있어요.</p></noscript>
         {% include "reports/_field.html" with field=form.location_text %}
+        {% include "reports/_field.html" with field=form.suggested_category %}
+        {% include "reports/_field.html" with field=form.suggested_address %}
+        {% include "reports/_field.html" with field=form.suggested_floor %}
+        {% include "reports/_field.html" with field=form.suggested_phone %}
       {% endif %}
     </fieldset>
 

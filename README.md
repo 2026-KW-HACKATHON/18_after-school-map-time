@@ -132,6 +132,19 @@ docker compose exec web python manage.py createsuperuser
 docker compose exec web python manage.py test
 ```
 
+장소 선택 UI의 검색·핀·좌표 동기화 테스트는 Node.js 18 이상에서 추가 패키지 없이 실행합니다.
+
+```bash
+node --test tests/js/location-picker.test.cjs
+```
+
+새 장소 제보(`/report/new/`)는 장소 이름과 위치 설명 사이에서 카카오맵 장소 검색 및 지도 클릭으로 핀을 선택할 수 있습니다.
+선택한 위도·경도는 화면에 표시되며 직접 수정하거나 현재 위치로 채울 수도 있습니다.
+검색 결과의 이름·주소·업종·전화번호를 자동 입력하고, 층은 직접 입력합니다.
+제안 정보는 제보에 보관되며 운영자가 검토 화면에서 수정·승인할 때 장소에 반영됩니다.
+지도 키가 없거나 SDK 연결에 실패하면 좌표·위치 설명으로 제보할 수 있습니다.
+실제 지도 검증에는 `KAKAO_JAVASCRIPT_KEY`와 카카오 개발자센터의 실행 도메인 등록이 필요합니다.
+
 ### 종료
 
 ```bash
