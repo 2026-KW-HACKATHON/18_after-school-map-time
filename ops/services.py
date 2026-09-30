@@ -36,6 +36,11 @@ def entrance_form_initial(place):
     if entrance is None:
         return {}
     initial = {}
+    # 이동 조건은 관측값이 아닌 제보 메타데이터다. 최근 작성된 검증 기록의 선택을 표시한다.
+    report = entrance.reports.filter(
+        status=Report.Status.VERIFIED, source__in=[Report.Source.USER_REPORT, Report.Source.TEAM_SURVEY],
+    ).order_by("-created_at", "-pk").first()
+    initial["profiles"] = report.profiles if report else []
     for key, value in current_values(entrance).items():
         if key in ENTRANCE_KEYS:
             raw = value.value
@@ -88,14 +93,20 @@ def save_place_survey(form, user):
     note = " · ".join(filter(None, [f"출처: {data['source_note']}" if data.get("source_note") else "", data.get("memo")]))
 
     entrance_values = form.values_for(ENTRANCE_KEYS)
+    previous = entrance_form_initial(place)
+    previous_profiles = previous.get("profiles", [])
+    # 체크를 모두 해제한 제출과 이동 조건 칸이 없는 기존 클라이언트의 제출을 구분한다.
+    profiles_submitted = "profiles" in form.data or form.data.get("profiles_present") == "1"
+    profiles = data["profiles"] if profiles_submitted else previous_profiles
+    profiles_changed = set(profiles) != set(previous_profiles)
     if not any(data.get(key) for key in ("source_note", "observed_on", "memo")):
         # 자동으로 채운 값을 그대로 제출한 경우 원래 제보의 출처·확인 시각을 유지한다.
         # 출처/확인일/메모를 입력한 명시적 재확인은 같은 값이어도 새 이력으로 남긴다.
-        previous = entrance_form_initial(place)
         entrance_values = {key: raw for key, raw in entrance_values.items()
                            if key not in previous or raw != previous[key]}
-    if entrance_values:
-        _save_values(_survey_report(user, observed_at, note, entrance=main_entrance(place)), entrance_values)
+    if entrance_values or profiles_changed:
+        report = _survey_report(user, observed_at, note, entrance=main_entrance(place), profiles=profiles)
+        _save_values(report, entrance_values)
     place_values = form.values_for(PLACE_KEYS)
     if place_values:
         _save_values(_survey_report(user, observed_at, note, place=place), place_values)

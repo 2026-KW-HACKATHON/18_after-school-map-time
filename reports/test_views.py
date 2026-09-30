@@ -204,7 +204,7 @@ class ReportFormTests(TempMediaMixin, TestCase):
 
         self.post(suggested_name="제안 약국", suggested_category="PHARMACY", suggested_floor="-1",
                   suggested_address="광운로 20", suggested_phone="02-123", lat="37.626123", lng="127.058789",
-                  step_height_cm="0", door_width_cm="90", has_ramp="false")
+                  step_height_cm="0", door_width_cm="90", has_ramp="false", profiles=["STROLLER", "WHEELCHAIR"])
         self.assertFalse(Place.objects.filter(name="제안 약국").exists())
         report = Report.objects.get()
         staff = User.objects.create_user(username="reviewer", is_staff=True)
@@ -227,10 +227,11 @@ class ReportFormTests(TempMediaMixin, TestCase):
         self.assertEqual(form["step_height_cm"].value(), Decimal("0"))
         self.assertEqual(form["door_width_cm"].value(), Decimal("90"))
         self.assertEqual(form["has_ramp"].value(), "false")
+        self.assertEqual(form["profiles"].value(), ["STROLLER", "WHEELCHAIR"])
 
     def test_existing_report_approval_fills_operator_entrance_fields(self):
         self.post(place=self.place.pk, step_height_cm="0", step_count="0", has_ramp="false",
-                  door_width_cm="90.5", door_type="자동문")
+                  door_width_cm="90.5", door_type="자동문", profiles=["WHEELCHAIR"])
         report = Report.objects.get()
         staff = User.objects.create_user(username="reviewer", is_staff=True)
         self.client.force_login(staff)
@@ -241,6 +242,7 @@ class ReportFormTests(TempMediaMixin, TestCase):
         self.assertRedirects(res, reverse("ops:report-done", args=[report.pk]))
         res = self.client.get(url)
         form = res.context["form"]
+        self.assertEqual(form["profiles"].value(), ["WHEELCHAIR"])
         for key, expected in {"step_height_cm": Decimal("0"), "step_count": Decimal("0"),
                               "has_ramp": "false", "door_width_cm": Decimal("90.5"),
                               "door_type": "자동문"}.items():

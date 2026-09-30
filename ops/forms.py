@@ -1,8 +1,10 @@
 """운영자 화면 폼 (와이어프레임 12·16·17번)"""
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 
+from judgments.models import ConditionProfile
 from places.models import Place
 
 UNKNOWN = ""
@@ -24,6 +26,8 @@ class PlaceForm(forms.ModelForm):
     has_ramp = forms.ChoiceField(label="고정 경사로", required=False, choices=BOOL_CHOICES)
     door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, min_value=0, max_value=1000, decimal_places=1)
     door_type = forms.ChoiceField(label="출입문 형태", required=False)
+    profiles = forms.MultipleChoiceField(label="이동 조건 (선택)", required=False,
+                                        widget=forms.CheckboxSelectMultiple)
     interior_step = forms.ChoiceField(label="가게 안 단차", required=False, choices=BOOL_CHOICES)
     accessible_toilet = forms.ChoiceField(label="장애인 화장실", required=False, choices=BOOL_CHOICES)
     assistance_offered = forms.ChoiceField(label="입장 도움", required=False, choices=BOOL_CHOICES)
@@ -46,6 +50,11 @@ class PlaceForm(forms.ModelForm):
     def __init__(self, *args, door_choices=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["door_type"].choices = [(UNKNOWN, "모름")] + [(c, c) for c in door_choices]
+        # 기존 선택이 비활성화돼도 다른 정보를 저장하면서 잃지 않도록 표시한다.
+        profiles = ConditionProfile.objects.filter(Q(is_active=True) | Q(key__in=self.initial.get("profiles", [])))
+        self.fields["profiles"].choices = [
+            (p.key, p.label if p.is_active else f"{p.label} (사용 중지)") for p in profiles
+        ]
         if not self.instance.pk:
             self.fields["observed_on"].initial = timezone.localdate()
 
