@@ -49,6 +49,63 @@ def confirm_report(report, user, required):
     return False
 
 
+RECONFIRM_WINDOW_DAYS = 30  # 상세 화면 "최근 30일 동안 주민 N명이 확인했어요"
+
+
+def place_report_filter(place):
+    """이 장소 화면에 나오는 제보: 장소·장소 출입구·건물·건물 출입구"""
+    from django.db.models import Q
+
+    q = Q(place=place) | Q(entrance__place=place)
+    if place.building_id:
+        q |= Q(building_id=place.building_id) | Q(entrance__building_id=place.building_id)
+    return q
+
+
+def has_public_info(place):
+    """재확인할 공개 정보가 있는지 (반영된 값이 하나라도 있어야 '지금도 맞아요'를 누를 수 있음)"""
+    return Report.objects.filter(
+        place_report_filter(place), status=Report.Status.VERIFIED, values__isnull=False,
+    ).exists()
+
+
+def last_checked_at(place):
+    """
+    최근 확인 시각 = 반영된 값의 가장 최근 확인 시각과 '지금도 맞아요' 중 늦은 쪽.
+    반영된 값이 하나도 없으면 None (확인할 정보가 없으므로 '지금도 맞아요'도 세지 않음)
+    """
+    from django.db.models import Max
+
+    last = (Report.objects.filter(place_report_filter(place), status=Report.Status.VERIFIED, values__isnull=False)
+            .aggregate(last=Max("observed_at"))["last"])
+    if last is None:
+        return None
+    reconfirmed = place.reconfirmations.aggregate(last=Max("created_at"))["last"]
+    return max(last, reconfirmed) if reconfirmed else last
+
+
+def reconfirm_place(place, user):
+    """
+    "지금도 맞아요" 기록. 판정·값은 바꾸지 않고 최근 확인일만 갱신 (reports.models.Reconfirmation 참고).
+    같은 사람·같은 가게는 하루 한 번
+    """
+    from .models import Reconfirmation
+
+    if not has_public_info(place):
+        raise ConfirmationError("아직 확인할 정보가 없어요. 제보로 알려 주세요.")
+    if Reconfirmation.objects.filter(place=place, user=user, created_at__date=timezone.localdate()).exists():
+        raise ConfirmationError("오늘은 이미 확인해 주셨어요.")
+    return Reconfirmation.objects.create(place=place, user=user)
+
+
+def recent_reconfirmations(place, days=RECONFIRM_WINDOW_DAYS):
+    """최근 N일 동안 '지금도 맞아요'를 누른 서로 다른 사람 수"""
+    from datetime import timedelta
+
+    since = timezone.now() - timedelta(days=days)
+    return place.reconfirmations.filter(created_at__gte=since).values("user").distinct().count()
+
+
 def _review(report, status, by, reason=""):
     report.status = status
     report.reviewed_by = by
