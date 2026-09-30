@@ -105,6 +105,13 @@ class OwnerClaim(models.Model):
             return False
         return cls.objects.filter(user=user, place=place, status=cls.Status.APPROVED).exists()
 
+    @classmethod
+    def is_building_owner(cls, user, building):
+        """이 사람이 이 건물의 승인된 건물주인가 (기획 v2 5.2)"""
+        if not user.is_authenticated:
+            return False
+        return cls.objects.filter(user=user, building=building, status=cls.Status.APPROVED).exists()
+
     def review(self, status, by, reason=""):
         self.status, self.reviewed_by, self.reviewed_at, self.reject_reason = status, by, timezone.now(), reason
         self.save(update_fields=["status", "reviewed_by", "reviewed_at", "reject_reason"])

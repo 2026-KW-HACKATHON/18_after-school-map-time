@@ -6,8 +6,11 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from judgments.models import ConditionProfile
-from places.models import Entrance
+from judgments.constants import IMPROVEMENT_RANK, display
+from judgments.engine import judge
+from judgments.models import ConditionProfile, Judgment, Outcome, RuleSet
+from judgments.services import is_photo_request
+from places.models import Building, Entrance
 from reports.models import AccessibilityValue, Report
 from reports.selectors import current_values
 
@@ -52,6 +55,20 @@ def main_entrance(place):
     return entrance or Entrance.objects.create(place=place, name="정문", is_main=True)
 
 
+def building_main_entrance(building):
+    entrance = building.entrances.filter(is_main=True).first() or building.entrances.first()
+    return entrance or Entrance.objects.create(building=building, name="공용 입구", is_main=True)
+
+
+def _target_key(target):
+    """제보 대상 칸 이름: 출입구·건물·가게"""
+    if isinstance(target, Entrance):
+        return "entrance"
+    if isinstance(target, Building):
+        return "building"
+    return "place"
+
+
 def open_correction_fields(target):
     """진행 중인 사장님 제보가 있는 필드 → 같은 필드는 끝나야 새로 요청 가능"""
     from reports.selectors import _target_filter
@@ -72,7 +89,7 @@ def submit_owner_report(user, target, values, photo, note=""):
     busy = open_correction_fields(target) & set(values)
     if busy:
         raise OwnerError("같은 항목의 요청이 아직 확인 중이에요. 처리된 뒤에 다시 요청해 주세요.")
-    key = "entrance" if isinstance(target, Entrance) else "place"
+    key = _target_key(target)
     report = Report.objects.create(
         source=Report.Source.OWNER, status=Report.Status.PENDING, created_by=user, photo=photo, note=note,
         **{key: target},
@@ -123,7 +140,127 @@ def dashboard(place, today=None):
         "total_views": sum(views.values()),
         "total_wishes": sum(wishes.values()),
         "ramp": ramp_guide(place),
+        "judgments": place_judgments(place),
         "programs": SupportProgram.objects.filter(region=place.region, is_active=True),
-        "my_reports": Report.objects.filter(Q(place=place) | Q(entrance__place=place), source=Report.Source.OWNER)
-        .prefetch_related("values__field").order_by("-created_at")[:20],
+        "my_reports": sent_requests(Q(place=place) | Q(entrance__place=place)),
+        "photo_pending": has_pending_photo_request(place),
     }
+
+
+def place_judgments(place):
+    """지금 지도에 보이는 판정 (이동 조건별 문구 + 사실 한 줄) — 사장님이 '손님에게 어떻게 보이는지' 확인"""
+    judgments = {j.profile_id: j for j in Judgment.objects.filter(place=place)}
+    rows = []
+    for profile in ConditionProfile.objects.filter(is_active=True):
+        j = judgments.get(profile.key)
+        rows.append({"profile": profile, "display": display(j.result if j else Outcome.UNKNOWN),
+                     "reason": j.reason if j else ""})
+    return rows
+
+
+def sent_requests(condition):
+    """보낸 요청 목록 (종류 문구 포함)"""
+    reports = (Report.objects.filter(condition, source=Report.Source.OWNER)
+               .prefetch_related("values__field").order_by("-created_at")[:20])
+    return [{"report": r, "kind": "사진 교체 요청" if is_photo_request(r) else ""} for r in reports]
+
+
+# ── 입구 사진 교체 요청 (기획 v2 4.4) ────────────────────────
+
+PHOTO_REASONS = [
+    ("간판·상호가 크게 나와요", "간판·상호가 크게 나와요"),
+    ("사람 얼굴이 나와요", "사람 얼굴이 나와요"),
+    ("예전 모습이에요 (공사·이전 등)", "예전 모습이에요 (공사·이전 등)"),
+    ("기타", "기타"),
+]
+
+
+def has_pending_photo_request(place):
+    return Report.objects.filter(
+        entrance__place=place, source=Report.Source.OWNER, status=Report.Status.PENDING, values__isnull=True,
+    ).exists()
+
+
+@transaction.atomic
+def submit_photo_request(user, place, photo, reason, note=""):
+    """
+    입구 사진 교체 요청. 값 없이 사진만 담은 사장님 제보(확인 중)로 넣고, 운영자만 승인한다
+    (얼굴·번호판 확인 — judgments.services.required_confirmations). 가게 정보 '삭제' 요청은 받지 않는다.
+    """
+    if has_pending_photo_request(place):
+        raise OwnerError("사진 교체 요청이 아직 확인 중이에요. 처리된 뒤에 다시 요청해 주세요.")
+    return Report.objects.create(
+        source=Report.Source.OWNER, status=Report.Status.PENDING, created_by=user, photo=photo,
+        entrance=main_entrance(place), note=" · ".join(filter(None, [f"사진 교체 요청: {reason}", note]))[:500],
+    )
+
+
+# ── 건물주 (기획 v2 5장) ──────────────────────────────────────
+
+# 개선 시뮬레이션 시나리오: 건물 공용 입구에 가상 값을 넣고 판정 엔진으로 다시 계산한다 (기준값은 규칙 데이터 그대로)
+SCENARIOS = [
+    {"key": "ramp", "title": "건물 공용 입구에 고정 경사로를 설치하면", "entrance_values": {"has_ramp": True}},
+]
+
+
+def simulate(building, scenario):
+    """
+    건물 입구 개선 시 건물 안 가게들의 판정 변화 (기획 v2 5.2).
+    반환: [{"profile", "before", "after", "improved": [가게 이름]}]
+      before/after = "들어갈 수 있어요"(ACCESSIBLE) 가게 수, improved = 한 단계라도 나아지는 가게
+    """
+    rule_set = RuleSet.active()
+    entrances = list(building.entrances.all())
+    places = list(building.places.filter(is_closed=False))
+    if rule_set is None or not entrances or not places:
+        return []
+    overrides = {e: scenario["entrance_values"] for e in entrances}
+    rows = []
+    for profile in ConditionProfile.objects.filter(is_active=True):
+        before = after = 0
+        improved = []
+        for place in places:
+            b = judge(place, profile, rule_set).outcome
+            a = judge(place, profile, rule_set, overrides=overrides).outcome
+            before += b == Outcome.ACCESSIBLE
+            after += a == Outcome.ACCESSIBLE
+            if IMPROVEMENT_RANK.get(a, 0) > IMPROVEMENT_RANK.get(b, 0):
+                improved.append(place.name)
+        rows.append({"profile": profile, "before": before, "after": after, "improved": improved})
+    return rows
+
+
+def building_overview(building):
+    """건물주 화면·공유 페이지 공통: 건물 안 가게 판정 + 개선 시뮬레이션"""
+    places = building.places.filter(is_closed=False).order_by("floor", "name")
+    return {
+        "building": building,
+        "places": [{"place": p, "judgments": place_judgments(p)} for p in places],
+        "simulations": [{"title": s["title"], "rows": simulate(building, s)} for s in SCENARIOS],
+        "has_upper_floor": any(p.floor != 1 for p in places),
+        "programs": SupportProgram.objects.filter(region=building.region, is_active=True),
+    }
+
+
+# ── 상단 메뉴 '내 가게' ──────────────────────────────────────
+
+
+def owner_menu(user):
+    """
+    인증 신청이 있는 사람에게 상단 메뉴 링크. 승인된 곳이 하나뿐이면 그 화면으로 바로 간다.
+    반환: None 또는 {"url", "label", "pending"}
+    """
+    from django.urls import reverse
+
+    claims = list(OwnerClaim.objects.filter(user=user).exclude(status=OwnerClaim.Status.REJECTED)
+                  .values_list("status", "place_id", "building_id"))
+    if not claims:
+        return None
+    approved = [c for c in claims if c[0] == OwnerClaim.Status.APPROVED]
+    url = reverse("owners:home")
+    if len(claims) == 1 and approved:
+        _, place_id, building_id = approved[0]
+        url = (reverse("owners:dashboard", args=[place_id]) if place_id
+               else reverse("owners:building", args=[building_id]))
+    label = "내 건물" if all(c[2] for c in claims) else "내 가게"
+    return {"url": url, "label": label, "pending": not approved}
