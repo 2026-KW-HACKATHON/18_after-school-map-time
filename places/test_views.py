@@ -220,7 +220,12 @@ class DetailV2Tests(ViewTestBase):
     def test_pending_report_confirm_button(self):
         from accounts.models import User
 
-        author = User.objects.create_user(username="author")
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        # 가입 7일 미만 계정의 하향 제보는 운영자만 처리하므로, 오래된 계정으로 (기획 v2 7장)
+        author = User.objects.create_user(username="author", date_joined=timezone.now() - timedelta(days=30))
         report = self.add_values(self.easy.entrances.first(), status=Report.Status.PENDING, step_height_cm=20)
         report.source, report.created_by = Report.Source.USER_REPORT, author
         report.save()
