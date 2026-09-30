@@ -38,7 +38,7 @@ class ReportForm(forms.Form):
     suggested_floor = forms.IntegerField(label="층 (선택)", required=False, min_value=-32768, max_value=32767,
                                          help_text="예: 1 = 1층, -1 = 지하 1층. 모르면 비워 주세요.")
     suggested_phone = forms.CharField(label="전화번호 (선택)", max_length=20, required=False,
-                                      widget=forms.TextInput(attrs={"type": "tel"}))
+                                      widget=forms.TextInput(attrs={"inputmode": "tel", "autocomplete": "tel"}))
 
     photo = forms.ImageField(label="입구 사진", help_text="입구, 계단, 경사로가 잘 보이게 찍어 주세요. 사람 얼굴·차 번호판은 나오지 않게 해 주세요.")
 

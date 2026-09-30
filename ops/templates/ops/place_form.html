@@ -42,6 +42,13 @@
     </fieldset>
 
     <fieldset class="card">
+      <legend>제보 이동 조건</legend>
+      <input type="hidden" name="profiles_present" value="1">
+      {% include "reports/_field.html" with field=form.profiles %}
+      <p class="small muted">승인된 주 출입구 제보의 이동 조건을 수정할 수 있어요. 선택을 바꿔도 입구 정보에 따른 접근성 판정은 그대로예요.</p>
+    </fieldset>
+
+    <fieldset class="card">
       <legend>가게 안 · 사장님 확인 정보</legend>
       {% for field in place_fields %}{% include "reports/_field.html" %}{% endfor %}
       <p class="muted small">건물 공용 정보(엘리베이터 등)와 다른 출입구는 <a href="{% url 'admin:index' %}">관리자 화면</a>에서 입력해요.</p>

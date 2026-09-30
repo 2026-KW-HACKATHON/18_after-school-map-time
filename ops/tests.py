@@ -294,6 +294,110 @@ class PlaceFormTests(OpsTestBase):
         self.assertEqual(Judgment.objects.get(place=place, profile="WHEELCHAIR").result, "DIFFICULT")
 
 
+class PlaceMobilityTests(OpsTestBase):
+    def setUp(self):
+        super().setUp()
+        self.place, self.door = self.cafe_with_door()
+        self.original = self.user_report(self.door, step_count=0)
+        self.original.profiles = ["WHEELCHAIR", "STROLLER"]
+        self.original.status = Report.Status.VERIFIED
+        self.original.save()
+        self.url = reverse("ops:place-edit", args=[self.place.pk])
+
+    def post(self, **changes):
+        data = {"name": self.place.name, "category": self.place.category, "floor": self.place.floor,
+                "lat": self.place.lat, "lng": self.place.lng, "profiles_present": "1"}
+        data.update(changes)
+        return self.client.post(self.url, data)
+
+    def test_prefills_verified_main_entrance_only(self):
+        self.user_report(self.door).save()
+        rejected = self.user_report(self.door)
+        rejected.status = Report.Status.REJECTED
+        rejected.save()
+        side = Entrance.objects.create(place=self.place, name="옆문")
+        self.door.is_main = True
+        self.door.save()
+        Report.objects.create(entrance=side, source="USER_REPORT", status="VERIFIED", profiles=["WALKER"])
+        res = self.client.get(self.url)
+        self.assertEqual(res.context["form"]["profiles"].value(), ["WHEELCHAIR", "STROLLER"])
+        self.assertContains(res, 'name="profiles_present" value="1"')
+        self.assertContains(res, "제보 이동 조건")
+
+    def test_profile_only_edit_preserves_original_facts_and_judgments(self):
+        from reports.selectors import current_values
+
+        before = dict(Judgment.objects.filter(place=self.place).values_list("profile_id", "result"))
+        res = self.post(profiles=["WALKER"])
+        self.assertRedirects(res, reverse("ops:place-saved", args=[self.place.pk]))
+        self.original.refresh_from_db()
+        self.assertEqual(self.original.profiles, ["WHEELCHAIR", "STROLLER"])
+        latest = self.door.reports.latest("created_at")
+        self.assertEqual((latest.profiles, latest.source, latest.status), (["WALKER"], "TEAM_SURVEY", "VERIFIED"))
+        self.assertEqual(latest.created_by, self.staff)
+        self.assertEqual(latest.reviewed_by, self.staff)
+        self.assertFalse(latest.values.exists())
+        self.assertEqual(current_values(self.door)["step_count"].value, 0)
+        self.assertEqual(before, dict(Judgment.objects.filter(place=self.place).values_list("profile_id", "result")))
+        self.assertEqual(self.client.get(self.url).context["form"]["profiles"].value(), ["WALKER"])
+
+    def test_clear_all_profiles_is_persistent(self):
+        self.post()
+        self.assertEqual(self.door.reports.latest("created_at").profiles, [])
+        self.assertEqual(self.client.get(self.url).context["form"]["profiles"].value(), [])
+
+    def test_unchanged_profiles_do_not_create_record(self):
+        count = Report.objects.count()
+        self.post(profiles=["STROLLER", "WHEELCHAIR"])
+        self.assertEqual(Report.objects.count(), count)
+
+    def test_legacy_submission_preserves_profiles_with_changed_facts(self):
+        self.client.post(self.url, {"name": self.place.name, "category": self.place.category,
+                                   "floor": self.place.floor, "lat": self.place.lat, "lng": self.place.lng,
+                                   "step_height_cm": "30"})
+        self.assertEqual(self.door.reports.latest("created_at").profiles, ["WHEELCHAIR", "STROLLER"])
+        self.assertEqual(Judgment.objects.get(place=self.place, profile="WHEELCHAIR").result, "DIFFICULT")
+
+    def test_invalid_profiles_do_not_save_place_or_reports(self):
+        count = Report.objects.count()
+        res = self.post(name="변경되지 않아야 함", profiles=["INVALID"])
+        self.assertIn("profiles", res.context["form"].errors)
+        self.place.refresh_from_db()
+        self.assertEqual(self.place.name, "턱없는 카페")
+        self.assertEqual(Report.objects.count(), count)
+
+    def test_inactive_existing_profile_can_be_preserved(self):
+        from judgments.models import ConditionProfile
+
+        ConditionProfile.objects.filter(key="STROLLER").update(is_active=False)
+        form = self.client.get(self.url).context["form"]
+        self.assertIn(("STROLLER", "유아차 (사용 중지)"), form.fields["profiles"].choices)
+        count = Report.objects.count()
+        self.post(profiles=["WHEELCHAIR", "STROLLER"])
+        self.assertEqual(Report.objects.count(), count)
+
+    def test_mobility_edit_works_with_past_observation_date(self):
+        self.post(profiles=["WALKER"], observed_on="2020-01-01")
+        self.assertEqual(self.client.get(self.url).context["form"]["profiles"].value(), ["WALKER"])
+
+    def test_new_place_saves_profiles_with_entrance_facts(self):
+        res = self.client.post(reverse("ops:place-new"), {
+            "name": "새 장소", "category": "CAFE", "floor": 1, "lat": self.place.lat, "lng": self.place.lng,
+            "profiles_present": "1", "profiles": ["STROLLER"], "step_height_cm": "0",
+        })
+        place = Place.objects.get(name="새 장소")
+        self.assertRedirects(res, reverse("ops:place-saved", args=[place.pk]))
+        report = Report.objects.get(entrance__place=place)
+        self.assertEqual(report.profiles, ["STROLLER"])
+        self.assertEqual(report.values.get(field_id="step_height_cm").value, 0)
+
+    def test_non_staff_cannot_edit_mobility(self):
+        count = Report.objects.count()
+        self.client.force_login(self.jumin)
+        self.assertEqual(self.post(profiles=["WALKER"]).status_code, 302)
+        self.assertEqual(Report.objects.count(), count)
+
+
 class PlaceEntrancePrefillTests(OpsTestBase):
     def edit_url(self, place):
         return reverse("ops:place-edit", args=[place.pk])
