@@ -10,6 +10,8 @@
   <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <link rel="manifest" href="{% static 'site.webmanifest' %}">
   <meta name="theme-color" content="#2F5DA8">
+  {# 큰 글씨 모드: 저장된 선택을 화면이 그려지기 전에 적용 (static/js/common.js 와 같은 키) #}
+  <script>try { if (localStorage.getItem("teokeopne-large-text") === "1") document.documentElement.classList.add("large-text"); } catch (e) {}</script>
   <!-- Pretendard 웹폰트 (SIL OFL 1.1, README 오픈소스 / 출처 참고) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
   <link rel="stylesheet" href="{% static 'css/common.css' %}">
@@ -26,6 +28,7 @@
       <a class="nav-wide" href="{% url 'places:search' %}">검색</a>
       <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
       {% block nav %}{% endblock %}
+      <button type="button" id="text-size-toggle" class="text-size-toggle" aria-pressed="false" title="글씨를 크게 보기">큰 글씨</button>
       {% if wish_nav is not None %}
         {# 가고 싶어요 누른 가게가 좋아지면 모바일에서도 보이게 (평소엔 넓은 화면에서만) #}
         <a href="{% url 'owners:wishes' %}"{% if not wish_nav %} class="nav-wide"{% endif %}>가고 싶어요{% if wish_nav %} <span class="badge-positive">좋아진 곳 {{ wish_nav }}</span>{% endif %}</a>
@@ -33,7 +36,7 @@
       {% if owner_nav %}<a href="{{ owner_nav.url }}">{{ owner_nav.label }}{% if owner_nav.pending %} <span class="muted small">(확인 중)</span>{% endif %}</a>{% endif %}
       {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
       {% if user.is_authenticated %}
-        <span class="muted">{{ user.display_name }}님</span>
+        <span class="muted nav-wide">{{ user.display_name }}님</span>{# 휴대폰에서는 메뉴가 넘치지 않게 이름 숨김 #}
         {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지) #}
         <form method="post" action="{% url 'account_logout' %}" class="inline">
           {% csrf_token %}

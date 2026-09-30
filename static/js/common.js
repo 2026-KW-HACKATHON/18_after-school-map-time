@@ -31,3 +31,20 @@ async function api(url, { method = "GET", body } = {}) {
   }
   return data;
 }
+
+/**
+ * 큰 글씨 모드 (어르신 친화). 선택은 이 브라우저에만 저장(localStorage)하고,
+ * 화면이 그려지기 전에 base.html <head>의 짧은 스크립트가 먼저 적용해 깜빡임을 막는다.
+ */
+(function () {
+  const KEY = "teokeopne-large-text";
+  const button = document.getElementById("text-size-toggle");
+  if (!button) return;
+  const sync = () => button.setAttribute("aria-pressed", String(document.documentElement.classList.contains("large-text")));
+  sync();
+  button.addEventListener("click", () => {
+    const on = document.documentElement.classList.toggle("large-text");
+    try { localStorage.setItem(KEY, on ? "1" : "0"); } catch (e) { /* 저장이 막힌 브라우저: 이번 화면에만 적용 */ }
+    sync();
+  });
+})();
