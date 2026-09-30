@@ -93,6 +93,15 @@ class Report(models.Model):
     def __str__(self):
         return f"[{self.get_status_display()}] {self.target} ({self.get_source_display()})"
 
+    def save(self, *args, **kwargs):
+        # 새로 올린 사진은 저장 전에 EXIF(촬영 위치 GPS·기기 정보)를 지우고 크기를 줄인다 (core/images.py).
+        # 주민 제보·사장님 요청·관리자 화면 어디서 올려도 여기를 거친다. 이미 저장된 사진은 건드리지 않음
+        if self.photo and not self.photo._committed:
+            from core.images import normalize_photo
+
+            self.photo = normalize_photo(self.photo.file, name=self.photo.name)
+        super().save(*args, **kwargs)
+
     @property
     def target(self):
         return self.place or self.building or self.entrance

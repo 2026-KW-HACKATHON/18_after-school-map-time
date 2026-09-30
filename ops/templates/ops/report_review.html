@@ -68,7 +68,7 @@
     {% if required %}
       <p class="muted small">주민 확인 {{ confirmations|length }}/{{ required }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     {% else %}
-      <p class="muted small">사진 교체 요청은 주민 확인 없이 운영자만 처리해요. 승인하면 이 사진이 입구 사진으로 보여요.</p>
+      <p class="muted small">이 제보는 주민 확인 없이 운영자만 처리해요 (사진 교체 요청, 또는 가입 7일 미만 계정의 하향 제보).</p>
     {% endif %}
   </section>
   {% endif %}

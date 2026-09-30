@@ -129,7 +129,11 @@
     <p class="muted small">주민이 알려준 새 정보예요. 확인되기 전까지 위의 판정에는 반영되지 않아요. 직접 보셨다면 확인해 주세요.</p>
     {% for item in pending_reports %}
       <div class="pending-report">
-        {% if item.report.photo %}<img class="entrance-photo" src="{{ item.report.photo.url }}" alt="제보 사진" loading="lazy">{% endif %}
+        {# 확인 전 사진은 운영진 검수 전이라(기획 v2 4.4) 확인에 참여할 수 있는 로그인 주민에게만 보여 줌 #}
+        {% if item.report.photo %}
+          {% if user.is_authenticated %}<img class="entrance-photo" src="{{ item.report.photo.url }}" alt="제보 사진" loading="lazy">
+          {% else %}<p class="muted small">📷 제보 사진은 로그인하면 볼 수 있어요.</p>{% endif %}
+        {% endif %}
         <p class="small">{% for v in item.values %}{{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
         {% if item.report.note %}<p class="small">"{{ item.report.note }}"</p>{% endif %}
         <p class="muted small">{{ item.report.created_at|date:"n월 j일" }} 제보 · 확인 {{ item.confirmations }}/{{ item.required }}명</p>

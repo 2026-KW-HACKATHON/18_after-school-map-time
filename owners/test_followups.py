@@ -76,5 +76,5 @@ class DistrictTests(OwnerTestBase):
 
         csv_res = self.client.get(reverse("ops:district-csv"))
         body = csv_res.content.decode("utf-8")
-        self.assertTrue(body.startswith("﻿가게,주소"))
+        self.assertTrue(body.startswith("\ufeff가게,주소"))
         self.assertIn("계단 약국", body)

@@ -9,7 +9,7 @@ from reports.models import Report
 from reports.services import last_checked_at, place_report_filter, recent_reconfirmations
 from reports.selectors import conflicting_fields, current_values, latest_photo, pending_field_sources
 
-from .models import FieldDefinition, Place
+from .models import Building, FieldDefinition, Place
 
 # 목록·팝업·검색 결과에 보여줄 입구 핵심 값 (순서대로)
 SUMMARY_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type"]
@@ -98,6 +98,8 @@ def _fields_section(target, scope):
         return []
     values = current_values(target)
     pending = pending_field_sources(target)
+    # 건물·건물 출입구 정보는 건물주가, 가게·가게 출입구 정보는 사장님이 정정을 요청한다
+    requester = "건물주가" if isinstance(target, Building) or getattr(target, "building_id", None) else "사장님이"
     rows = []
     for f in FieldDefinition.objects.filter(scope=scope, is_active=True):
         v = values.get(f.key)
@@ -109,6 +111,7 @@ def _fields_section(target, scope):
             "checked_at": v.report.observed_at if v else None,
             "pending": f.key in pending,  # "새 제보 확인 중" (기획 v2 7장)
             "pending_owner": pending.get(f.key) == Report.Source.OWNER,  # "사장님이 정정을 요청했어요"
+            "owner_label": requester,
         })
     return rows
 

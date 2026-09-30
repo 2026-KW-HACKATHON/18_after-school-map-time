@@ -10,7 +10,11 @@
   <ul class="result-list">
     {% for row in rows %}
       <li class="card result-card">
-        <a href="{% url 'places:detail' row.place.pk %}?profile={{ row.profile.key }}"><strong>{{ row.place.name }}</strong></a>
+        {% if row.place.is_closed %}
+          <strong>{{ row.place.name }}</strong> <span class="muted small">(폐업)</span>
+        {% else %}
+          <a href="{% url 'places:detail' row.place.pk %}?profile={{ row.profile.key }}"><strong>{{ row.place.name }}</strong></a>
+        {% endif %}
         <span class="small">{{ row.profile.label }} 기준: <strong>{{ row.display.label }}</strong>
           {% if row.improved %}<span class="badge-positive">좋아졌어요</span>{% endif %}</span>
         <span class="muted small">{{ row.wish.created_at|date:"Y.m.d" }}에 누름</span>

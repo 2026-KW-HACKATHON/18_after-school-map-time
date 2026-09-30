@@ -3,12 +3,14 @@
 판정 기준표가 확정돼 수치가 바뀌면 경계값 테스트의 숫자도 같이 바꾼다.
 """
 
+from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
 
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from places.models import Building, Entrance
 from places.tests import make_place, make_region
@@ -258,7 +260,8 @@ class ReportEffectTests(JudgmentTestBase):
 
         self.values(self.door, step_height_cm="0", door_width_cm=90, has_ramp=False)  # 휠체어 가능
         recompute_place(self.place)
-        self.reporter = User.objects.create_user(username="reporter")
+        # 가입 7일 미만 계정의 하향 제보는 운영자만 처리 → 확인 수 규칙은 오래된 계정으로 시험 (기획 v2 7장)
+        self.reporter = User.objects.create_user(username="reporter", date_joined=timezone.now() - timedelta(days=30))
         self.neighbors = [User.objects.create_user(username=f"n{i}") for i in range(2)]
 
     def pending(self, **values):
@@ -266,6 +269,21 @@ class ReportEffectTests(JudgmentTestBase):
         report.created_by = self.reporter
         report.save()
         return report
+
+    def test_new_account_downgrade_is_operator_only(self):
+        """가입 7일 미만 계정의 판정 하향 제보는 주민 확인으로 반영되지 않고 운영자 검수로 (기획 v2 7장)"""
+        from accounts.models import User
+        from judgments.services import DOWN, SAME, report_direction, required_confirmations
+
+        newbie = User.objects.create_user(username="newbie")
+        down = self.values(self.door, status=Report.Status.PENDING, step_height_cm="30")
+        down.source, down.created_by = Report.Source.USER_REPORT, newbie
+        down.save()
+        self.assertEqual((report_direction(down), required_confirmations(down)), (DOWN, None))
+        same = self.values(self.door, status=Report.Status.PENDING, has_ramp=True)
+        same.source, same.created_by = Report.Source.USER_REPORT, newbie
+        same.save()
+        self.assertEqual((report_direction(same), required_confirmations(same)), (SAME, 1))  # 하향이 아니면 그대로
 
     def test_downgrade_detected_and_needs_two_confirmations(self):
         from reports.services import confirm_report

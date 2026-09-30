@@ -19,10 +19,10 @@ from pathlib import Path
 
 import requests
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.db import transaction
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 
+from core.images import normalize_photo
 from judgments.constants import display
 from judgments.receivers import affected_places
 from judgments.engine import recompute_place
@@ -46,7 +46,6 @@ LAT_RANGE = (Decimal("33"), Decimal("39"))
 LNG_RANGE = (Decimal("124"), Decimal("132"))
 COORD = Decimal("0.000001")
 
-PHOTO_MAX_PX = 1600  # 폰 사진(4000px·수 MB)을 줄여 저장 공간·모바일 데이터 절약
 KAKAO_ADDRESS_URL = "https://dapi.kakao.com/v2/local/search/address.json"
 
 
@@ -344,13 +343,8 @@ def _already_recorded(target, values, observed_at):
 
 
 def _photo_file(path):
-    """방향 바로잡기 + 크기 줄이기. 다시 저장하면서 EXIF(촬영 위치 등)도 지워진다"""
-    with Image.open(path) as im:
-        im = ImageOps.exif_transpose(im)
-        im.thumbnail((PHOTO_MAX_PX, PHOTO_MAX_PX))
-        buffer = io.BytesIO()
-        im.convert("RGB").save(buffer, "JPEG", quality=85)
-    return ContentFile(buffer.getvalue(), name=f"{path.stem}.jpg")
+    """방향 바로잡기 + 크기 줄이기 + EXIF(촬영 위치 등) 지우기 — 제보 사진과 같은 규칙 (core/images.py)"""
+    return normalize_photo(path)
 
 
 def _record(target, values, row, user, result, touched, photo_path=None):

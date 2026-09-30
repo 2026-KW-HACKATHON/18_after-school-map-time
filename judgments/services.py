@@ -90,8 +90,9 @@ def is_photo_request(report):
 
 def required_confirmations(report):
     """
-    반영에 필요한 주민 확인 수. None = 주민 확인으로는 반영하지 않고 운영자만 처리
-    (사진 교체 요청: 얼굴·번호판이 없는지 운영자가 봐야 함 — 기획 v2 4.4)
+    반영에 필요한 주민 확인 수. None = 주민 확인으로는 반영하지 않고 운영자만 처리:
+      - 사진 교체 요청: 얼굴·번호판이 없는지 운영자가 봐야 함 (기획 v2 4.4)
+      - 가입 7일 미만 계정의 판정 하향 제보: 관리자 검수 큐로 (기획 v2 7장)
     """
     from reports.models import Report
 
@@ -99,4 +100,8 @@ def required_confirmations(report):
         return None
     if report.source == Report.Source.OWNER:
         return OWNER_DECLARATION_CONFIRMATIONS if is_owner_declaration(report) else OWNER_CORRECTION_CONFIRMATIONS
-    return REQUIRED_CONFIRMATIONS[report_direction(report)]
+    direction = report_direction(report)
+    author = report.created_by
+    if direction == DOWN and author is not None and author.is_new_account(now=report.created_at):
+        return None
+    return REQUIRED_CONFIRMATIONS[direction]

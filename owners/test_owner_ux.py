@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 from django.urls import reverse
+from django.utils.http import urlencode
 
 from judgments.engine import recompute_place
 from judgments.services import required_confirmations
@@ -45,7 +46,7 @@ class OwnerMenuTests(OwnerTestBase):
         self.assertContains(res, "카카오로 로그인하고 인증하기")
         self.assertContains(res, "123456")
         self.assertRedirects(self.client.post(url, {"code": "123456"}),
-                             f"{reverse('account_login')}?next={url}", fetch_redirect_response=False)
+                             f"{reverse('account_login')}?{urlencode({'next': url})}", fetch_redirect_response=False)
         self.client.force_login(self.owner)
         self.assertContains(self.client.get(url), 'value="123456"')
 
