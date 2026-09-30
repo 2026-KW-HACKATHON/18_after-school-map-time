@@ -223,6 +223,31 @@ class ReportFormTests(TempMediaMixin, TestCase):
         self.assertEqual((place.lat, place.lng), (Decimal("37.626123"), Decimal("127.058789")))
         self.assertEqual(report.status, Report.Status.VERIFIED)
         self.assertTrue(Judgment.objects.filter(place=place).exists())
+        form = self.client.get(reverse("ops:place-edit", args=[place.pk])).context["form"]
+        self.assertEqual(form["step_height_cm"].value(), Decimal("0"))
+        self.assertEqual(form["door_width_cm"].value(), Decimal("90"))
+        self.assertEqual(form["has_ramp"].value(), "false")
+
+    def test_existing_report_approval_fills_operator_entrance_fields(self):
+        self.post(place=self.place.pk, step_height_cm="0", step_count="0", has_ramp="false",
+                  door_width_cm="90.5", door_type="자동문")
+        report = Report.objects.get()
+        staff = User.objects.create_user(username="reviewer", is_staff=True)
+        self.client.force_login(staff)
+        url = reverse("ops:place-edit", args=[self.place.pk])
+        self.assertIsNone(self.client.get(url).context["form"]["step_height_cm"].value())
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(reverse("ops:report-review", args=[report.pk]), {"action": "approve"})
+        self.assertRedirects(res, reverse("ops:report-done", args=[report.pk]))
+        res = self.client.get(url)
+        form = res.context["form"]
+        for key, expected in {"step_height_cm": Decimal("0"), "step_count": Decimal("0"),
+                              "has_ramp": "false", "door_width_cm": Decimal("90.5"),
+                              "door_type": "자동문"}.items():
+            with self.subTest(field=key):
+                self.assertEqual(form[key].value(), expected)
+        self.assertInHTML('<option value="false" selected>없음</option>', str(form["has_ramp"]))
+        self.assertInHTML('<option value="자동문" selected>자동문</option>', str(form["door_type"]))
 
 
 class ConfirmViewTests(TestCase):

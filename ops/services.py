@@ -1,6 +1,7 @@
 """운영자 작업. 화면(views)과 분리해서 테스트하기 쉽게 둔다."""
 
 from datetime import datetime, time, timedelta
+from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
@@ -21,6 +22,23 @@ ABUSE_PLACE_COUNT = 5   # 서로 다른 장소 5곳 이상 하향 제보 → 관
 def main_entrance(place):
     entrance = place.entrances.filter(is_main=True).first() or place.entrances.first()
     return entrance or Entrance.objects.create(place=place, name="정문", is_main=True)
+
+
+def entrance_form_initial(place):
+    """장소 수정 폼에 검증된 주 출입구 값을 채운다. 조회만으로 출입구를 만들지 않는다."""
+    entrance = place.entrances.filter(is_main=True).first() or place.entrances.first()
+    if entrance is None:
+        return {}
+    initial = {}
+    for key, value in current_values(entrance).items():
+        if key in ENTRANCE_KEYS:
+            raw = value.value
+            if isinstance(raw, Decimal):
+                # DB는 소수 2자리, 입력 폼은 1자리다. 90.00을 그대로 재제출하면 검증에 걸린다.
+                raw = Decimal(f"{raw.normalize():f}")
+            # ChoiceField는 bool이 아닌 문자열을 사용한다. 0·False도 유효한 값이다.
+            initial[key] = ("true" if raw else "false") if isinstance(raw, bool) else raw
+    return initial
 
 
 def observed_at_for(observed_on):
@@ -64,6 +82,12 @@ def save_place_survey(form, user):
     note = " · ".join(filter(None, [f"출처: {data['source_note']}" if data.get("source_note") else "", data.get("memo")]))
 
     entrance_values = form.values_for(ENTRANCE_KEYS)
+    if not any(data.get(key) for key in ("source_note", "observed_on", "memo")):
+        # 자동으로 채운 값을 그대로 제출한 경우 원래 제보의 출처·확인 시각을 유지한다.
+        # 출처/확인일/메모를 입력한 명시적 재확인은 같은 값이어도 새 이력으로 남긴다.
+        previous = entrance_form_initial(place)
+        entrance_values = {key: raw for key, raw in entrance_values.items()
+                           if key not in previous or raw != previous[key]}
     if entrance_values:
         _save_values(_survey_report(user, observed_at, note, entrance=main_entrance(place)), entrance_values)
     place_values = form.values_for(PLACE_KEYS)

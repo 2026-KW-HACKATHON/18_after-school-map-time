@@ -37,6 +37,7 @@
 
     <fieldset class="card">
       <legend>입구 정보 <span class="muted small">(주 출입구 · 모르면 비워 두기 — 기존 값 유지)</span></legend>
+      {% if place %}<p class="small muted">승인·확인된 최신 입구 정보가 표시돼요. 확인 중인 제보는 <a href="{% url 'ops:reports' %}">제보 검토</a>에서 승인하면 반영돼요.</p>{% endif %}
       {% for field in entrance_fields %}{% include "reports/_field.html" %}{% endfor %}
     </fieldset>
 
