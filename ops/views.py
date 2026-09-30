@@ -3,12 +3,14 @@
 Django 관리자(/admin/)는 데이터 전체를 다루는 도구로 남겨 두고, 여기는 매일 하는 일(제보 검토·장소 등록)만 쉽게.
 """
 
+import csv
 from datetime import timedelta
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import views as auth_views
 from django.db.models import Max, Q
 from django.contrib import messages
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse, reverse_lazy
@@ -21,6 +23,7 @@ from owners.services import CORRECTION_OVERDUE_DAYS
 from places.models import Building, Place, Region
 from reports.models import Report
 
+from . import district as district_data
 from . import services
 from .templatetags.ops_tags import OPS_STATUS_LABELS
 from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceDeleteForm, PlaceForm, ReviewForm
@@ -210,6 +213,30 @@ def place_saved(request, pk):
     place = get_object_or_404(Place, pk=pk)
     last = place.reports.aggregate(last=Max("observed_at"))["last"]
     return render(request, "ops/place_saved.html", {"place": place, "last": last})
+
+
+@staff_required
+def district(request):
+    """구청용 지역 집계 (기획 v2 8장). 운영자만 — 공개 랭킹이 아니라 지원사업 대상 발굴용"""
+    region = _region()
+    return render(request, "ops/district.html", {
+        "region": region,
+        "summary": district_data.summary(region),
+        "distribution": district_data.outcome_distribution(region),
+        "candidates": district_data.support_candidates(region),
+    })
+
+
+@staff_required
+def district_csv(request):
+    """지원사업 검토 목록 CSV (구청 전달용, 엑셀에서 한글이 깨지지 않게 BOM)"""
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="support-candidates-{timezone.localdate():%Y%m%d}.csv"'
+    response.write("﻿")
+    writer = csv.writer(response)
+    writer.writerow(district_data.CSV_HEADER)
+    writer.writerows(district_data.candidate_csv_rows(district_data.support_candidates(_region())))
+    return response
 
 
 @staff_required
