@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.decorators.http import require_POST
 
 from judgments.models import ConditionProfile
@@ -58,7 +58,7 @@ def claim(request):
     code = request.GET.get("code", "")
     form = ClaimForm(request.POST or None, initial={"code": code if code.isdigit() and len(code) == 6 else ""})
     if request.method == "POST" and not request.user.is_authenticated:
-        return redirect(f"{reverse('account_login')}?next={request.get_full_path()}")
+        return redirect(f"{reverse('account_login')}?{urlencode({'next': request.get_full_path()})}")
     if request.method == "POST" and form.is_valid():
         try:
             services.claim_with_code(request.user, form.cleaned_data["code"])

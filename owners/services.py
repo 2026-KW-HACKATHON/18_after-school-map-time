@@ -129,7 +129,8 @@ def my_wishes(user):
         result = j.result if j else Outcome.UNKNOWN
         rows.append({
             "wish": w, "place": w.place, "profile": w.profile, "display": display(result),
-            "improved": IMPROVEMENT_RANK.get(result, 0) > IMPROVEMENT_RANK[Outcome.DIFFICULT],
+            # 폐업한 가게는 알림에서 제외 (상세 화면도 없음)
+            "improved": not w.place.is_closed and IMPROVEMENT_RANK.get(result, 0) > IMPROVEMENT_RANK[Outcome.DIFFICULT],
         })
     return rows
 
