@@ -75,8 +75,12 @@ def report_confirm(request, pk):
     # 되돌아갈 주소는 우리 사이트 안만 허용 (//다른사이트.com 같은 외부 이동 방지)
     if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         back = "/"
+    required = required_confirmations(report)
+    if required is None:  # 사진 교체 요청처럼 운영자만 처리하는 제보
+        messages.error(request, "이 요청은 운영진이 확인해요.")
+        return redirect(back)
     try:
-        applied = confirm_report(report, request.user, required_confirmations(report))
+        applied = confirm_report(report, request.user, required)
     except ConfirmationError as e:
         messages.error(request, str(e))
     else:
