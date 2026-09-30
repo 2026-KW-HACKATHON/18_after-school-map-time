@@ -7,7 +7,7 @@ from django.db.models import Max, Q
 from judgments.constants import display
 from judgments.models import ConditionProfile, Judgment, Outcome
 from reports.models import Report
-from reports.selectors import current_values, latest_photo, pending_field_sources
+from reports.selectors import conflicting_fields, current_values, latest_photo, pending_field_sources
 
 from .models import FieldDefinition, Place
 
@@ -202,4 +202,18 @@ def place_detail(place):
         "assistance_badge": getattr(current_values(place).get("assistance_offered"), "value", None) is True,
         "verified_user_reports": verified.filter(source=Report.Source.USER_REPORT).count(),
         "pending_reports": _pending_reports(place),
+        "conflicts": place_conflicts(place),
     }
+
+
+def place_conflicts(place):
+    """가게·출입구·건물에서 사장님 정보와 주민 제보가 다른 항목 이름 (기획 v2 7장)"""
+    targets = [place, *place.entrances.all()]
+    if place.building_id:
+        targets += [place.building, *place.building.entrances.all()]
+    labels = []
+    for target in targets:
+        for f in conflicting_fields(target):
+            if f.label not in labels:
+                labels.append(f.label)
+    return labels

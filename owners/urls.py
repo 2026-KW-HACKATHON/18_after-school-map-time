@@ -16,5 +16,6 @@ urlpatterns = [
     path("owner/buildings/<int:pk>/correction/", views.building_correction, name="building-correction"),
     path("buildings/<int:pk>/improve/", views.building_improve, name="building-improve"),
     path("places/<int:pk>/wish/", views.wish_toggle, name="wish"),
+    path("wishes/", views.wishes, name="wishes"),
     path("support/", views.support, name="support"),
 ]

@@ -17,8 +17,8 @@ from .services import claim_with_code, simulate, SCENARIOS
 from .tests import OwnerTestBase
 
 
-def survey(target_kw, values):
-    report = Report.objects.create(source="TEAM_SURVEY", status="VERIFIED", **target_kw)
+def survey(target_kw, values, source="TEAM_SURVEY"):
+    report = Report.objects.create(source=source, status="VERIFIED", **target_kw)
     for key, raw in values.items():
         v = AccessibilityValue(report=report, field_id=key)
         v.set_value(raw)

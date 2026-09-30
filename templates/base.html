@@ -26,6 +26,10 @@
       <a class="nav-wide" href="{% url 'places:search' %}">검색</a>
       <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
       {% block nav %}{% endblock %}
+      {% if wish_nav is not None %}
+        {# 가고 싶어요 누른 가게가 좋아지면 모바일에서도 보이게 (평소엔 넓은 화면에서만) #}
+        <a href="{% url 'owners:wishes' %}"{% if not wish_nav %} class="nav-wide"{% endif %}>가고 싶어요{% if wish_nav %} <span class="badge-positive">좋아진 곳 {{ wish_nav }}</span>{% endif %}</a>
+      {% endif %}
       {% if owner_nav %}<a href="{{ owner_nav.url }}">{{ owner_nav.label }}{% if owner_nav.pending %} <span class="muted small">(확인 중)</span>{% endif %}</a>{% endif %}
       {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
       {% if user.is_authenticated %}

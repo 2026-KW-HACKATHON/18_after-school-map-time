@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% comment %}내 '가고 싶어요' (기획 v2 6.2): 누른 가게가 개선되면 여기서 '좋아졌어요'로 알려 준다{% endcomment %}
+
+{% block title %}가고 싶어요 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <h1>가고 싶어요</h1>
+  <p class="muted">"가고 싶어요"를 누른 가게예요. 사장님께 수요로 전해지고, 입구가 좋아지면 여기에 알려 드려요.</p>
+  <ul class="result-list">
+    {% for row in rows %}
+      <li class="card result-card">
+        <a href="{% url 'places:detail' row.place.pk %}?profile={{ row.profile.key }}"><strong>{{ row.place.name }}</strong></a>
+        <span class="small">{{ row.profile.label }} 기준: <strong>{{ row.display.label }}</strong>
+          {% if row.improved %}<span class="badge-positive">좋아졌어요</span>{% endif %}</span>
+        <span class="muted small">{{ row.wish.created_at|date:"Y.m.d" }}에 누름</span>
+      </li>
+    {% empty %}
+      <li class="muted">아직 누른 가게가 없어요. 들어가기 어려운 가게 상세 화면에서 "가고 싶어요"를 누를 수 있어요.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

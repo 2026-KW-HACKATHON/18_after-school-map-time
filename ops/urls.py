@@ -19,4 +19,6 @@ urlpatterns = [
     path("buildings/<int:pk>/claim-code/", views.issue_building_claim_code, name="building-claim-code"),
     path("claim-codes/<int:pk>/print/", views.claim_code_print, name="claim-code-print"),
     path("claims/", views.claim_list, name="claims"),
+    path("district/", views.district, name="district"),
+    path("district/support-candidates.csv", views.district_csv, name="district-csv"),
 ]

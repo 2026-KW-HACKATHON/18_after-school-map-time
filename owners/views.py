@@ -76,6 +76,12 @@ def home(request):
     return render(request, "owners/home.html", {"claims": claims})
 
 
+@login_required
+def wishes(request):
+    """내 '가고 싶어요' — 누른 가게가 좋아졌는지 확인 (기획 v2 6.2)"""
+    return render(request, "owners/wishes.html", {"rows": services.my_wishes(request.user)})
+
+
 @owner_required
 def photo_request(request, place):
     """입구 사진 교체 요청 (기획 v2 4.4) — 운영자가 확인한 뒤 바뀐다"""
