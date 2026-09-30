@@ -38,6 +38,17 @@
   </section>
 
   <section class="card">
+    <h2>재답사가 필요한 가게</h2>
+    <p class="small">확인된 정보가 없는 가게 <strong>{{ recheck.never }}곳</strong> · {{ recheck.days }}일 넘게 확인이 없는 가게 <strong>{{ recheck.stale_count }}곳</strong></p>
+    <p class="muted small">최근 확인 = 팀 답사·반영된 제보·주민 "지금도 맞아요" 중 가장 최근. 오래된 순으로 최대 20곳.</p>
+    <ul class="plain-list">
+      {% for r in recheck.stale %}
+        <li class="small"><a href="{% url 'ops:place-edit' r.place.pk %}">{{ r.place.name }}</a> — {{ r.last|date:"Y년 n월 j일" }} ({{ r.days }}일 전)</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
     <h2>경사로 지원사업 검토 목록</h2>
     <p class="small muted">어떤 이동 조건으로든 "혼자 들어가기 어려워요"인 가게예요. 개선 의지(사장님·건물주 인증) → 가고 싶어요 → 이번 달 조회 순으로 놓았어요.</p>
     <p><a class="btn" href="{% url 'ops:district-csv' %}">CSV 내려받기 (구청 전달용)</a></p>
