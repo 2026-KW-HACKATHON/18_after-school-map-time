@@ -20,5 +20,6 @@ urlpatterns = [
     path("claim-codes/<int:pk>/print/", views.claim_code_print, name="claim-code-print"),
     path("claims/", views.claim_list, name="claims"),
     path("district/", views.district, name="district"),
+    path("poster/", views.poster, name="poster"),
     path("district/support-candidates.csv", views.district_csv, name="district-csv"),
 ]

@@ -17,6 +17,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from judgments.constants import display
+from judgments.models import Outcome
 from judgments.services import is_owner_declaration, is_photo_request, report_direction, report_effect, required_confirmations
 from owners.models import ClaimCode, OwnerClaim
 from owners.services import CORRECTION_OVERDUE_DAYS
@@ -213,6 +214,19 @@ def place_saved(request, pk):
     place = get_object_or_404(Place, pk=pk)
     last = place.reports.aggregate(last=Max("observed_at"))["last"]
     return render(request, "ops/place_saved.html", {"place": place, "last": last})
+
+
+@staff_required
+def poster(request):
+    """
+    전시·주민투표용 QR 포스터 (인쇄용 A4). 주민이 폰으로 찍으면 지도로 바로 들어온다.
+    """
+    return render(request, "ops/poster.html", {
+        "site_url": request.build_absolute_uri(reverse("places:map")),
+        "region": _region(),
+        # 지도 표시 설명: 문구·색은 판정 표시 상수 한 곳에서 (기획 v2 3.1). 미확인은 포스터에서 생략
+        "legend": [display(o) for o in (Outcome.ACCESSIBLE, Outcome.CONDITIONAL, Outcome.DIFFICULT)],
+    })
 
 
 @staff_required
