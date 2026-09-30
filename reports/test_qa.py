@@ -80,3 +80,26 @@ class QATests(TempMediaMixin, TestCase):
         res = self.client.get(reverse("places:detail", args=[self.place.pk]))
         self.assertContains(res, "건물주가 정정을 요청했어요 (확인 중)")
         self.assertNotContains(res, "사장님이 정정을 요청했어요")
+
+
+class StripExifCommandTests(TempMediaMixin, TestCase):
+    def setUp(self):
+        self.use_temp_media()
+        call_command("seed_base", stdout=StringIO())
+        place = make_place(Region.objects.get(code="wolgye1"))
+        self.door = Entrance.objects.create(place=place, name="정문")
+
+    def test_cleans_old_photos_saved_before_the_fix(self):
+        report = Report.objects.create(source="USER_REPORT", entrance=self.door)
+        report.photo.save("old.jpg", phone_photo(), save=False)          # 수정 전처럼 원본 그대로 저장
+        Report.objects.filter(pk=report.pk).update(photo=report.photo.name)
+        out = StringIO()
+        call_command("strip_photo_exif", "--dry-run", stdout=out)
+        self.assertIn("정리 대상 1장", out.getvalue())
+        call_command("strip_photo_exif", stdout=StringIO())
+        report.refresh_from_db()
+        with Image.open(report.photo) as im:
+            self.assertEqual(len(im.getexif()), 0)
+        out = StringIO()
+        call_command("strip_photo_exif", stdout=out)
+        self.assertIn("정리 0장 · 이미 깨끗함 1장", out.getvalue())
