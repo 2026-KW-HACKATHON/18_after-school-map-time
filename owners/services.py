@@ -197,9 +197,14 @@ def submit_photo_request(user, place, photo, reason, note=""):
 
 # ── 건물주 (기획 v2 5장) ──────────────────────────────────────
 
-# 개선 시뮬레이션 시나리오: 건물 공용 입구에 가상 값을 넣고 판정 엔진으로 다시 계산한다 (기준값은 규칙 데이터 그대로)
+# 개선 시뮬레이션 시나리오: 건물 공용 입구·건물 값에 가상 값을 넣고 판정 엔진으로 다시 계산한다 (기준값은 규칙 데이터 그대로)
+#  entrance_values: 건물 공용 출입구에 넣을 값 / building_values: 건물 값 (엘리베이터 등)
+#  only_upper_floor: 2층 이상·지하 가게가 있을 때만 보여 줌 (1층 가게만 있는 건물에 엘리베이터 안내는 의미 없음)
 SCENARIOS = [
     {"key": "ramp", "title": "건물 공용 입구에 고정 경사로를 설치하면", "entrance_values": {"has_ramp": True}},
+    {"key": "elevator", "title": "엘리베이터를 설치하면", "building_values": {"elevator": True}, "only_upper_floor": True},
+    {"key": "both", "title": "입구 경사로와 엘리베이터를 모두 설치하면", "entrance_values": {"has_ramp": True},
+     "building_values": {"elevator": True}, "only_upper_floor": True},
 ]
 
 
@@ -212,9 +217,10 @@ def simulate(building, scenario):
     rule_set = RuleSet.active()
     entrances = list(building.entrances.all())
     places = list(building.places.filter(is_closed=False))
-    if rule_set is None or not entrances or not places:
+    if rule_set is None or not places or (scenario.get("entrance_values") and not entrances):
         return []
-    overrides = {e: scenario["entrance_values"] for e in entrances}
+    overrides = {e: scenario.get("entrance_values", {}) for e in entrances}
+    overrides[building] = scenario.get("building_values", {})
     rows = []
     for profile in ConditionProfile.objects.filter(is_active=True):
         before = after = 0
@@ -232,12 +238,13 @@ def simulate(building, scenario):
 
 def building_overview(building):
     """건물주 화면·공유 페이지 공통: 건물 안 가게 판정 + 개선 시뮬레이션"""
-    places = building.places.filter(is_closed=False).order_by("floor", "name")
+    places = list(building.places.filter(is_closed=False).order_by("floor", "name"))
+    upper = any(p.floor != 1 for p in places)
     return {
         "building": building,
         "places": [{"place": p, "judgments": place_judgments(p)} for p in places],
-        "simulations": [{"title": s["title"], "rows": simulate(building, s)} for s in SCENARIOS],
-        "has_upper_floor": any(p.floor != 1 for p in places),
+        "simulations": [{"title": s["title"], "rows": simulate(building, s)}
+                        for s in SCENARIOS if upper or not s.get("only_upper_floor")],
         "programs": SupportProgram.objects.filter(region=building.region, is_active=True),
     }
 

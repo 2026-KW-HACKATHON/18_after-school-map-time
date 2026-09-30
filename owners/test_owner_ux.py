@@ -122,10 +122,22 @@ class BuildingOwnerTests(OwnerTestBase):
         self.assertRedirects(res, edit)
         self.assertTrue(ClaimCode.objects.filter(building=self.building).exists())
 
+    def scenario(self, key):
+        rows = simulate(self.building, next(s for s in SCENARIOS if s["key"] == key))
+        return {r["profile"].key: r for r in rows}
+
     def test_simulation_counts_places_that_improve(self):
-        rows = {r["profile"].key: r for r in simulate(self.building, SCENARIOS[0])}
+        survey({"building": self.building}, {"elevator": True})
+        rows = self.scenario("ramp")
         self.assertEqual((rows["WHEELCHAIR"]["before"], rows["WHEELCHAIR"]["after"]), (0, 1))
         self.assertEqual(rows["WHEELCHAIR"]["improved"], ["2층 치과"])
+
+    def test_elevator_scenarios(self):
+        survey({"building": self.building}, {"elevator": False})
+        wheelchair = lambda key: (self.scenario(key)["WHEELCHAIR"]["before"], self.scenario(key)["WHEELCHAIR"]["after"])
+        self.assertEqual(wheelchair("ramp"), (0, 0))       # 경사로만으로는 2층에 못 감
+        self.assertEqual(wheelchair("elevator"), (0, 0))   # 엘리베이터만으로는 입구 턱 15cm
+        self.assertEqual(wheelchair("both"), (0, 1))
 
     def test_building_dashboard_menu_and_access(self):
         self.client.force_login(self.neighbor)
@@ -136,7 +148,7 @@ class BuildingOwnerTests(OwnerTestBase):
         res = self.client.get(dashboard)
         self.assertContains(res, "건물 공용 입구에 고정 경사로를 설치하면")
         self.assertContains(res, "나아지는 가게: 2층 치과")
-        self.assertContains(res, "층 이동(엘리베이터·계단)은 아직 판정에 넣지 않았어요")
+        self.assertContains(res, "엘리베이터를 설치하면")
 
     def test_building_correction_goes_to_common_entrance(self):
         self.approved_building_owner()

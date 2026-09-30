@@ -4,11 +4,13 @@
 판정(장소, 이동 조건)
   1. 경로 만들기
      - 1층 가게: 가게 출입구 하나 = 경로 하나 (정문, 뒷문 … 각각)
-     - 1층이 아닌 가게: [건물 공용 출입구 → 가게 출입구(있으면)] 를 하나의 경로로
+     - 1층이 아닌 가게: [건물 공용 출입구 → 층 이동 → 가게 출입구(있으면)] 를 하나의 경로로
+       층 이동 = 건물 값(엘리베이터 등)으로 판정하는 단계. 이 이동 조건에 층 이동 규칙(Rule.stage=FLOOR)이
+       하나도 없으면 넣지 않는다 (예전 규칙 버전과 같은 결과)
      - 출입구 정보가 하나도 없으면 → 미확인
-  2. 출입구 하나 판정: 우선순위 순서로 규칙을 보고, 조건이 모두 맞는 첫 규칙의 결과.
+  2. 단계 하나 판정: 그 단계(출입구/층 이동)의 규칙을 우선순위 순서로 보고, 조건이 모두 맞는 첫 규칙의 결과.
      맞는 규칙이 없으면 → 어려움. 단, 정보가 없어서 판단 못 한 규칙이 있었으면 → 미확인
-  3. 경로 판정: 경로의 출입구 중 하나라도 어려움이면 어려움, 미확인이 있으면 미확인, 아니면 가장 낮은 결과
+  3. 경로 판정: 경로의 단계 중 하나라도 어려움이면 어려움, 미확인이 있으면 미확인, 아니면 가장 낮은 결과
   4. 장소 판정: 경로 중 가장 좋은 결과 (constants.BEST_ROUTE_ORDER)
 
 값 조회: 조건의 필드가 출입구 필드면 그 출입구 값, 장소 필드면 장소 값, 건물 필드면 건물 값.
@@ -26,7 +28,7 @@ from places.models import FieldDefinition
 from reports.selectors import current_values
 
 from .constants import BEST_ROUTE_ORDER, IMPROVEMENT_RANK
-from .models import ConditionProfile, Judgment, Outcome, RuleCondition, RuleSet
+from .models import ConditionProfile, Judgment, Outcome, Rule, RuleCondition, RuleSet
 
 Scope = FieldDefinition.Scope
 Op = RuleCondition.Operator
@@ -36,12 +38,17 @@ MAX_FACTS = 2  # 사실 한 줄에 넣을 값 개수
 
 @dataclass
 class Subject:
-    """판정할 출입구 하나와 그때 참고할 값들 {필드 키: 값}"""
+    """판정할 경로 단계 하나(출입구 또는 층 이동)와 그때 참고할 값들 {필드 키: 값}"""
 
     entrance: object
     values: dict = field(default_factory=dict)          # 출입구 값
     place_values: dict = field(default_factory=dict)    # 장소 값
     building_values: dict = field(default_factory=dict) # 건물 값
+    floor: int | None = None                            # 층 이동 단계면 가게 층 (출입구 단계는 None)
+
+    @property
+    def is_floor(self):
+        return self.floor is not None
 
     def lookup(self, field_def):
         source = {
@@ -129,8 +136,11 @@ def _raw(values):
     return {key: v.value for key, v in values.items()}
 
 
-def build_routes(place, overrides=None):
-    """[[Subject, ...], ...] 경로 목록. overrides: {대상 객체: {필드 키: 값}}"""
+def build_routes(place, overrides=None, with_floor=False):
+    """
+    [[Subject, ...], ...] 경로 목록. overrides: {대상 객체: {필드 키: 값}}
+    with_floor: 1층이 아닌 가게에 층 이동 단계를 넣을지 (층 이동 규칙이 있는 이동 조건만)
+    """
     overrides = overrides or {}
 
     def values_of(target):
@@ -145,16 +155,21 @@ def build_routes(place, overrides=None):
     def subject(entrance):
         return Subject(entrance, values_of(entrance), place_values, building_values)
 
+    # 층 이동: 건물 값(엘리베이터)으로 판정. 건물이 등록 안 됐으면 값이 없어 미확인
+    floor_step = (
+        [Subject(None, {}, place_values, building_values, floor=place.floor)]
+        if with_floor and place.floor != 1 else []
+    )
     place_entrances = list(place.entrances.all())
     if place.floor == 1 or not building:
-        return [[subject(e)] for e in place_entrances]
+        return [floor_step + [subject(e)] for e in place_entrances]
 
     building_entrances = list(building.entrances.all())
     if not building_entrances:
-        return [[subject(e)] for e in place_entrances]
+        return [floor_step + [subject(e)] for e in place_entrances]
     inner = place_entrances or [None]
     return [
-        [subject(b)] + ([subject(p)] if p is not None else [])
+        [subject(b)] + floor_step + ([subject(p)] if p is not None else [])
         for b in building_entrances
         for p in inner
     ]
@@ -176,16 +191,39 @@ def _fmt(value):
     return f"{Decimal(value).normalize():f}"  # 30.00 → 30
 
 
+def floor_label(floor):
+    return f"지하 {-floor}층" if floor < 0 else f"{floor}층"
+
+
+def floor_facts(subject, rules):
+    """층 이동 단계의 사실 한 줄. 예: 2층 · 엘리베이터 없음 (기준에 걸린 예/아니오 값만)"""
+    parts = [floor_label(subject.floor)]
+    for rule in rules:
+        for cond in rule.conditions.all():
+            value = subject.lookup(cond.field)
+            if value is None or cond.field.value_type != FieldDefinition.ValueType.BOOL:
+                continue
+            text = f"{cond.field.label} {'있음' if value else '없음'}"
+            if text not in parts and evaluate_condition(cond, subject) is False:
+                parts.append(text)
+    return " · ".join(parts[:MAX_FACTS])
+
+
 def facts_line(result, rules, all_rules):
     """
     사실 한 줄 (기획 v2 3.1: 어려움 옆에 항상 사실 한 줄. 예: 입구 단차 30cm · 계단 수 2칸)
       1. 이 이동 조건의 기준에 걸린 출입구 숫자 값
       2. 자리가 남으면, 다른 이동 조건의 기준에 걸린 출입구 숫자 값 (계단 수 등)
       기준을 통과한 값(예: 충분한 문 폭)은 이유가 아니므로 넣지 않는다
+    층 이동 단계가 결과를 냈으면 "2층 · 엘리베이터 없음"
     """
     subject = result.subject
     if subject is None:
         return ""
+    if subject.is_floor:
+        return floor_facts(subject, [r for r in rules if r.stage == Rule.Stage.FLOOR])
+    rules = [r for r in rules if r.stage == Rule.Stage.ENTRANCE]
+    all_rules = [r for r in all_rules if r.stage == Rule.Stage.ENTRANCE]
 
     def numeric_entrance_fields(rule_list):
         for rule in rule_list:
@@ -224,11 +262,17 @@ def judge(place, profile, rule_set=None, overrides=None):
         rule_set.rules.prefetch_related("conditions__field", "conditions__ref_field").order_by("priority", "id")
     )
     rules = [r for r in all_rules if r.profile_id == profile.pk]
-    routes = build_routes(place, overrides)
+    stage_rules = {
+        stage: [r for r in rules if r.stage == stage] for stage in (Rule.Stage.ENTRANCE, Rule.Stage.FLOOR)
+    }
+    routes = build_routes(place, overrides, with_floor=bool(stage_rules[Rule.Stage.FLOOR]))
     if not routes:
         return Result(Outcome.UNKNOWN)
 
-    route_results = [combine_route([evaluate_subject(rules, s) for s in route]) for route in routes]
+    def evaluate(subject):
+        return evaluate_subject(stage_rules[Rule.Stage.FLOOR if subject.is_floor else Rule.Stage.ENTRANCE], subject)
+
+    route_results = [combine_route([evaluate(s) for s in route]) for route in routes]
     best = min(route_results, key=lambda r: BEST_ROUTE_ORDER.index(r.outcome))
     if best.outcome in (Outcome.DIFFICULT, Outcome.CONDITIONAL):
         best.reason = facts_line(best, rules, all_rules)

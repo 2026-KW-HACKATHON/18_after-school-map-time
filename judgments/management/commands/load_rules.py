@@ -2,8 +2,8 @@
 판정 규칙 파일을 DB에 넣는다. 같은 버전이 이미 있으면 그 버전의 규칙을 파일 내용으로 교체한다.
 "activate": true 면 이 버전을 사용 중으로 바꾸고 전체 장소를 다시 판정한다.
 
-    python manage.py load_rules                          # judgments/data/rules_v1.json
-    python manage.py load_rules judgments/data/rules_v2.json
+    python manage.py load_rules                          # 최신 규칙: judgments/data/rules_v2.json
+    python manage.py load_rules judgments/data/rules_v1.json   # 예전 버전으로 되돌리기
 """
 
 import json
@@ -15,11 +15,12 @@ from django.db import transaction
 from judgments.models import ConditionProfile, Rule, RuleCondition, RuleSet
 from places.models import FieldDefinition
 
-DEFAULT_FILE = Path(__file__).resolve().parents[2] / "data" / "rules_v1.json"
+# 기본 파일 = 지금 쓰는 최신 규칙. 새 버전 파일을 만들면 여기도 바꾼다
+DEFAULT_FILE = Path(__file__).resolve().parents[2] / "data" / "rules_v2.json"
 
 
 class Command(BaseCommand):
-    help = "판정 규칙 JSON 파일을 불러온다 (기본: judgments/data/rules_v1.json)"
+    help = "판정 규칙 JSON 파일을 불러온다 (기본: judgments/data/rules_v2.json)"
 
     def add_arguments(self, parser):
         parser.add_argument("path", nargs="?", default=str(DEFAULT_FILE))
@@ -49,6 +50,7 @@ class Command(BaseCommand):
                 profile_id=r["profile"],
                 outcome=r["outcome"],
                 priority=r["priority"],
+                stage=r.get("stage", Rule.Stage.ENTRANCE),  # 없으면 출입구 규칙 (v1 파일 호환)
                 basis=r["basis"],
                 note=r.get("note", ""),
             )
