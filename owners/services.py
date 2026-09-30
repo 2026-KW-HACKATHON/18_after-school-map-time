@@ -113,6 +113,34 @@ def toggle_wish(user, place, profile):
     return created
 
 
+def my_wishes(user):
+    """
+    내가 '가고 싶어요'를 누른 가게와 지금 판정 (기획 v2 6.2 "개선 완료 알림").
+    누를 때는 어려움이었으므로, 지금 한 단계라도 올라갔으면 '좋아졌어요'
+    """
+    wishes = VisitWish.objects.filter(user=user).select_related("place", "profile").order_by("-created_at")
+    judgments = {
+        (j.place_id, j.profile_id): j
+        for j in Judgment.objects.filter(place__in=[w.place_id for w in wishes])
+    }
+    rows = []
+    for w in wishes:
+        j = judgments.get((w.place_id, w.profile_id))
+        result = j.result if j else Outcome.UNKNOWN
+        rows.append({
+            "wish": w, "place": w.place, "profile": w.profile, "display": display(result),
+            "improved": IMPROVEMENT_RANK.get(result, 0) > IMPROVEMENT_RANK[Outcome.DIFFICULT],
+        })
+    return rows
+
+
+def improved_wish_count(user):
+    """상단 메뉴 알림용: 가고 싶어요 누른 가게 중 좋아진 곳 수. 누른 게 없으면 None (메뉴 안 보임)"""
+    if not VisitWish.objects.filter(user=user).exists():
+        return None
+    return sum(1 for row in my_wishes(user) if row["improved"])
+
+
 # ── 사장님 대시보드 (기획 v2 4.5) ─────────────────────────────
 
 
