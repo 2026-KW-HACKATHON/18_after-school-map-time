@@ -168,7 +168,8 @@ def place_list(request):
 def place_edit(request, pk=None):
     """장소 등록·수정 (12번). 필수 항목이 비면 누락 안내(13번), 저장하면 완료 안내(14번)"""
     place = get_object_or_404(Place, pk=pk) if pk else None
-    form = PlaceForm(request.POST or None, instance=place, door_choices=services.door_type_choices())
+    form = PlaceForm(request.POST or None, instance=place, door_choices=services.door_type_choices(),
+                     initial=services.entrance_form_initial(place) if place else {})
     if request.method == "POST" and form.is_valid():
         saved = services.save_place_survey(form, request.user)
         return redirect("ops:place-saved", pk=saved.pk)

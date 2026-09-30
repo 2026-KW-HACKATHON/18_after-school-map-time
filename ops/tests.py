@@ -1,11 +1,13 @@
 """운영자 화면 테스트 (와이어프레임 10~18번)"""
 
 from decimal import Decimal
+from datetime import timedelta
 from io import StringIO
 
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from judgments.engine import recompute_place
@@ -190,6 +192,92 @@ class PlaceFormTests(OpsTestBase):
         self.assertEqual(place.name, "턱없는 카페 (리모델링)")
         self.assertEqual(Report.objects.filter(entrance__place=place).count(), 2)   # 기존 기록 + 새 기록
         self.assertEqual(Judgment.objects.get(place=place, profile="WHEELCHAIR").result, "DIFFICULT")
+
+
+class PlaceEntrancePrefillTests(OpsTestBase):
+    def edit_url(self, place):
+        return reverse("ops:place-edit", args=[place.pk])
+
+    def post_values(self, place, **changes):
+        form = self.client.get(self.edit_url(place)).context["form"]
+        data = {key: form[key].value() for key in
+                ("name", "category", "address", "floor", "phone", "lat", "lng")}
+        data.update({key: value for key, value in form.initial.items() if key in
+                     ("step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type")})
+        data.update(changes)
+        return self.client.post(self.edit_url(place), data)
+
+    def test_latest_verified_value_per_field_ignores_pending_and_rejected(self):
+        place, door = self.cafe_with_door(step="0")
+        recent = self.user_report(door, step_count=2)
+        Report.objects.filter(pk=recent.pk).update(status="VERIFIED")
+        old = self.user_report(door, step_height_cm=30)
+        Report.objects.filter(pk=old.pk).update(status="VERIFIED", observed_at=timezone.now() - timedelta(days=2))
+        self.user_report(door, step_height_cm=40)
+        rejected = self.user_report(door, has_ramp=True)
+        Report.objects.filter(pk=rejected.pk).update(status="REJECTED")
+        form = self.client.get(self.edit_url(place)).context["form"]
+        self.assertEqual(form["step_height_cm"].value(), Decimal("0"))
+        self.assertEqual(form["step_count"].value(), Decimal("2"))
+        self.assertEqual(form["has_ramp"].value(), "false")
+        self.assertEqual(form["door_width_cm"].value(), Decimal("90"))
+
+    def test_main_entrance_precedes_older_side_entrance(self):
+        place, side = self.cafe_with_door(step="30")
+        side.is_main = False
+        side.save(update_fields=["is_main"])
+        main = Entrance.objects.create(place=place, name="주 출입구", is_main=True)
+        report = self.user_report(main, step_height_cm=0)
+        Report.objects.filter(pk=report.pk).update(status="VERIFIED")
+        self.assertEqual(self.client.get(self.edit_url(place)).context["form"]["step_height_cm"].value(), Decimal("0"))
+
+    def test_get_does_not_create_entrances_or_reports(self):
+        place = make_place(self.region)
+        self.client.get(self.edit_url(place))
+        self.assertFalse(Entrance.objects.exists())
+        self.assertFalse(Report.objects.exists())
+
+    def test_name_only_edit_does_not_copy_resident_values_into_survey(self):
+        place, door = self.cafe_with_door()
+        original = self.user_report(door, step_height_cm=0, step_count=0, has_ramp=False,
+                                    door_width_cm=90, door_type="자동문")
+        Report.objects.filter(pk=original.pk).update(status="VERIFIED")
+        count = Report.objects.count()
+        res = self.post_values(place, name="새 이름")
+        self.assertRedirects(res, reverse("ops:place-saved", args=[place.pk]))
+        self.assertEqual(Report.objects.count(), count)
+        from reports.selectors import current_values
+        self.assertEqual(current_values(door)["has_ramp"].report_id, original.pk)
+
+    def test_changed_field_only_is_saved_and_blank_keeps_old_values(self):
+        place, door = self.cafe_with_door()
+        count = Report.objects.count()
+        res = self.post_values(place, step_height_cm="30", door_width_cm="")
+        self.assertRedirects(res, reverse("ops:place-saved", args=[place.pk]))
+        self.assertEqual(Report.objects.count(), count + 1)
+        newest = Report.objects.filter(entrance=door).first()
+        self.assertEqual(set(newest.values.values_list("field_id", flat=True)), {"step_height_cm"})
+        form = self.client.get(self.edit_url(place)).context["form"]
+        self.assertEqual(form["step_height_cm"].value(), Decimal("30"))
+        self.assertEqual(form["door_width_cm"].value(), Decimal("90"))
+        self.assertEqual(form["has_ramp"].value(), "false")
+
+    def test_explicit_recheck_keeps_new_survey_history(self):
+        place, door = self.cafe_with_door()
+        count = Report.objects.count()
+        res = self.post_values(place, source_note="운영팀 재확인", observed_on=timezone.localdate().isoformat())
+        self.assertRedirects(res, reverse("ops:place-saved", args=[place.pk]))
+        self.assertEqual(Report.objects.count(), count + 1)
+        self.assertIn("운영팀 재확인", Report.objects.filter(entrance=door).first().note)
+
+    def test_validation_error_keeps_submitted_entrance_values(self):
+        place, _ = self.cafe_with_door()
+        res = self.post_values(place, name="", step_height_cm="12", has_ramp="true")
+        self.assertEqual(res.status_code, 200)
+        form = res.context["form"]
+        self.assertEqual(form["step_height_cm"].value(), "12")
+        self.assertEqual(form["has_ramp"].value(), "true")
+        self.assertEqual(Report.objects.count(), 1)
 
 
 class PageSmokeTests(OpsTestBase):
