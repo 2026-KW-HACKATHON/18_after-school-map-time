@@ -5,14 +5,14 @@ from datetime import timedelta
 from io import StringIO
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
 from judgments.engine import recompute_place
 from judgments.models import Judgment
-from places.models import Entrance, Place, Region
+from places.models import Building, Entrance, Place, Region
 from places.tests import make_place
 from reports.models import AccessibilityValue, Report
 
@@ -157,6 +157,106 @@ class ReviewTests(OpsTestBase):
         self.assertEqual((report.status, report.entrance.place), ("VERIFIED", place))
         self.assertEqual(place.address, "월계역 앞")
         self.assertEqual(Judgment.objects.get(place=place, profile="WHEELCHAIR").result, "ACCESSIBLE")
+
+
+class PlaceDeleteTests(OpsTestBase):
+    def setUp(self):
+        super().setUp()
+        self.place, self.door = self.cafe_with_door()
+        self.url = reverse("ops:place-delete", args=[self.place.pk])
+
+    def test_get_confirmation_does_not_delete(self):
+        reports = Report.objects.count()
+        res = self.client.get(self.url)
+        self.assertContains(res, "장소 삭제 확인")
+        self.assertContains(res, self.place.name)
+        self.assertContains(res, "복구할 수 없어요")
+        self.assertContains(res, 'name="confirm"')
+        self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+        self.assertEqual(Report.objects.count(), reports)
+        self.assertContains(self.client.get(reverse("ops:place-edit", args=[self.place.pk])), self.url)
+        self.assertNotContains(self.client.get(reverse("ops:place-new")), "장소 삭제하기")
+
+    def test_anonymous_and_owner_cannot_delete(self):
+        from owners.models import OwnerClaim
+
+        OwnerClaim.objects.create(user=self.jumin, place=self.place, role="OPERATOR", status="APPROVED")
+        for logged_in in (False, True):
+            if logged_in:
+                self.client.force_login(self.jumin)
+            else:
+                self.client.logout()
+            for method in ("get", "post"):
+                with self.subTest(logged_in=logged_in, method=method):
+                    res = getattr(self.client, method)(self.url, {"confirm": "on"})
+                    self.assertEqual(res.status_code, 302)
+                    self.assertIn(reverse("ops:login"), res["Location"])
+                    self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+
+    def test_confirmation_required(self):
+        for data in ({}, {"confirm": "false"}):
+            with self.subTest(data=data):
+                self.assertContains(self.client.post(self.url, data), "삭제할 내용을 확인하고 동의해 주세요.")
+                self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+
+    def test_staff_delete_cascades_only_target_place(self):
+        from owners.models import ClaimCode, OwnerClaim, OwnerResponse, PlaceViewStat, VisitWish
+
+        other, _ = self.cafe_with_door()
+        building = Building.objects.create(region=self.region, name="공용 건물", address="월계로",
+                                           lat=self.place.lat, lng=self.place.lng)
+        self.place.building = building
+        self.place.save(update_fields=["building"])
+        other.building = building
+        other.save(update_fields=["building"])
+        shared = Entrance.objects.create(building=building, name="공용 출입구")
+        code = ClaimCode.issue(place=self.place)
+        OwnerClaim.objects.create(user=self.jumin, place=self.place, role="OPERATOR", code=code, status="APPROVED")
+        OwnerResponse.objects.create(place=self.place, owner_comment="안내")
+        VisitWish.objects.create(place=self.place, user=self.jumin, profile_id="WHEELCHAIR")
+        PlaceViewStat.objects.create(place=self.place, profile_id="WHEELCHAIR", date=timezone.localdate(), count=1)
+        code_id, door_id, place_id = code.pk, self.door.pk, self.place.pk
+        # DB에는 장소 대상 제보와 입구 대상 제보가 모두 있을 수 있다.
+        Report.objects.create(place=self.place, source="USER_REPORT")
+        res = self.client.post(self.url, {"confirm": "on"}, follow=True)
+        self.assertRedirects(res, reverse("ops:places"))
+        self.assertContains(res, "장소를 삭제했어요.")
+        self.assertFalse(Place.objects.filter(pk=place_id).exists())
+        self.assertFalse(Entrance.objects.filter(pk=door_id).exists())
+        self.assertFalse(Report.objects.filter(entrance_id=door_id).exists())
+        self.assertFalse(Report.objects.filter(place_id=place_id).exists())
+        self.assertFalse(Judgment.objects.filter(place_id=place_id).exists())
+        self.assertFalse(ClaimCode.objects.filter(pk=code_id).exists())
+        for model in (OwnerClaim, OwnerResponse, VisitWish, PlaceViewStat):
+            self.assertFalse(model.objects.filter(place_id=place_id).exists())
+        self.assertTrue(Place.objects.filter(pk=other.pk).exists())
+        self.assertEqual(Report.objects.filter(entrance__place=other).count(), 1)
+        self.assertEqual(AccessibilityValue.objects.count(), 3)
+        self.assertTrue(Building.objects.filter(pk=building.pk).exists())
+        self.assertTrue(Entrance.objects.filter(pk=shared.pk).exists())
+        self.assertTrue(Region.objects.filter(pk=self.region.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.jumin.pk).exists())
+
+    def test_csrf_is_required_for_delete(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.staff)
+        self.assertEqual(client.post(self.url, {"confirm": "on"}).status_code, 403)
+        self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+        client.get(self.url)
+        res = client.post(self.url, {"confirm": "on", "csrfmiddlewaretoken": client.cookies["csrftoken"].value})
+        self.assertRedirects(res, reverse("ops:places"))
+        self.assertFalse(Place.objects.filter(pk=self.place.pk).exists())
+
+    def test_other_http_methods_do_not_delete(self):
+        for method in ("put", "patch", "delete"):
+            with self.subTest(method=method):
+                self.assertEqual(getattr(self.client, method)(self.url).status_code, 405)
+                self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+
+    def test_missing_place_returns_404(self):
+        url = reverse("ops:place-delete", args=[999999])
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.post(url, {"confirm": "on"}).status_code, 404)
 
 
 class PlaceFormTests(OpsTestBase):
