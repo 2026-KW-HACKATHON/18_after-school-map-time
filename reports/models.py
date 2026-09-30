@@ -221,3 +221,26 @@ class ReportConfirmation(models.Model):
     def clean(self):
         if self.report.created_by_id and self.report.created_by_id == self.user_id:
             raise ValidationError("본인 제보는 확인할 수 없습니다.")
+
+
+class Reconfirmation(models.Model):
+    """
+    "지금도 맞아요" — 주민이 가게에 가 보고 공개된 정보가 여전히 맞다고 확인한 기록.
+    판정·값에는 쓰지 않고 '최근 확인일'·신뢰도 표시에만 쓴다.
+    값을 복사해 새 제보로 만들지 않는 이유: 복사본이 더 최신이 되면, 확인 중이던 하향 제보가 나중에 승인돼도
+    반영되지 않는다 (reports.selectors.current_values는 가장 최근 확인한 값을 씀). 같은 사람·같은 가게는 하루 한 번.
+    """
+
+    place = models.ForeignKey(Place, verbose_name="장소", on_delete=models.CASCADE, related_name="reconfirmations")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="확인한 사람", on_delete=models.CASCADE,
+                             related_name="reconfirmations")
+    created_at = models.DateTimeField("확인 시각", default=timezone.now)
+
+    class Meta:
+        verbose_name = "지금도 맞아요"
+        verbose_name_plural = "지금도 맞아요"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["place", "-created_at"], name="reconfirm_place_recent")]
+
+    def __str__(self):
+        return f"{self.place} · {self.user} ({self.created_at:%Y-%m-%d})"
