@@ -10,7 +10,7 @@ from django.contrib.auth import views as auth_views
 from django.db.models import Max, Q
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse_lazy
 from django.utils import timezone
 
@@ -23,7 +23,7 @@ from reports.models import Report
 
 from . import services
 from .templatetags.ops_tags import OPS_STATUS_LABELS
-from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceForm, ReviewForm
+from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceDeleteForm, PlaceForm, ReviewForm
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
 
@@ -182,6 +182,20 @@ def place_edit(request, pk=None):
         "missing": form.missing_required() if form.is_bound else [],
         "region": _region(),
     })
+
+
+@staff_required
+@require_http_methods(["GET", "POST"])
+def place_delete(request, pk):
+    """관리자만 확인 화면을 거쳐 삭제한다. GET 요청은 데이터를 변경하지 않는다."""
+    place = get_object_or_404(Place, pk=pk)
+    form = PlaceDeleteForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        name = place.name
+        services.delete_place(place)
+        messages.success(request, f"{name} 장소를 삭제했어요.")
+        return redirect("ops:places")
+    return render(request, "ops/place_delete.html", {"place": place, "form": form})
 
 
 @staff_required

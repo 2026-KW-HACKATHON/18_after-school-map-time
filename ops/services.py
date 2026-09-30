@@ -24,6 +24,12 @@ def main_entrance(place):
     return entrance or Entrance.objects.create(place=place, name="정문", is_main=True)
 
 
+@transaction.atomic
+def delete_place(place):
+    """장소와 연결된 기록을 기존 FK 삭제 규칙에 따라 한 트랜잭션으로 삭제한다."""
+    place.delete()
+
+
 def entrance_form_initial(place):
     """장소 수정 폼에 검증된 주 출입구 값을 채운다. 조회만으로 출입구를 만들지 않는다."""
     entrance = place.entrances.filter(is_main=True).first() or place.entrances.first()

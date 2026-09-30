@@ -68,6 +68,13 @@
     <p class="notice small">저장하면 입력한 값이 '팀 답사' 기록으로 바로 공개 지도에 반영되고 판정이 다시 계산돼요. 이전 값은 기록으로 남아요.</p>
     <button type="submit" class="btn btn-primary btn-block">장소 저장</button>
   </form>
+  {% if place %}
+    <section class="card">
+      <h2>장소 삭제</h2>
+      <p class="small muted">이 장소와 연결된 기록을 영구 삭제합니다. 삭제 전에 확인 화면이 열려요.</p>
+      <a class="btn" href="{% url 'ops:place-delete' place.pk %}">장소 삭제하기</a>
+    </section>
+  {% endif %}
 </section>
 {% endblock %}
 

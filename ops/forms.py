@@ -67,6 +67,11 @@ class PlaceForm(forms.ModelForm):
         return out
 
 
+class PlaceDeleteForm(forms.Form):
+    confirm = forms.BooleanField(label="장소와 연결된 기록을 영구 삭제하는 데 동의합니다.",
+                                 error_messages={"required": "삭제할 내용을 확인하고 동의해 주세요."})
+
+
 class ReviewForm(forms.Form):
     """제보 승인·반려 (16·17번)"""
 
