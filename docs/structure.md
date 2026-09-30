@@ -22,9 +22,9 @@
 │   ├── views.py                ←   /health/, 홈 화면
 │   ├── urls.py
 │   ├── context_processors.py   ←   모든 템플릿에 카카오 JS 키 전달
+│   ├── images.py               ←   사진 정리 (EXIF 촬영 위치 삭제·크기 줄이기)
 │   ├── tests.py
-│   ├── apps.py
-│   └── templates/core/home.html
+│   └── apps.py
 │
 ├── accounts/                   ← 회원 (커스텀 User, 카카오 로그인)
 │   ├── models.py               ←   User (닉네임, 가입 7일 규칙)
@@ -167,13 +167,12 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `views.py` | `health` — DB에 `SELECT 1`을 해보고 정상이면 200 `{"status": "ok", "db": true}`, 실패면 503. 배포 후 확인·모니터링용<br>`home` — 홈 화면 |
+| `views.py` | `health` — DB에 `SELECT 1`을 해보고 정상이면 200 `{"status": "ok", "db": true}`, 실패면 503. 배포 후 확인·모니터링용<br>`home` — 지도(`/map/`)로 이동 |
 | `urls.py` | `/` → home, `/health/` → health. `app_name = "core"`라서 템플릿에서 `{% url 'core:home' %}`로 참조 |
 | `context_processors.py` | 모든 템플릿에 `KAKAO_JAVASCRIPT_KEY`를 넘겨줌 → 지도 페이지에서 SDK 로드할 때 사용. **REST 키는 절대 넘기지 않음** |
 | `images.py` | `normalize_photo()` — 사진의 EXIF(촬영 위치 등)를 지우고 방향을 바로잡아 1600px JPEG로 다시 저장. 모든 사진 업로드가 거침 |
 | `tests.py` | 헬스체크 정상(200)·DB 장애(503), 홈 화면 테스트 |
 | `apps.py` | 앱 등록 정보 |
-| `templates/core/home.html` | 홈 화면 (`base.html` 상속) |
 
 ---
 
