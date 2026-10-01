@@ -9,4 +9,5 @@ urlpatterns = [
     path("report/done/", views.report_done, name="done"),
     path("reports/<int:pk>/confirm/", views.report_confirm, name="confirm"),
     path("places/<int:pk>/reconfirm/", views.place_reconfirm, name="reconfirm"),
+    path("entrances/<int:pk>/photo-fix/", views.photo_fix_request, name="photo-fix"),
 ]

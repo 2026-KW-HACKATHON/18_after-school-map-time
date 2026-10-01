@@ -12,7 +12,7 @@ from core.uploads import KeepPhotoMixin
 from judgments.models import ConditionProfile
 from places.models import FieldDefinition, Place
 
-from .models import Report
+from .models import PHOTO_FIX_PREFIX, Report
 
 UNKNOWN = ""  # "모름" — 값을 넣지 않음
 
@@ -81,7 +81,8 @@ class ReportForm(KeepPhotoMixin, forms.Form):
             raise forms.ValidationError("입구 정보를 하나 이상 고르거나, 추가 설명을 적어 주세요.")
         if self.place is not None and self.user is not None:
             since = timezone.now() - timedelta(hours=REPORT_LIMIT_HOURS)
-            recent = Report.objects.filter(created_by=self.user, created_at__gte=since)
+            recent = Report.objects.filter(created_by=self.user, created_at__gte=since).exclude(
+                note__startswith=PHOTO_FIX_PREFIX)  # 사진 수정 요청은 제보 간격 제한에서 뺌
             if recent.filter(place=self.place).exists() or recent.filter(entrance__place=self.place).exists():
                 raise forms.ValidationError("같은 장소는 24시간에 한 번만 제보할 수 있어요. 확인 중인 제보가 반영될 때까지 기다려 주세요.")
         return data
@@ -95,3 +96,25 @@ class ReportForm(KeepPhotoMixin, forms.Form):
                 continue
             out[key] = v
         return out
+
+
+PHOTO_FIX_REASONS = [
+    ("예전 모습이에요 (공사·이전 등)", "예전 모습이에요 (공사·이전 등)"),
+    ("내 얼굴이나 아는 사람 얼굴이 나와요", "내 얼굴이나 아는 사람 얼굴이 나와요"),
+    ("차량 번호판이나 개인 정보가 보여요", "차량 번호판이나 개인 정보가 보여요"),
+    ("기타", "기타"),
+]
+
+
+class PhotoFixForm(KeepPhotoMixin, forms.Form):
+    """주민 → 운영자 입구 사진 수정 요청. 새 사진은 있으면 같이 (얼굴 문제면 사진 없이 '내려 주세요'만 해도 됨)"""
+
+    reason = forms.ChoiceField(label="어떤 문제인가요?", choices=PHOTO_FIX_REASONS, widget=forms.RadioSelect)
+    photo = forms.ImageField(label="새 입구 사진 (있으면)", required=False,
+                             help_text="입구 정면, 문턱·계단이 보이게. 사람 얼굴·차량 번호판은 나오지 않게 찍어 주세요")
+    note = forms.CharField(label="덧붙일 말 (선택)", max_length=200, required=False,
+                           widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_kept_photo()

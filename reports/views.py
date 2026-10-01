@@ -3,14 +3,15 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from judgments.services import required_confirmations
 from places.models import Entrance, Place, Region
 
-from .forms import ReportForm
-from .models import AccessibilityValue, Report
+from .forms import PhotoFixForm, ReportForm
+from .models import PHOTO_FIX_PREFIX, AccessibilityValue, Report
 from .services import ConfirmationError, confirm_report, reconfirm_place
 
 
@@ -77,6 +78,42 @@ def _safe_next(request):
     if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         back = "/"
     return back
+
+
+@login_required
+def photo_fix_request(request, pk):
+    """
+    입구 사진 수정 요청 (주민 → 운영자, 기획 v2 4.4): 예전 모습이거나 얼굴·번호판이 보일 때.
+    운영자가 새 사진으로 바꾸거나 지금 사진을 내린다. 같은 입구에 내 요청이 확인 중이면 다시 못 냄
+    """
+    entrance = get_object_or_404(Entrance.objects.select_related("place", "building"), pk=pk)
+    place = entrance.place or (entrance.building.places.filter(is_closed=False).first() if entrance.building else None)
+    if place is None or place.is_closed:
+        raise Http404("장소를 찾을 수 없어요.")
+    back = request.GET.get("next") or request.POST.get("next") or ""
+    if not back or not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()},
+                                                        require_https=request.is_secure()):
+        back = reverse("places:detail", args=[place.pk])
+
+    form = PhotoFixForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        busy = Report.objects.filter(entrance=entrance, created_by=request.user, status=Report.Status.PENDING,
+                                     note__startswith=PHOTO_FIX_PREFIX).exists()
+        if busy:
+            form.add_error(None, "이 입구 사진에 보낸 요청이 아직 확인 중이에요.")
+        else:
+            data = form.cleaned_data
+            Report.objects.create(
+                source=Report.Source.USER_REPORT, status=Report.Status.PENDING, created_by=request.user,
+                entrance=entrance, photo=data["photo"] or "",
+                note=" · ".join(filter(None, [f"{PHOTO_FIX_PREFIX} {data['reason']}", data["note"]]))[:500],
+            )
+            messages.success(request, "사진 수정 요청을 보냈어요. 운영진이 확인하면 알림으로 알려 드려요.")
+            return redirect(back)
+    if request.method == "POST":
+        form.keep_photo_for_retry()
+    return render(request, "reports/photo_fix_form.html", {"form": form, "entrance": entrance, "place": place,
+                                                          "next": back})
 
 
 @login_required
