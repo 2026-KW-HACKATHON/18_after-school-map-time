@@ -18,6 +18,8 @@
   {% block extra_css %}{% endblock %}
 </head>
 <body>
+  {# 키보드·스크린리더: 메뉴를 건너뛰고 본문으로 (Tab 을 처음 누르면 보임) #}
+  <a class="skip-link" href="#main">본문 바로가기</a>
   <header class="topbar">
     <a class="logo" href="{% url 'core:home' %}">
       <img src="{% static 'img/teokeopne-icon.svg' %}" alt="" width="28" height="28">
@@ -36,7 +38,7 @@
       {% if owner_nav %}<a href="{{ owner_nav.url }}">{{ owner_nav.label }}{% if owner_nav.pending %} <span class="muted small">(확인 중)</span>{% endif %}</a>{% endif %}
       {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
       {% if user.is_authenticated %}
-        <span class="muted nav-wide">{{ user.display_name }}님</span>{# 휴대폰에서는 메뉴가 넘치지 않게 이름 숨김 #}
+        <a class="nav-wide" href="{% url 'accounts:me' %}" title="내 활동">{{ user.display_name }}님</a>{# 휴대폰에서는 하단 탭의 '내 활동' #}
         {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지) #}
         <form method="post" action="{% url 'account_logout' %}" class="inline">
           {% csrf_token %}
@@ -56,7 +58,7 @@
     </ul>
   {% endif %}
 
-  <main class="{% block main_class %}container{% endblock %}">
+  <main id="main" tabindex="-1" class="{% block main_class %}container{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
@@ -66,6 +68,7 @@
     <a href="{% url 'places:map' %}" {% if request.resolver_match.url_name == 'map' %}aria-current="page"{% endif %}>지도</a>
     <a href="{% url 'places:search' %}" {% if request.resolver_match.url_name == 'search' %}aria-current="page"{% endif %}>검색</a>
     <a href="{% url 'reports:new' %}" {% if request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>제보</a>
+    {% if user.is_authenticated %}<a href="{% url 'accounts:me' %}" {% if request.resolver_match.url_name == 'me' %}aria-current="page"{% endif %}>내 활동</a>{% endif %}
   </nav>
   {% endblock %}
 
