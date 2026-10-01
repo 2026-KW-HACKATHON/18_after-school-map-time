@@ -222,3 +222,4 @@ REST_FRAMEWORK = {
 KAKAO_JAVASCRIPT_KEY = os.getenv("KAKAO_JAVASCRIPT_KEY", "")  # 브라우저용: 템플릿에서 지도 SDK 로드
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")      # 서버 전용: 주소→좌표 등. 템플릿/JS로 절대 내보내지 않기
 AI_VISION_API_KEY = os.getenv("AI_VISION_API_KEY", "")        # AI 사진 판별 (서비스 미정)
+PUBLIC_DATA_API_KEY = os.getenv("PUBLIC_DATA_API_KEY", "")    # 공공데이터포털 일반 인증키 (장애인편의시설 현황, 서버 전용)
