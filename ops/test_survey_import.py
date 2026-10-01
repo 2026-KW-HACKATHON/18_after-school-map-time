@@ -125,10 +125,10 @@ class SurveyImportTests(TempMediaMixin, TestCase):
 
     def test_missing_coordinates_use_geocoder_for_new_place(self):
         path = self.write(self.row(**{"위도": "", "경도": ""}))
-        import_survey(path, geocode=lambda address: (Decimal("37.600001"), Decimal("127.050001")))
+        import_survey(path, geocode=lambda query, near=None: (Decimal("37.600001"), Decimal("127.050001")))
         self.assertEqual(Place.objects.get().lat, Decimal("37.600001"))
 
-        def fail(address):
+        def fail(query, near=None):
             raise ValueError("주소를 찾지 못했어요")
         with self.assertRaisesMessage(SurveyError, "2번째 줄: 주소를 찾지 못했어요"):
             import_survey(self.write(self.row(**{"이름": "새 가게", "위도": "", "경도": ""})), geocode=fail)

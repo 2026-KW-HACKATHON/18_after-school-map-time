@@ -17,8 +17,6 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-import requests
-from django.conf import settings
 from django.db import transaction
 from PIL import Image, UnidentifiedImageError
 
@@ -26,6 +24,7 @@ from core.images import normalize_photo
 from judgments.constants import display
 from judgments.receivers import affected_places
 from judgments.engine import recompute_place
+from places.geocoding import geocode
 from places.models import Building, Entrance, FieldDefinition, Place, Region
 from reports.models import Report
 from reports.selectors import current_values
@@ -46,7 +45,6 @@ LAT_RANGE = (Decimal("33"), Decimal("39"))
 LNG_RANGE = (Decimal("124"), Decimal("132"))
 COORD = Decimal("0.000001")
 
-KAKAO_ADDRESS_URL = "https://dapi.kakao.com/v2/local/search/address.json"
 
 
 class SurveyError(Exception):
@@ -283,25 +281,10 @@ def _category(cell):
     return None
 
 
-# ── 3. 주소 → 좌표 (카카오 로컬 API, 서버 전용 REST 키) ─────────
+# ── 3. 주소·이름 → 좌표 (places/geocoding.py, 카카오 로컬 API) ─────────
 
-
-def geocode_address(address):
-    """주소 → (위도, 경도). 위도·경도 칸을 비워 두면 새 장소에 한해 이걸로 찾는다"""
-    key = settings.KAKAO_REST_API_KEY
-    if not key:
-        raise ValueError("위도·경도가 비어 있어요. 주소로 찾으려면 .env에 KAKAO_REST_API_KEY가 필요해요")
-    try:
-        res = requests.get(KAKAO_ADDRESS_URL, params={"query": address},
-                           headers={"Authorization": f"KakaoAK {key}"}, timeout=5)
-    except requests.RequestException as e:
-        raise ValueError(f"카카오 주소 검색에 연결하지 못했어요 ({e.__class__.__name__})")
-    if res.status_code != 200:
-        raise ValueError(f"카카오 주소 검색 실패 (HTTP {res.status_code}). 위도·경도를 직접 적어 주세요")
-    documents = res.json().get("documents") or []
-    if not documents:
-        raise ValueError(f"주소 '{address}'를 찾지 못했어요. 위도·경도를 직접 적어 주세요")
-    return Decimal(documents[0]["y"]).quantize(COORD), Decimal(documents[0]["x"]).quantize(COORD)
+# 위도·경도 칸이 비면 새 장소에 한해 주소로, 주소도 비면 가게 이름으로 지역 중심 근처에서 찾는다
+geocode_address = geocode
 
 
 # ── 4. 저장 ──────────────────────────────────────────────
@@ -386,9 +369,11 @@ def _save_place(region, row, geocode):
     place = _find_place(region, row)
     status = "갱신" if place else "새 장소"
     lat, lng = row.lat, row.lng
+    found = None
     if place is None:
         if lat is None:
-            lat, lng = geocode(info.get("주소", ""))
+            found = geocode(info.get("주소") or info["이름"], near=(region.center_lat, region.center_lng))
+            lat, lng = found
         place = Place(region=region, name=info["이름"], address=info.get("주소", ""), lat=lat, lng=lng)
     elif lat is not None:
         place.lat, place.lng = lat, lng
@@ -401,7 +386,8 @@ def _save_place(region, row, geocode):
     if "건물 주소" in info or "건물 이름" in info:
         place.building = _save_building(region, row, place.lat, place.lng)
     place.save()
-    return place, status
+    # 주소·이름으로 찾은 위치는 미리 보기에서 사람이 확인할 수 있게 함께 돌려준다
+    return place, status, getattr(found, "label", "") and f"{found.method}로 찾음: {found.label}"
 
 
 def import_survey(path, *, region=None, photos_dir=None, user=None, dry_run=False, geocode=geocode_address):
@@ -416,7 +402,7 @@ def import_survey(path, *, region=None, photos_dir=None, user=None, dry_run=Fals
     with transaction.atomic():
         for row in rows:
             try:
-                place, status = _save_place(region, row, geocode)
+                place, status, located = _save_place(region, row, geocode)
             except ValueError as e:  # 주소 → 좌표 실패
                 errors.append(f"{row.line}번째 줄: {e}")
                 continue
@@ -432,7 +418,8 @@ def import_survey(path, *, region=None, photos_dir=None, user=None, dry_run=Fals
                 recompute_place(p)
             if status == "갱신" and not saved:
                 status = "변경 없음"
-            result.rows.append({"line": row.line, "name": place.name, "status": status, "place": place})
+            result.rows.append({"line": row.line, "name": place.name, "status": status, "place": place,
+                                "located": located})
         if errors:
             raise SurveyError(errors)  # 예외로 빠져나가면 transaction.atomic이 전부 되돌린다
         # 판정은 같은 건물의 다른 가게 때문에 바뀔 수 있어서 마지막에 모아서 읽는다

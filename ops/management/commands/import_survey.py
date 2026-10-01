@@ -60,6 +60,8 @@ class Command(BaseCommand):
 
         for row in result.rows:
             self.stdout.write(f"{row['line']:>3}줄  [{row['status']}] {row['name']}")
+            if row.get("located"):
+                self.stdout.write(f"        위치 — {row['located']} (맞는지 지도에서 확인해 주세요)")
             for profile, label, reason in row["judgments"]:
                 self.stdout.write(f"        {profile}: {label}" + (f" — {reason}" if reason else ""))
         summary = (f"새 장소 {result.count('새 장소')}곳 · 갱신 {result.count('갱신')}곳 · "
