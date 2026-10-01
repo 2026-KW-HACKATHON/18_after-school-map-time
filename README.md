@@ -62,13 +62,13 @@
 
 **사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드 + QR 안내 쪽지, 상단 "내 가게" 메뉴), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, 입구 사진 교체 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
 
-**정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 올린 사진의 촬영 위치(EXIF) 자동 삭제, 확인 전 제보 사진은 로그인한 주민에게만
+**정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 올린 사진의 촬영 위치(EXIF) 자동 삭제와 **얼굴 자동 가림**(서버 안 OpenCV, 외부 전송 없음), 확인 전 제보 사진은 로그인한 주민에게만
 
 **개선 연결·분쟁 방지 (✅):** "가고 싶어요" 누른 가게가 좋아지면 알림, 사장님 정보와 주민 제보가 다르면 "방문 전 전화 확인" 안내, 운영자용 **지역 집계**(판정 분포·경사로 지원사업 검토 목록 CSV — 구청 협력용, 비공개)
 
 **어르신·접근성·전시 대비 (✅):** 모든 화면 상단 **큰 글씨** 버튼(선택 기억), 본문 바로가기·키보드 포커스 표시·지도 팝업 키보드 사용(스크린리더), 전시·주민투표용 QR 포스터(운영자 화면에서 인쇄)
 
-**주민 참여 (✅):** 내 활동(`/me/`) — 내 제보 처리 상태·반려 사유, 기여 수, 긍정 배지 (순위·비교 없음)
+**주민 참여·알림 (✅):** 내 활동(`/me/`) — 내 제보 처리 상태·반려 사유, 기여 수, 긍정 배지 (순위·비교 없음). **서비스 안 알림**(`/notifications/`, 외부 발송·비용 없음) — 제보·사장님 요청 처리 결과, 인증 결과, 가고 싶어요 가게가 좋아졌을 때
 
 **건물주 기능 (Could, ✅):** 건물주 인증, 건물 공용 정보 정정 요청, 건물 입구 **개선 시뮬레이션**(판정 엔진으로 재계산)과 로그인 없이 보는 공유 페이지
 
@@ -147,7 +147,7 @@ docker compose exec web python manage.py createsuperuser
 | `python manage.py recompute_judgments` | 규칙은 그대로 두고 전체 장소 다시 판정 |
 | `python manage.py import_survey 답사.csv --photos 사진폴더 --dry-run` | 팀 답사 CSV 검사·판정 미리 보기 (`--dry-run` 빼면 저장). [답사 가이드](docs/survey-guide.md) |
 | `python manage.py import_survey --template 파일.csv` | 빈 답사 양식 만들기 |
-| `python manage.py strip_photo_exif --dry-run` | 예전에 올라온 사진의 촬영 위치(EXIF) 정리 (한 번) |
+| `python manage.py strip_photo_exif --dry-run` | 예전에 올라온 사진의 촬영 위치(EXIF) 정리 (한 번). `--all`이면 모든 사진을 다시 처리해 얼굴도 가림 |
 
 > Docker로 실행 중이면 앞에 `docker compose exec web`, 배포 서버에서는 `docker compose -f docker-compose.prod.yml exec -T web`을 붙입니다.
 
@@ -215,8 +215,8 @@ python manage.py runserver
 ```
 18_after-school-map-time/
 ├── config/                 # Django 프로젝트 설정 (settings.py, urls.py, wsgi/asgi)
-├── core/                   # 헬스체크(/health/), 홈, 공통 context processor, 사진 정리(EXIF 삭제)
-├── accounts/               # 회원 — 커스텀 User, 카카오 로그인, 내 활동(/me/)
+├── core/                   # 헬스체크(/health/), 홈, 공통 context processor, 사진 정리(EXIF 삭제·얼굴 가림)
+├── accounts/               # 회원 — 커스텀 User, 카카오 로그인, 내 활동(/me/), 서비스 안 알림
 ├── places/                 # 장소 데이터 — 지역·건물·장소·출입구·접근성 필드 정의
 ├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인
 ├── judgments/              # 판정 — 규칙(데이터)·판정 엔진·판정 결과
@@ -254,6 +254,7 @@ python manage.py runserver
 | `/buildings/<id>/improve/` | 건물 입구 개선 효과 공유 페이지 (로그인 없이) |
 | `/wishes/` | 내가 "가고 싶어요" 누른 가게와 개선 여부 |
 | `/me/` | 내 활동 — 내 제보 처리 상태(반려 사유 포함), 기여 수, 긍정 배지 |
+| `/notifications/` | 알림 — 제보·요청 처리 결과, 인증 결과, 가고 싶어요 가게 소식 |
 | `/support/` | 경사로 설치 지원사업 안내 |
 | `/ops/` | 운영자 화면 — 대시보드, 제보 검토(판정 변화 미리보기·승인·반려·새 장소 등록), 장소 등록·수정, 사장님·건물주 인증 코드 발급·안내 쪽지·승인, 지역 집계(구청용), 전시 포스터 |
 | `/admin/` | 관리자 — 전체 데이터·판정 규칙·건물 정보 관리 |
@@ -306,6 +307,8 @@ python manage.py runserver
 | [psycopg2](https://www.psycopg.org/) | PostgreSQL 드라이버 | LGPL-3.0 |
 | [Gunicorn](https://gunicorn.org/) | WSGI 서버 | MIT |
 | [Pillow](https://python-pillow.org/) | 이미지 처리 | MIT-CMU |
+| [OpenCV](https://opencv.org/) (opencv-python-headless) | 제보 사진 얼굴 자동 가림 (정면 얼굴 검출기 포함) | Apache-2.0 |
+| [NumPy](https://numpy.org/) | OpenCV 이미지 배열 | BSD-3-Clause |
 | [Requests](https://requests.readthedocs.io/) | 외부 API 호출 | Apache-2.0 |
 | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (cdnjs) | 사장님 인증 안내 쪽지·전시 포스터의 QR 코드 | MIT |
 | [PostgreSQL](https://www.postgresql.org/) | 데이터베이스 | PostgreSQL License |
