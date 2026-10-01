@@ -34,3 +34,37 @@ class User(AbstractUser):
         """가입한 지 NEW_ACCOUNT_DAYS일이 안 됐으면 True"""
         now = now or timezone.now()
         return now - self.date_joined < timedelta(days=self.NEW_ACCOUNT_DAYS)
+
+
+class Notification(models.Model):
+    """
+    서비스 안 알림 (외부 발송 없음 → 비용 없음). 상단 메뉴에 안 읽은 개수, /notifications/ 에서 확인.
+    만드는 곳은 accounts/notify.py 한 곳 — 제보·사장님 요청 처리 결과, 인증 결과, 가고 싶어요 가게 개선
+    """
+
+    class Kind(models.TextChoices):
+        REPORT = "REPORT", "제보 결과"
+        OWNER_REQUEST = "OWNER_REQUEST", "사장님·건물주 요청 결과"
+        CLAIM = "CLAIM", "인증 결과"
+        WISH = "WISH", "가고 싶어요 가게 소식"
+
+    user = models.ForeignKey("accounts.User", verbose_name="받는 사람", on_delete=models.CASCADE,
+                             related_name="notifications")
+    kind = models.CharField("종류", max_length=20, choices=Kind.choices)
+    message = models.CharField("내용", max_length=200)
+    url = models.CharField("링크", max_length=200, blank=True)
+    created_at = models.DateTimeField("만든 시각", default=timezone.now)
+    read_at = models.DateTimeField("읽은 시각", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "알림"
+        verbose_name_plural = "알림"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "read_at"], name="notification_user_unread")]
+
+    def __str__(self):
+        return f"{self.user} · {self.message}"
+
+    @property
+    def is_read(self):
+        return self.read_at is not None
