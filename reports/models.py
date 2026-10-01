@@ -23,6 +23,7 @@ class Report(models.Model):
         USER_REPORT = "USER_REPORT", "이용자 제보"
         OWNER = "OWNER", "사장님·건물주"
         AI = "AI", "AI 판별"
+        PUBLIC_DATA = "PUBLIC_DATA", "공공데이터"  # 장애인편의시설 현황 API (places/public_data.py)
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "확인 중"

@@ -41,6 +41,9 @@
 │   ├── static/places/          ←   css/places.css, js/map-app.js (지도 화면)
 │   ├── data/*.json             ←   기본 데이터 (월계1동, 필드 정의) — 코드 수정 없이 여기서 바꿈
 │   ├── data/survey/            ←   답사 양식 template.csv (+ 팀 답사 결과 wolgye1.csv)
+│   ├── data/public/            ←   공공데이터 스냅숏 (장애인편의시설 현황, 월계동, 받은 날짜별)
+│   ├── geocoding.py            ←   주소·이름 → 좌표 (카카오 로컬 API)
+│   ├── public_data.py          ←   공공데이터 가져오기 (항목 대응표 FIELD_MAP, 주거시설 제외)
 │   └── management/commands/seed_base.py  ← 기본 데이터 넣기
 │
 ├── reports/                    ← 접근성 값과 그 출처 (제보 묶음·값·확인)
@@ -212,6 +215,8 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 | `Place` | 가게·시설. `building`(선택), `category`, `floor`, `is_closed`(삭제 대신 폐업 처리) |
 | `Entrance` | 장소 출입구 **또는** 건물 출입구 (둘 중 정확히 하나 — DB 제약). 출입구마다 따로 판정해 대체 출입구 안내 |
 | `FieldDefinition` | 필드 키를 자유 텍스트로 쓰지 않기 위한 정의 테이블. 대상(`PLACE`/`BUILDING`/`ENTRANCE`), 값 종류(`NUMBER`/`BOOL`/`CHOICE`/`TEXT`), 측정 방법 |
+
+**공공데이터 가져오기** (`places/public_data.py`, `import_public_facilities`): 공공데이터포털 "한국사회보장정보원_장애인편의시설 현황"에서 노원구 목록을 받아 **월계동(법정동 코드 1135010200)·영업 중·주거시설 아닌 곳**만 고르고, 시설마다 "설치된 편의시설 항목"을 받는다. 항목은 뜻이 바로 맞는 것만 값으로 옮김 — 주출입구 높이차이 제거 → 입구 단차 0cm, 승강기 → 엘리베이터 있음(건물), 장애인사용가능화장실 → 장애인 화장실 있음. 문 폭처럼 수치가 없는 건 비워 둬서 휠체어는 "정보 없음"으로 남음(지어낸 값으로 판정하지 않음). 출처는 `공공데이터`, 확인 시각은 데이터 등록일이라 이후 답사·제보가 더 최신이면 그 값이 우선. 좌표가 없으면 카카오 주소 검색. 받은 내용은 `places/data/public/*.json` 스냅숏으로 레포에 두어 **호출 없이 누구나 같은 결과**(이용허락 제한 없음 데이터). 하루 호출 100회 제한 → `--limit`, 이미 가져온 시설은 다시 부르지 않음.
 
 기본 데이터는 `places/data/regions.json`, `field_definitions.json`에 있고 `python manage.py seed_base`로 넣습니다 (여러 번 실행해도 결과 같음). 개발용 compose는 시작할 때 자동 실행.
 

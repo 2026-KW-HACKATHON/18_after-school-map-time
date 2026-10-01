@@ -62,6 +62,8 @@
 
 **사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드 + QR 안내 쪽지, 상단 "내 가게" 메뉴), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, 입구 사진 교체 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
 
+**공공데이터 연동 (✅):** 공공데이터포털 장애인편의시설 현황에서 월계동 공공·업무시설 46곳을 초기 데이터로 (주거시설 제외, 뜻이 바로 맞는 항목만 값으로, 출처 "공공데이터" 표시)
+
 **정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 올린 사진의 촬영 위치(EXIF) 자동 삭제와 **얼굴 자동 가림**(서버 안 OpenCV, 외부 전송 없음), 확인 전 제보 사진은 로그인한 주민에게만
 
 **개선 연결·분쟁 방지 (✅):** "가고 싶어요" 누른 가게가 좋아지면 알림, 사장님 정보와 주민 제보가 다르면 "방문 전 전화 확인" 안내, 운영자용 **지역 집계**(판정 분포·경사로 지원사업 검토 목록 CSV — 구청 협력용, 비공개)
@@ -147,6 +149,7 @@ docker compose exec web python manage.py createsuperuser
 | `python manage.py recompute_judgments` | 규칙은 그대로 두고 전체 장소 다시 판정 |
 | `python manage.py import_survey 답사.csv --photos 사진폴더 --dry-run` | 팀 답사 CSV 검사·판정 미리 보기 (`--dry-run` 빼면 저장). [답사 가이드](docs/survey-guide.md) |
 | `python manage.py import_survey --template 파일.csv` | 빈 답사 양식 만들기 |
+| `python manage.py import_public_facilities --cache places/data/public/wolgye-facilities-20261001.json --dry-run` | 공공데이터(장애인편의시설 현황) 월계동 시설 미리 보기 (`--dry-run` 빼면 저장, 스냅숏이라 호출 0회) |
 | `python manage.py strip_photo_exif --dry-run` | 예전에 올라온 사진의 촬영 위치(EXIF) 정리 (한 번). `--all`이면 모든 사진을 다시 처리해 얼굴도 가림 |
 
 > Docker로 실행 중이면 앞에 `docker compose exec web`, 배포 서버에서는 `docker compose -f docker-compose.prod.yml exec -T web`을 붙입니다.
@@ -315,6 +318,7 @@ python manage.py runserver
 | [Nginx](https://nginx.org/) | 리버스 프록시 (배포) | BSD-2-Clause |
 | [Pretendard](https://github.com/orioncactus/pretendard) | 웹폰트 | SIL OFL 1.1 |
 | [카카오맵 API](https://apis.map.kakao.com/) | 지도 · 장소 정보 | [카카오 API 이용약관](https://developers.kakao.com/terms/latest/ko/site-policies) |
+| [한국사회보장정보원_장애인편의시설 현황](https://www.data.go.kr/data/15092317/openapi.do) (공공데이터포털) | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 |
 
 ### 참고 자료
 
