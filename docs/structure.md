@@ -183,6 +183,7 @@
 | `models.py` | `User`(Django `AbstractUser` 확장). 화면 표시용 `nickname`, `display_name`, `is_new_account()`(가입 7일 미만 → 하향 제보 검수 규칙). 식별번호는 저장하지 않음 |
 | `adapters.py` | 카카오 첫 로그인 때 추가 입력 없이 가입(`is_open_for_signup`), 카카오 닉네임 저장(`populate_user`). 카카오 닉네임이 한글이면 `username`은 allauth가 영문으로 자동 생성 |
 | `admin.py` | 관리자 화면 회원 목록 (닉네임 검색) |
+| `activity.py` · `views.py` · `urls.py` | **내 활동** `/me/` (로그인): 내 제보 상태(확인 중 "주민 확인 n/m명"·"운영진이 확인해요" / 반영됨 / 반려 + 사유), 기여 수, **긍정 배지만**(OP-5, 순위·비교 없음). 배지 기준은 `BADGES` 목록 한 곳에서. 상단 이름 링크·휴대폰 하단 탭·제보 완료 화면에서 들어감 |
 | `tests.py` | 7일 경계값, 로그인 화면에 카카오만 있는지, 카카오 인증 페이지로 보내는지, 닉네임 저장, 로그아웃 |
 
 로그인 구조 (`settings.py` "회원·로그인" 구역)
@@ -360,6 +361,7 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 
 | 파일 | 역할 · 구성 |
 | --- | --- |
+| 키보드·스크린리더 | 모든 화면 맨 앞 **본문 바로가기**(Tab 첫 번째), 링크·버튼·입력칸 공통 포커스 테두리(`:focus-visible`), 지도 영역·미리 보기 팝업에 이름, 마커는 이름·판정을 읽는 버튼, 팝업은 열리면 포커스 이동·Esc로 닫으면 누른 마커로 복귀, 목록 개수 변화는 `aria-live`로 읽어 줌. 지도를 못 써도 목록·검색으로 같은 정보 |
 | `templates/base.html` | 모든 페이지의 뼈대. 상단 바(로고 + `nav` 블록), Django 메시지, 본문. 각 페이지는 `{% extends "base.html" %}` 후 아래 블록을 채움:<br>`title` · `extra_css` · `nav` · `main_class` · `content` · `extra_js` |
 | `templates/404.html` | 없는 페이지 (`DEBUG=False`일 때만 보임) |
 | `templates/500.html` | 서버 오류. 오류 상황에서도 뜰 수 있게 `base.html`·`url` 태그 없이 단독 HTML |
