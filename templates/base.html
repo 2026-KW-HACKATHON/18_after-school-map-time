@@ -31,6 +31,10 @@
       <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
       {% block nav %}{% endblock %}
       <button type="button" id="text-size-toggle" class="text-size-toggle" aria-pressed="false" title="글씨를 크게 보기">큰 글씨</button>
+      {% if user.is_authenticated %}
+        {# 알림: 안 읽은 게 있으면 휴대폰에서도 보이게 #}
+        <a href="{% url 'accounts:notifications' %}"{% if not notif_unread %} class="nav-wide"{% endif %}>알림{% if notif_unread %} <span class="badge-positive" aria-label="안 읽은 알림 {{ notif_unread }}개">{{ notif_unread }}</span>{% endif %}</a>
+      {% endif %}
       {% if wish_nav is not None %}
         {# 가고 싶어요 누른 가게가 좋아지면 모바일에서도 보이게 (평소엔 넓은 화면에서만) #}
         <a href="{% url 'owners:wishes' %}"{% if not wish_nav %} class="nav-wide"{% endif %}>가고 싶어요{% if wish_nav %} <span class="badge-positive">좋아진 곳 {{ wish_nav }}</span>{% endif %}</a>

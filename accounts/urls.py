@@ -6,4 +6,5 @@ app_name = "accounts"
 
 urlpatterns = [
     path("me/", views.me, name="me"),
+    path("notifications/", views.notifications, name="notifications"),
 ]
