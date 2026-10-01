@@ -62,6 +62,8 @@ def report_new(request):
                 value.save()
         return redirect("reports:done")
 
+    if request.method == "POST":
+        form.keep_photo_for_retry()  # 오류가 있으면 올린 사진을 보관해서 다시 고르지 않게
     region = Region.objects.filter(is_active=True).order_by("id").first()  # 위치 선택 지도의 처음 중심
     return render(request, "reports/report_form.html", {"form": form, "place": place, "region": region})
 

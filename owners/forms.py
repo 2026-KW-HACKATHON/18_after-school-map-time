@@ -1,6 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+from core.uploads import KeepPhotoMixin
+
 from places.models import FieldDefinition
 from reports.models import AccessibilityValue
 
@@ -27,7 +29,7 @@ class ResponseForm(forms.ModelForm):
         widgets = {"owner_comment": forms.Textarea(attrs={"rows": 3})}
 
 
-class DeclarationForm(forms.Form):
+class DeclarationForm(KeepPhotoMixin, forms.Form):
     """
     도움 제공 선언 (기획 v2 4.2). 사진 확인(주민 1명 또는 운영자)을 거쳐야 판정에 반영된다.
     """
@@ -37,6 +39,10 @@ class DeclarationForm(forms.Form):
     portable_ramp_length_cm = forms.DecimalField(label="이동식 경사로 길이 (cm)", required=False, min_value=10, max_value=1000)
     photo = forms.ImageField(label="확인 사진", help_text="경사로를 펼친 모습이나 호출벨 등 선언한 내용이 보이는 사진")
     note = forms.CharField(label="덧붙일 말 (선택)", max_length=200, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_kept_photo()  # 오류로 다시 보여 줄 때 올린 사진 유지
 
     def clean(self):
         data = super().clean()
@@ -56,7 +62,7 @@ class DeclarationForm(forms.Form):
         return out
 
 
-class CorrectionForm(forms.Form):
+class CorrectionForm(KeepPhotoMixin, forms.Form):
     """정정 요청 (기획 v2 4.3): 항목 하나 + 새 값 + 증빙 사진. 다른 주민 2명 확인 또는 운영자 승인 후 반영"""
 
     field = forms.ChoiceField(label="고칠 항목")
@@ -70,6 +76,7 @@ class CorrectionForm(forms.Form):
 
     def __init__(self, *args, scopes=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setup_kept_photo()
         scopes = scopes or self.PLACE_SCOPES
         fields = FieldDefinition.objects.filter(scope__in=scopes, is_active=True).order_by("scope", "order")
         self.definitions = {f.key: f for f in fields}
@@ -99,9 +106,13 @@ class CorrectionForm(forms.Form):
         return data
 
 
-class PhotoRequestForm(forms.Form):
+class PhotoRequestForm(KeepPhotoMixin, forms.Form):
     """입구 사진 교체 요청 (기획 v2 4.4). 운영자가 얼굴·번호판을 확인하고 바꾼다. 정보 삭제 요청은 받지 않음"""
 
     reason = forms.ChoiceField(label="바꾸고 싶은 이유", choices=PHOTO_REASONS, widget=forms.RadioSelect)
     photo = forms.ImageField(label="새 입구 사진", help_text="입구 정면, 문턱·계단이 보이게. 사람 얼굴·차량 번호판은 나오지 않게 찍어 주세요")
     note = forms.CharField(label="덧붙일 말 (선택)", max_length=200, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_kept_photo()  # 오류로 다시 보여 줄 때 올린 사진 유지

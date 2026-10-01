@@ -8,6 +8,7 @@ from datetime import timedelta
 from django import forms
 from django.utils import timezone
 
+from core.uploads import KeepPhotoMixin
 from judgments.models import ConditionProfile
 from places.models import FieldDefinition, Place
 
@@ -21,7 +22,7 @@ ENTRANCE_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", 
 REPORT_LIMIT_HOURS = 24  # 같은 사람이 같은 장소를 다시 제보할 수 있는 간격 (기획 v2 7장)
 
 
-class ReportForm(forms.Form):
+class ReportForm(KeepPhotoMixin, forms.Form):
     # 새 장소 제안 (장소를 고르지 않고 들어왔을 때만 사용)
     suggested_name = forms.CharField(label="장소 이름", max_length=100, required=False,
                                      widget=forms.TextInput(attrs={"placeholder": "예: 월계 약국, 1번 출구 카페"}))
@@ -63,6 +64,7 @@ class ReportForm(forms.Form):
         if place is not None:
             for name in ("suggested_name", "location_text", "suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
                 del self.fields[name]
+        self.setup_kept_photo()  # 칸을 잘못 적어 다시 보여 줄 때 올린 사진 유지
 
     def clean(self):
         data = super().clean()

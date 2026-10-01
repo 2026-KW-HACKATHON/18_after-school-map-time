@@ -39,6 +39,7 @@
     <fieldset class="card">
       <legend>입구 사진</legend>
       {% include "reports/_field.html" with field=form.photo %}
+      {{ form.photo_token }}
       <p class="muted small">사진으로 값을 자동으로 채워 주는 AI 분석은 준비 중이에요.</p>
     </fieldset>
 
