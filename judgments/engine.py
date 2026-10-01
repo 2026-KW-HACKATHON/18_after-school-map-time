@@ -29,6 +29,7 @@ from reports.selectors import current_values
 
 from .constants import BEST_ROUTE_ORDER, IMPROVEMENT_RANK
 from .models import ConditionProfile, Judgment, Outcome, Rule, RuleCondition, RuleSet
+from .signals import place_improved
 
 Scope = FieldDefinition.Scope
 Op = RuleCondition.Operator
@@ -300,10 +301,13 @@ def recompute_place(place, rule_set=None):
         judgment.reason = result.reason
         judgment.matched_rule = result.rule
         judgment.rule_version = rule_set.version
-        if _is_improvement(previous, result.outcome):
+        improved = _is_improvement(previous, result.outcome)
+        if improved:
             judgment.improved_at = timezone.now()
             judgment.improved_to = result.outcome
         judgment.save()
+        if improved:
+            place_improved.send(sender=Judgment, judgment=judgment)  # 가고 싶어요 누른 주민 알림 (owners)
         saved.append(judgment)
     return saved
 
