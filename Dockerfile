@@ -16,6 +16,9 @@ WORKDIR /app
 # psycopg2-binary / pillow 는 미리 빌드된 휠로 설치되므로 gcc, libpq-dev 같은 빌드 도구는 설치하지 않음
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+# 사진 얼굴 자동 가림(OpenCV)이 이 이미지에서 실제로 불러와지는지 빌드 때 확인
+# → 못 불러오면 조용히 가림을 건너뛰는 대신 빌드가 실패해서 바로 알 수 있음
+RUN python -c "import cv2; print('OpenCV', cv2.__version__)"
 
 # 프로젝트 전체 복사 (.dockerignore에 적힌 .env·문서 등은 제외됨)
 COPY . .

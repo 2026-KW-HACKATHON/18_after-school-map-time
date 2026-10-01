@@ -4,6 +4,7 @@
 
     python manage.py strip_photo_exif --dry-run   # 몇 장이 대상인지 보기만
     python manage.py strip_photo_exif             # 실제로 정리
+    python manage.py strip_photo_exif --all       # 이미 깨끗한 사진도 다시 처리 (얼굴 자동 가림 적용 전 사진)
 """
 
 from django.core.management.base import BaseCommand
@@ -24,18 +25,21 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="대상 수만 세고 바꾸지 않음")
+        parser.add_argument("--all", action="store_true", help="EXIF가 없어도 모든 사진을 다시 처리 (얼굴 자동 가림)")
 
     def handle(self, *args, dry_run=False, **options):
-        cleaned = skipped = broken = 0
+        cleaned = skipped = broken = faces = 0
+        redo_all = options.get("all", False)
         for report in Report.objects.exclude(photo="").only("id", "photo"):
             photo = report.photo
             try:
-                if not needs_cleanup(photo):
+                if not redo_all and not needs_cleanup(photo):
                     skipped += 1
                     continue
                 if not dry_run:
                     with photo.open("rb") as f:
                         new = normalize_photo(f, name=photo.name)
+                    faces += new.blurred_faces
                     old_name = photo.name
                     storage = photo.storage
                     photo.save(new.name, new, save=False)         # 새 파일로 저장 (모델 save 는 거치지 않음)
@@ -46,4 +50,5 @@ class Command(BaseCommand):
             except (FileNotFoundError, UnidentifiedImageError, OSError):
                 broken += 1
         verb = "정리 대상" if dry_run else "정리"
-        self.stdout.write(self.style.SUCCESS(f"{verb} {cleaned}장 · 이미 깨끗함 {skipped}장 · 열 수 없음 {broken}장"))
+        face_note = f" · 얼굴 가림 {faces}곳" if faces else ""
+        self.stdout.write(self.style.SUCCESS(f"{verb} {cleaned}장 · 이미 깨끗함 {skipped}장 · 열 수 없음 {broken}장{face_note}"))

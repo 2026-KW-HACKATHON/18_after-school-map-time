@@ -113,8 +113,11 @@ class OwnerClaim(models.Model):
         return cls.objects.filter(user=user, building=building, status=cls.Status.APPROVED).exists()
 
     def review(self, status, by, reason=""):
+        from accounts import notify
+
         self.status, self.reviewed_by, self.reviewed_at, self.reject_reason = status, by, timezone.now(), reason
         self.save(update_fields=["status", "reviewed_by", "reviewed_at", "reject_reason"])
+        notify.claim_reviewed(self)  # 신청한 사람에게 결과 알림
 
 
 class OwnerResponse(models.Model):

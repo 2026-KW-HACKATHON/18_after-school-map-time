@@ -103,3 +103,14 @@ class StripExifCommandTests(TempMediaMixin, TestCase):
         out = StringIO()
         call_command("strip_photo_exif", stdout=out)
         self.assertIn("정리 0장 · 이미 깨끗함 1장", out.getvalue())
+
+    def test_all_option_reprocesses_clean_photos(self):
+        report = Report.objects.create(source="USER_REPORT", entrance=self.door, photo=phone_photo())  # 이미 정리됨
+        out = StringIO()
+        call_command("strip_photo_exif", stdout=out)
+        self.assertIn("정리 0장 · 이미 깨끗함 1장", out.getvalue())
+        out = StringIO()
+        call_command("strip_photo_exif", "--all", stdout=out)
+        self.assertIn("정리 1장", out.getvalue())
+        report.refresh_from_db()
+        self.assertTrue(report.photo.storage.exists(report.photo.name))

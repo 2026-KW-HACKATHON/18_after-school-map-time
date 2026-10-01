@@ -170,7 +170,7 @@
 | `views.py` | `health` — DB에 `SELECT 1`을 해보고 정상이면 200 `{"status": "ok", "db": true}`, 실패면 503. 배포 후 확인·모니터링용<br>`home` — 지도(`/map/`)로 이동 |
 | `urls.py` | `/` → home, `/health/` → health. `app_name = "core"`라서 템플릿에서 `{% url 'core:home' %}`로 참조 |
 | `context_processors.py` | 모든 템플릿에 `KAKAO_JAVASCRIPT_KEY`를 넘겨줌 → 지도 페이지에서 SDK 로드할 때 사용. **REST 키는 절대 넘기지 않음** |
-| `images.py` | `normalize_photo()` — 사진의 EXIF(촬영 위치 등)를 지우고 방향을 바로잡아 1600px JPEG로 다시 저장. 모든 사진 업로드가 거침 |
+| `images.py` | `normalize_photo()` — 사진의 EXIF(촬영 위치 등)를 지우고 방향을 바로잡아 1600px JPEG로 다시 저장, **정면 얼굴은 자동으로 흐리게**(OpenCV Haar 검출기, 서버 안에서 처리·비용 없음, 짧은 변의 4%보다 작은 무늬는 무시). 번호판은 무료 모델 정확도가 낮아 운영자 검수. OpenCV를 못 불러오면 가림만 건너뜀 (Dockerfile이 빌드 때 불러와지는지 확인). 모든 사진 업로드가 거침 |
 | `tests.py` | 헬스체크 정상(200)·DB 장애(503), 홈 화면 테스트 |
 | `apps.py` | 앱 등록 정보 |
 
@@ -183,6 +183,7 @@
 | `models.py` | `User`(Django `AbstractUser` 확장). 화면 표시용 `nickname`, `display_name`, `is_new_account()`(가입 7일 미만 → 하향 제보 검수 규칙). 식별번호는 저장하지 않음 |
 | `adapters.py` | 카카오 첫 로그인 때 추가 입력 없이 가입(`is_open_for_signup`), 카카오 닉네임 저장(`populate_user`). 카카오 닉네임이 한글이면 `username`은 allauth가 영문으로 자동 생성 |
 | `admin.py` | 관리자 화면 회원 목록 (닉네임 검색) |
+| `models.py` `Notification` · `notify.py` · `receivers.py` | **서비스 안 알림** (외부 발송 없음 → 비용 없음). 문구는 `notify.py` 한 곳. 만드는 때: 주민 제보 반영·반려(`report_reviewed` 신호), 사장님·건물주 요청 반영·반려, 인증 승인·반려(`OwnerClaim.review`), 가고 싶어요 가게 판정 상승(`judgments.signals.place_improved` → `owners/receivers.py`, 개선 때 한 번만). 팀 답사·운영자 자기 기록은 알림 없음. 상단 "알림 n"(안 읽은 게 있으면 휴대폰에서도 보임), `/notifications/`를 열면 읽음 처리 |
 | `activity.py` · `views.py` · `urls.py` | **내 활동** `/me/` (로그인): 내 제보 상태(확인 중 "주민 확인 n/m명"·"운영진이 확인해요" / 반영됨 / 반려 + 사유), 기여 수, **긍정 배지만**(OP-5, 순위·비교 없음). 배지 기준은 `BADGES` 목록 한 곳에서. 상단 이름 링크·휴대폰 하단 탭·제보 완료 화면에서 들어감 |
 | `tests.py` | 7일 경계값, 로그인 화면에 카카오만 있는지, 카카오 인증 페이지로 보내는지, 닉네임 저장, 로그아웃 |
 
