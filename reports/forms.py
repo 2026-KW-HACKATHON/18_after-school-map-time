@@ -8,10 +8,11 @@ from datetime import timedelta
 from django import forms
 from django.utils import timezone
 
+from core.uploads import KeepPhotoMixin
 from judgments.models import ConditionProfile
 from places.models import FieldDefinition, Place
 
-from .models import Report
+from .models import PHOTO_FIX_PREFIX, Report
 
 UNKNOWN = ""  # "모름" — 값을 넣지 않음
 
@@ -21,7 +22,7 @@ ENTRANCE_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", 
 REPORT_LIMIT_HOURS = 24  # 같은 사람이 같은 장소를 다시 제보할 수 있는 간격 (기획 v2 7장)
 
 
-class ReportForm(forms.Form):
+class ReportForm(KeepPhotoMixin, forms.Form):
     # 새 장소 제안 (장소를 고르지 않고 들어왔을 때만 사용)
     suggested_name = forms.CharField(label="장소 이름", max_length=100, required=False,
                                      widget=forms.TextInput(attrs={"placeholder": "예: 월계 약국, 1번 출구 카페"}))
@@ -63,6 +64,7 @@ class ReportForm(forms.Form):
         if place is not None:
             for name in ("suggested_name", "location_text", "suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
                 del self.fields[name]
+        self.setup_kept_photo()  # 칸을 잘못 적어 다시 보여 줄 때 올린 사진 유지
 
     def clean(self):
         data = super().clean()
@@ -79,7 +81,8 @@ class ReportForm(forms.Form):
             raise forms.ValidationError("입구 정보를 하나 이상 고르거나, 추가 설명을 적어 주세요.")
         if self.place is not None and self.user is not None:
             since = timezone.now() - timedelta(hours=REPORT_LIMIT_HOURS)
-            recent = Report.objects.filter(created_by=self.user, created_at__gte=since)
+            recent = Report.objects.filter(created_by=self.user, created_at__gte=since).exclude(
+                note__startswith=PHOTO_FIX_PREFIX)  # 사진 수정 요청은 제보 간격 제한에서 뺌
             if recent.filter(place=self.place).exists() or recent.filter(entrance__place=self.place).exists():
                 raise forms.ValidationError("같은 장소는 24시간에 한 번만 제보할 수 있어요. 확인 중인 제보가 반영될 때까지 기다려 주세요.")
         return data
@@ -93,3 +96,25 @@ class ReportForm(forms.Form):
                 continue
             out[key] = v
         return out
+
+
+PHOTO_FIX_REASONS = [
+    ("예전 모습이에요 (공사·이전 등)", "예전 모습이에요 (공사·이전 등)"),
+    ("내 얼굴이나 아는 사람 얼굴이 나와요", "내 얼굴이나 아는 사람 얼굴이 나와요"),
+    ("차량 번호판이나 개인 정보가 보여요", "차량 번호판이나 개인 정보가 보여요"),
+    ("기타", "기타"),
+]
+
+
+class PhotoFixForm(KeepPhotoMixin, forms.Form):
+    """주민 → 운영자 입구 사진 수정 요청. 새 사진은 있으면 같이 (얼굴 문제면 사진 없이 '내려 주세요'만 해도 됨)"""
+
+    reason = forms.ChoiceField(label="어떤 문제인가요?", choices=PHOTO_FIX_REASONS, widget=forms.RadioSelect)
+    photo = forms.ImageField(label="새 입구 사진 (있으면)", required=False,
+                             help_text="입구 정면, 문턱·계단이 보이게. 사람 얼굴·차량 번호판은 나오지 않게 찍어 주세요")
+    note = forms.CharField(label="덧붙일 말 (선택)", max_length=200, required=False,
+                           widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_kept_photo()

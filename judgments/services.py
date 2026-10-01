@@ -82,10 +82,16 @@ def is_owner_declaration(report):
 
 
 def is_photo_request(report):
-    """사장님 입구 사진 교체 요청 (값 없이 사진만 — 기획 v2 4.4)"""
-    from reports.models import Report
+    """
+    사진 교체·수정 요청 (기획 v2 4.4) — 운영자만 처리
+      - 사장님: 값 없이 사진만 담은 사장님 요청
+      - 주민: 설명이 '[사진 수정 요청]'으로 시작하는 주민 제보 (예전 모습, 내 얼굴·지인 얼굴이 나옴 등)
+    """
+    from reports.models import PHOTO_FIX_PREFIX, Report
 
-    return report.source == Report.Source.OWNER and not report.values.exists()
+    if report.source == Report.Source.OWNER:
+        return not report.values.exists()
+    return report.source == Report.Source.USER_REPORT and report.note.startswith(PHOTO_FIX_PREFIX)
 
 
 def required_confirmations(report):

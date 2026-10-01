@@ -27,7 +27,7 @@ def _place_url(report):
 
 def report_reviewed(report):
     """제보·사장님 요청이 처리됐을 때 (반영 VERIFIED / 반려 REJECTED)"""
-    from reports.models import Report
+    from reports.models import PHOTO_FIX_PREFIX, Report
 
     author = report.created_by
     if author is None or report.reviewed_by_id == author.pk:
@@ -36,7 +36,11 @@ def report_reviewed(report):
     reason = f" — {report.reject_reason}" if report.reject_reason and not verified else ""
     target = report.target_place.name if report.target_place else report.target_label
     if report.source == Report.Source.USER_REPORT:
-        message = f"{target} 제보가 지도에 반영됐어요." if verified else f"{target} 제보가 반영되지 않았어요{reason}"
+        if report.note.startswith(PHOTO_FIX_PREFIX):
+            message = (f"{target} 사진 수정 요청을 처리했어요." if verified
+                       else f"{target} 사진 수정 요청이 반려됐어요{reason}")
+        else:
+            message = f"{target} 제보가 지도에 반영됐어요." if verified else f"{target} 제보가 반영되지 않았어요{reason}"
         return notify(author, Notification.Kind.REPORT, message, _place_url(report) or reverse("accounts:me"))
     if report.source == Report.Source.OWNER:
         message = f"{target}에 보낸 요청이 반영됐어요." if verified else f"{target}에 보낸 요청이 반려됐어요{reason}"

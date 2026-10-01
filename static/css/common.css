@@ -192,3 +192,11 @@ html.large-text .badge-neutral,
 html.large-text .badge-warn { font-size: 15px; }
 html.large-text .btn { padding: 14px 22px; }
 html.large-text .tabbar a { font-size: 18px; }
+
+/* 폼 오류로 다시 보여 줄 때 보관 중인 사진 미리 보기 (core/uploads.py) */
+.kept-photo { display: flex; gap: 12px; align-items: center; padding: 8px; border: 1px dashed var(--color-border); border-radius: 8px; }
+.kept-photo img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; }
+
+/* 운영자: 사진 수정·교체 요청 검토 때 지금 사진과 새 사진 나란히 */
+.photo-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.photo-compare figure { margin: 0; display: grid; gap: 4px; }

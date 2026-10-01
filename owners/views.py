@@ -95,6 +95,8 @@ def photo_request(request, place):
         else:
             messages.success(request, "사진 교체를 요청했어요. 운영진이 확인하면 바뀌어요.")
             return redirect("owners:dashboard", pk=place.pk)
+    if request.method == "POST":
+        form.keep_photo_for_retry()
     return render(request, "owners/photo_request_form.html", {"form": form, "place": place})
 
 
@@ -131,6 +133,8 @@ def declaration(request, place):
         else:
             messages.success(request, "접수했어요. 사진이 확인되면 지도에 반영돼요.")
             return redirect("owners:dashboard", pk=place.pk)
+    if request.method == "POST":
+        form.keep_photo_for_retry()
     return render(request, "owners/declaration_form.html", {"form": form, "place": place})
 
 
@@ -149,6 +153,8 @@ def correction(request, place):
         else:
             messages.success(request, "정정 요청을 접수했어요. 확인되면 반영되고, 반려되면 사유를 알려드려요.")
             return redirect("owners:dashboard", pk=place.pk)
+    if request.method == "POST":
+        form.keep_photo_for_retry()
     return render(request, "owners/correction_form.html", {"form": form, "place": place})
 
 
@@ -193,6 +199,8 @@ def building_correction(request, building):
         else:
             messages.success(request, "정정 요청을 접수했어요. 확인되면 반영되고, 반려되면 사유를 알려드려요.")
             return redirect("owners:building", pk=building.pk)
+    if request.method == "POST":
+        form.keep_photo_for_retry()
     return render(request, "owners/correction_form.html", {"form": form, "building": building})
 
 

@@ -28,7 +28,14 @@
 
   <section class="card">
     <h2>제보 사진 및 주민 설명</h2>
-    {% if report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="제보 사진">{% else %}<p class="muted">사진 없음</p>{% endif %}
+    {% if photo_request %}
+      <div class="photo-compare">
+        <figure><figcaption class="small muted">지금 공개된 사진</figcaption>
+          {% if current_photo %}<img class="entrance-photo" src="{{ current_photo.url }}" alt="지금 공개된 입구 사진">{% else %}<p class="muted">공개된 사진 없음</p>{% endif %}</figure>
+        <figure><figcaption class="small muted">요청과 함께 온 새 사진</figcaption>
+          {% if report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="새 사진">{% else %}<p class="muted">새 사진 없음 — 지금 사진만 내려 달라는 요청일 수 있어요</p>{% endif %}</figure>
+      </div>
+    {% elif report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="제보 사진">{% else %}<p class="muted">사진 없음</p>{% endif %}
     <p>{{ report.note|default:"설명 없음" }}</p>
     {% if report.profiles %}<p class="muted small">제보자가 고른 이동 조건: {{ report.profiles|join:", " }}</p>{% endif %}
     <p class="muted small">정면 얼굴은 올릴 때 자동으로 흐리게 처리돼요. 옆모습·뒷모습으로 알아볼 수 있는 사람이나 차량 번호판이 보이면 반려하고 다시 찍어 달라고 안내해 주세요. (기획 v2 4.4)</p>
@@ -97,6 +104,10 @@
       </fieldset>
     {% endif %}
 
+    {% if photo_request %}
+      <div class="field"><label><input type="checkbox" name="{{ form.remove_current_photo.html_name }}" id="{{ form.remove_current_photo.id_for_label }}"{% if form.remove_current_photo.value %} checked{% endif %}> {{ form.remove_current_photo.label }}</label>
+        <p class="muted small">승인할 때 체크하면 지금 사진을 지워요 (되돌릴 수 없음). 새 사진이 있으면 승인 후 새 사진이 보여요.</p></div>
+    {% endif %}
     {% include "reports/_field.html" with field=form.review_note %}
     {% include "reports/_field.html" with field=form.reject_reason %}
 

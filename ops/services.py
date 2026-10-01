@@ -140,6 +140,20 @@ def approve_report(report, user, review_note="", new_place=None):
     return report
 
 
+def remove_current_photo(entrance, keep=None):
+    """
+    지금 상세 화면에 보이는 입구 사진(검증된 제보 중 가장 최근 사진)을 내린다 — 파일까지 지움 (얼굴·번호판).
+    keep: 지우지 않을 제보 (지금 승인하는 요청의 새 사진). 내린 사진이 있으면 그 제보를 돌려준다
+    """
+    shown = (Report.objects.filter(entrance=entrance, status=Report.Status.VERIFIED).exclude(photo="")
+             .exclude(pk=getattr(keep, "pk", None)).order_by("-observed_at", "-created_at", "-id").first())
+    if shown is None:
+        return None
+    shown.photo.delete(save=False)
+    Report.objects.filter(pk=shown.pk).update(photo="")
+    return shown
+
+
 def reject(report, user, reason, review_note=""):
     report.review_note = review_note
     report.save(update_fields=["review_note"])

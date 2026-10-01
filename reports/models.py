@@ -16,6 +16,10 @@ from django.utils import timezone
 
 from places.models import Building, Entrance, FieldDefinition, Place
 
+# 주민 '사진 수정 요청' 표시: 값 없이 사진(선택)과 이유만 담긴 주민 제보의 설명 앞에 붙인다.
+# 운영자만 처리한다 (judgments.services.is_photo_request → required_confirmations 가 None)
+PHOTO_FIX_PREFIX = "[사진 수정 요청]"
+
 
 class Report(models.Model):
     class Source(models.TextChoices):

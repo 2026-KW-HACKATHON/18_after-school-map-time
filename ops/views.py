@@ -10,7 +10,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import views as auth_views
 from django.db.models import Max, Q
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse, reverse_lazy
@@ -23,6 +23,7 @@ from owners.models import ClaimCode, OwnerClaim
 from owners.services import CORRECTION_OVERDUE_DAYS
 from places.models import Building, Place, Region
 from reports.models import Report
+from reports.selectors import latest_photo
 
 from . import district as district_data
 from . import services
@@ -77,7 +78,12 @@ STATUS_TABS = [("", "전체")] + list(OPS_STATUS_LABELS.items())
 
 
 def _owner_kind(report):
-    """사장님·건물주 요청 종류 표시 (선언은 확인 1명, 정정은 2명, 사진 교체는 운영자만 — 기획 v2 4.2~4.4)"""
+    """
+    요청 종류 표시 — 사장님 선언은 확인 1명, 정정은 2명, 사진 교체·수정은 운영자만 (기획 v2 4.2~4.4).
+    주민의 사진 수정 요청도 여기서 구분한다. 일반 주민 제보는 빈 문자열
+    """
+    if report.source == Report.Source.USER_REPORT:
+        return "주민 사진 수정 요청" if is_photo_request(report) else ""
     if report.source != Report.Source.OWNER:
         return ""
     if is_photo_request(report):
@@ -125,6 +131,8 @@ def report_review(request, pk):
     if request.method == "POST" and report.status == Report.Status.PENDING and form.is_valid():
         data = form.cleaned_data
         if data["action"] == "approve":
+            if data.get("remove_current_photo") and is_photo_request(report) and report.entrance_id:
+                services.remove_current_photo(report.entrance, keep=report)
             services.approve_report(report, request.user, data["review_note"], new_place={
                 "name": data["place_name"], "category": data["category"], "lat": data["lat"], "lng": data["lng"],
                 # 이전 화면에서 보낸 요청도 제보의 주소를 잃지 않도록 한다.
@@ -153,6 +161,9 @@ def report_review(request, pk):
         "confirmations": report.confirmations.select_related("user"),
         "required": required_confirmations(report),
         "owner_kind": _owner_kind(report),
+        # 사진 교체·수정 요청이면 지금 공개된 사진과 나란히 보여 줌
+        "photo_request": is_photo_request(report),
+        "current_photo": latest_photo(report.entrance) if report.entrance_id else None,
         "region": _region(),
     })
 
@@ -214,6 +225,22 @@ def place_saved(request, pk):
     place = get_object_or_404(Place, pk=pk)
     last = place.reports.aggregate(last=Max("observed_at"))["last"]
     return render(request, "ops/place_saved.html", {"place": place, "last": last})
+
+
+def pending_counts():
+    """검토를 기다리는 일: 제보·사장님 요청, 사장님·건물주 인증 신청"""
+    return {
+        "pending": Report.objects.filter(source__in=REVIEW_SOURCES, status=Report.Status.PENDING).count(),
+        "claims": OwnerClaim.objects.filter(status=OwnerClaim.Status.PENDING).count(),
+    }
+
+
+@staff_required
+def pending_status(request):
+    """운영자 화면이 10초마다 묻는 검토 대기 수 (ops/static/ops/js/pending-poll.js)"""
+    response = JsonResponse(pending_counts())
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @staff_required
