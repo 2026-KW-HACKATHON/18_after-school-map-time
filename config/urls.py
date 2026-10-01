@@ -11,6 +11,7 @@ urlpatterns = [
     path("", include("reports.urls")),               # /report/new/, /report/done/, /reports/<id>/confirm/
     path("ops/", include("ops.urls")),               # 운영자 화면 (관리자 계정만)
     path("", include("owners.urls")),                # /owner/..., /places/<id>/wish/, /support/
+    path("", include("accounts.urls")),              # /me/ 내 활동
     # 로그인·로그아웃·카카오 콜백 (/accounts/kakao/login/callback/)
     path("accounts/", include("allauth.urls")),
     # 새 앱을 만들면 여기에 추가: path("reports/", include("reports.urls")),
