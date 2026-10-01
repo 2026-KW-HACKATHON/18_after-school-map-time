@@ -1,9 +1,16 @@
-<nav class="ops-nav" aria-label="운영자 메뉴">
+{% load static ops_tags %}{% ops_pending_counts as pc %}
+{# 운영자 메뉴. 검토 대기 수는 10초마다 다시 물어 새 제보가 오면 알려 준다 (static/ops/js/pending-poll.js) #}
+<nav class="ops-nav" aria-label="운영자 메뉴"
+     data-pending-url="{% url 'ops:pending-status' %}" data-pending="{{ pc.pending }}" data-claims="{{ pc.claims }}">
   <a href="{% url 'ops:dashboard' %}">대시보드</a>
-  <a href="{% url 'ops:reports' %}">제보 검토</a>
+  <a href="{% url 'ops:reports' %}">제보 검토 <span class="badge-warn" data-badge="pending"{% if not pc.pending %} hidden{% endif %}>{{ pc.pending }}</span></a>
   <a href="{% url 'ops:places' %}">장소 관리</a>
-  <a href="{% url 'ops:claims' %}">사장님 인증</a>
+  <a href="{% url 'ops:claims' %}">사장님 인증 <span class="badge-warn" data-badge="claims"{% if not pc.claims %} hidden{% endif %}>{{ pc.claims }}</span></a>
   <a href="{% url 'ops:district' %}">지역 집계</a>
   <a href="{% url 'ops:poster' %}" target="_blank" rel="noopener">전시 포스터</a>
   <a href="{% url 'admin:index' %}">전체 데이터(관리자)</a>
 </nav>
+<p id="ops-new-banner" class="notice" role="status" hidden>
+  새로 검토할 일이 <strong data-new-count>0</strong>건 들어왔어요. <a href="{% url 'ops:reports' %}">제보 검토 목록 보기</a>
+</p>
+<script src="{% static 'ops/js/pending-poll.js' %}" defer></script>

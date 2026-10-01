@@ -10,7 +10,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import views as auth_views
 from django.db.models import Max, Q
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse, reverse_lazy
@@ -214,6 +214,22 @@ def place_saved(request, pk):
     place = get_object_or_404(Place, pk=pk)
     last = place.reports.aggregate(last=Max("observed_at"))["last"]
     return render(request, "ops/place_saved.html", {"place": place, "last": last})
+
+
+def pending_counts():
+    """검토를 기다리는 일: 제보·사장님 요청, 사장님·건물주 인증 신청"""
+    return {
+        "pending": Report.objects.filter(source__in=REVIEW_SOURCES, status=Report.Status.PENDING).count(),
+        "claims": OwnerClaim.objects.filter(status=OwnerClaim.Status.PENDING).count(),
+    }
+
+
+@staff_required
+def pending_status(request):
+    """운영자 화면이 10초마다 묻는 검토 대기 수 (ops/static/ops/js/pending-poll.js)"""
+    response = JsonResponse(pending_counts())
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @staff_required
