@@ -61,7 +61,7 @@
   </aside>
 
   <div class="map-wrap">
-    <div id="map" class="map"></div>
+    <div id="map" class="map" role="region" aria-label="지도. 같은 장소를 목록에서도 볼 수 있어요"></div>
 
     {# 와이어프레임 6번: 지도 로딩 오류 — 목록·검색·제보는 계속 쓸 수 있게 #}
     <div id="map-error" class="map-error" hidden role="alert">
@@ -75,7 +75,7 @@
     </div>
 
     {# 와이어프레임 3번: 마커 팝업 #}
-    <div id="popup" class="popup card" hidden aria-live="polite">
+    <div id="popup" class="popup card" hidden aria-live="polite" role="region" aria-label="장소 미리 보기" tabindex="-1">
       <button type="button" class="popup-close" id="popup-close" aria-label="닫기">×</button>
       <div id="popup-body"></div>
     </div>

@@ -122,9 +122,20 @@
 
   const POPUP_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type"];
 
+  // 팝업을 연 마커 버튼 — 닫을 때 키보드 포커스를 그 자리로 돌려준다
+  let popupOpener = null;
+
+  function closePopup() {
+    els.popup.hidden = true;
+    if (popupOpener && document.contains(popupOpener)) popupOpener.focus();
+    popupOpener = null;
+  }
+
   async function openPopup(id) {
     const brief = state.all.find((p) => p.id === id);
+    popupOpener = document.activeElement;
     els.popup.hidden = false;
+    els.popup.focus();  // 스크린리더가 팝업 내용을 바로 읽도록
     els.popupBody.textContent = "불러오는 중...";
     try {
       const d = await api(urls.detailApi(id));
@@ -155,7 +166,8 @@
       els.popupBody.textContent = err.message;
     }
   }
-  $("popup-close").addEventListener("click", () => { els.popup.hidden = true; });
+  $("popup-close").addEventListener("click", closePopup);
+  els.popup.addEventListener("keydown", (e) => { if (e.key === "Escape") closePopup(); });
 
   // ── 데이터 불러오기 ────────────────────────────────────
   async function loadPlaces() {
