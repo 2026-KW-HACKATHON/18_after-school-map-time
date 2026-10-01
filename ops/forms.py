@@ -100,6 +100,8 @@ class ReviewForm(forms.Form):
     phone = forms.CharField(label="전화번호", max_length=20, required=False)
     lat = forms.DecimalField(label="위도", max_digits=9, decimal_places=6, required=False, min_value=-90, max_value=90)
     lng = forms.DecimalField(label="경도", max_digits=9, decimal_places=6, required=False, min_value=-180, max_value=180)
+    # 사진 수정·교체 요청을 승인할 때: 지금 공개된 입구 사진을 내림 (얼굴·번호판, 기획 v2 4.4)
+    remove_current_photo = forms.BooleanField(label="지금 공개된 입구 사진 내리기 (얼굴·번호판·개인 정보가 보이면)", required=False)
 
     def __init__(self, *args, report=None, **kwargs):
         super().__init__(*args, **kwargs)
