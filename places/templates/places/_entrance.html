@@ -7,4 +7,8 @@
     <p class="small"><a href="{% url 'reports:photo-fix' entrance.id %}?next={{ request.get_full_path|urlencode }}">사진에 문제가 있나요? 수정 요청하기</a></p>
   {% endif %}
   {% include "places/_fields.html" with fields=entrance.fields %}
+  {% if entrance.checked_at %}<p class="muted small">최근 확인: {{ entrance.checked_at|date:"Y년 n월 j일" }}</p>{% endif %}
+  {% if entrance.location_text %}<p class="small">위치: {{ entrance.location_text }}</p>{% endif %}
+  {% if entrance.observation_note %}<p class="small">{{ entrance.observation_note }}</p>{% endif %}
+  <a class="btn" href="{% url 'reports:new' %}?{% if entrance.building_id %}building={{ entrance.building_id }}&ownership=BUILDING{% else %}place={{ entrance.place_id }}{% endif %}&facility_kind=ENTRANCE&target_reference=entrance:{{ entrance.id }}">이 출입구 정보 제보</a>
 </div>

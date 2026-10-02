@@ -15,7 +15,7 @@
     </div>
     <ul id="place-results" class="plain-list" aria-label="장소 검색 결과"></ul>
   {% endif %}
-  <p id="picker-help" class="small"><strong>지도를 눌러 위치를 표시해 주세요.</strong> 지도를 움직이고 확대해서 정확한 입구 위치를 누르면 돼요.</p>
+  <p id="picker-help" class="small"><strong>지도를 눌러 위치를 표시해 주세요.</strong> 지도를 움직이고 확대해서 정확한 {{ location_label|default:"입구" }} 위치를 누르면 돼요.</p>
   <div id="picker-map" class="picker-map"
        {% if region %}data-lat="{{ region.center_lat|unlocalize }}" data-lng="{{ region.center_lng|unlocalize }}"{% endif %}
        role="region" aria-label="위치 선택 지도"></div>

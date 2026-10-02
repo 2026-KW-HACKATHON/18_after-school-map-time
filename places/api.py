@@ -94,6 +94,16 @@ def _section_json(section):
             for e in section["entrances"]
         ],
         "fields": _fields_json(section["fields"]),
+        "facilities": [
+            {**{k: f[k] for k in ("id", "name", "kind", "kind_label", "description", "location_text")},
+             "lat": float(f["lat"]) if f["lat"] is not None else None,
+             "lng": float(f["lng"]) if f["lng"] is not None else None,
+             "checked_at": f["checked_at"].isoformat(),
+             "photo_url": f["photo"].url if f["photo"] else None,
+             "fields": _fields_json(f["fields"])}
+            for f in section["facilities"]
+        ],
+        "facility_counts": section["facility_counts"],
     }
     if "building" in section:
         b = section["building"]

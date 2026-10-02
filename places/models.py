@@ -141,6 +141,39 @@ class Entrance(models.Model):
         return f"{owner} · {self.name}"
 
 
+class AccessFacility(models.Model):
+    """출입구 외 접근 시설. 사실 값·사진·위치는 검증된 Report 이력에 둔다."""
+
+    class Kind(models.TextChoices):
+        ELEVATOR = "ELEVATOR", "엘리베이터 (E/V)"
+        ESCALATOR = "ESCALATOR", "에스컬레이터 (E/S)"
+        STAIRS = "STAIRS", "계단"
+        RAMP = "RAMP", "경사로"
+        TOILET = "TOILET", "장애인 화장실"
+        OTHER = "OTHER", "기타 접근 편의시설"
+
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, null=True, blank=True, related_name="facilities")
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, null=True, blank=True, related_name="facilities")
+    kind = models.CharField("시설 종류", max_length=20, choices=Kind.choices)
+    name = models.CharField("시설 이름", max_length=50)
+
+    class Meta:
+        verbose_name = "접근 시설"
+        verbose_name_plural = "접근 시설"
+        constraints = [models.CheckConstraint(
+            condition=(models.Q(place__isnull=False, building__isnull=True)
+                       | models.Q(place__isnull=True, building__isnull=False)),
+            name="facility_belongs_to_place_or_building",
+        )]
+
+    def clean(self):
+        if bool(self.place_id) == bool(self.building_id):
+            raise ValidationError("시설은 장소 또는 건물 중 한 곳에 속해야 합니다.")
+
+    def __str__(self):
+        return f"{self.place or self.building} · {self.name}"
+
+
 class FieldDefinition(models.Model):
     """
     접근성 필드 정의 (입구 단차, 출입문 폭 ...). 필드를 자유 텍스트가 아닌 이 테이블의 키로만 쓴다 (기획 v2 8장).
@@ -151,6 +184,7 @@ class FieldDefinition(models.Model):
         PLACE = "PLACE", "장소"
         BUILDING = "BUILDING", "건물"
         ENTRANCE = "ENTRANCE", "출입구"
+        FACILITY = "FACILITY", "접근 시설"
 
     class ValueType(models.TextChoices):
         NUMBER = "NUMBER", "숫자"

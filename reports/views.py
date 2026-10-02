@@ -1,3 +1,5 @@
+from datetime import datetime, time
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -5,10 +7,12 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from judgments.services import required_confirmations
-from places.models import Entrance, Place, Region
+from places.facilities import ENTRANCE
+from places.models import Building, Entrance, Place, Region
 
 from .forms import PhotoFixForm, ReportForm
 from .models import PHOTO_FIX_PREFIX, AccessibilityValue, Report
@@ -34,7 +38,19 @@ def report_new(request):
             raise Http404("장소를 찾을 수 없어요.")
         place = get_object_or_404(Place, pk=place_id, is_closed=False)
 
-    form = ReportForm(request.POST or None, request.FILES or None, place=place, user=request.user)
+    building = None
+    building_id = request.GET.get("building") or request.POST.get("building")
+    if building_id:
+        if not building_id.isdigit() or place is not None:
+            raise Http404("건물을 찾을 수 없어요.")
+        building = get_object_or_404(Building, pk=building_id, region__is_active=True)
+    kind = request.GET.get("facility_kind") or ENTRANCE
+    ownership = request.GET.get("ownership") or ("BUILDING" if building else "PLACE")
+    form = ReportForm(request.POST or None, request.FILES or None, place=place, building=building,
+                      user=request.user, kind=kind, ownership=ownership)
+    reference = request.GET.get("target_reference")
+    if reference in form.targets:
+        form.initial["target_reference"] = reference
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         with transaction.atomic():
@@ -47,16 +63,33 @@ def report_new(request):
                 profiles=data["profiles"],
                 lat=data.get("lat"),
                 lng=data.get("lng"),
+                location_text=data.get("location_text", ""),
             )
-            if place is not None:
+            observed_on = data.get("observed_on")
+            if observed_on and observed_on < timezone.localdate():
+                report.observed_at = timezone.make_aware(datetime.combine(observed_on, time(12)))
+            reference = data.get("target_reference") or form.initial["target_reference"]
+            target = form.targets.get(reference)
+            if target is not None:
+                if form.kind == ENTRANCE:
+                    report.entrance = target
+                else:
+                    report.facility = target
+            elif reference == "default" and place is not None:
                 report.entrance = _main_entrance(place)
             else:
-                report.suggested_name = data["suggested_name"]
-                report.location_text = data["location_text"]
-                for key in ("suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
-                    setattr(report, key, data[key])
+                # 명시적 새 시설 제안은 승인 전 기존 출입구/시설을 만들거나 바꾸지 않는다.
+                if form.parent is not None:
+                    setattr(report, "building" if form.ownership == "BUILDING" else "place", form.parent)
+                else:
+                    report.suggested_name = data["suggested_name"]
+                    for key in ("suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
+                        setattr(report, key, data[key])
+                if form.parent is not None or form.kind != ENTRANCE or data.get("facility_name"):
+                    report.facility_kind = form.kind
+                report.facility_name = data.get("facility_name", "")
             report.save()
-            for key, raw in form.entrance_values().items():
+            for key, raw in form.observation_values().items():
                 value = AccessibilityValue(report=report, field_id=key)
                 value.set_value(raw)
                 value.full_clean()
@@ -65,8 +98,15 @@ def report_new(request):
 
     if request.method == "POST":
         form.keep_photo_for_retry()  # 오류가 있으면 올린 사진을 보관해서 다시 고르지 않게
-    region = Region.objects.filter(is_active=True).order_by("id").first()  # 위치 선택 지도의 처음 중심
-    return render(request, "reports/report_form.html", {"form": form, "place": place, "region": region})
+    region = (place.region if place else building.region if building else
+              Region.objects.filter(is_active=True).order_by("id").first())
+    return render(request, "reports/report_form.html", {
+        "form": form, "place": place, "building": building, "region": region,
+        "selected_ownership": form.ownership,
+        "show_picker": ((place is None and building is None) or form.kind != ENTRANCE or
+                        form.ownership == "BUILDING" or "facility_kind" in request.GET),
+        "kind_label": dict(form.fields["facility_kind"].choices)[form.kind],
+    })
 
 
 def report_done(request):

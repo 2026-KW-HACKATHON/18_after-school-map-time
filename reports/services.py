@@ -1,6 +1,7 @@
 """제보 상태 변경. 관리자 화면·API 어디서 처리하든 이 함수를 거친다 (처리자·시각 기록 + 신호 발송)"""
 
 from django.db import transaction
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
 from .models import Report
@@ -10,7 +11,42 @@ from .signals import report_reviewed
 @transaction.atomic
 def verify_report(report, by=None):
     """제보를 반영한다 → 이 값이 판정에 쓰이기 시작함"""
+    Report.objects.select_for_update().get(pk=report.pk)
+    report.refresh_from_db()
+    if report.status == Report.Status.VERIFIED:
+        return report
+    if report.is_facility_report:
+        if by is None or not by.is_staff:
+            raise PermissionDenied("시설 제보는 운영자가 검토해야 합니다.")
+        if report.is_facility_proposal:
+            _create_proposed_facility(report)
     _review(report, Report.Status.VERIFIED, by)
+    return report
+
+
+def _create_proposed_facility(report):
+    """운영자 승인 시에만 시설 식별자를 만든다. 기존 입구·시설은 변경하지 않는다."""
+    from places.models import AccessFacility, Entrance
+
+    report.full_clean()
+    parent = report.place or report.building
+    if parent is None:
+        raise ValidationError("새 장소 등록 화면에서 장소를 먼저 확인해 주세요.")
+    parent_key = "place" if report.place_id else "building"
+    if report.facility_kind == "ENTRANCE":
+        target = Entrance.objects.create(**{parent_key: parent}, name=report.facility_name or "정문",
+                                         is_main=not parent.entrances.exists())
+        report.entrance = target
+        target_field = "entrance"
+    else:
+        target = AccessFacility(**{parent_key: parent}, kind=report.facility_kind,
+                                name=report.facility_name or dict(AccessFacility.Kind.choices)[report.facility_kind])
+        target.full_clean()
+        target.save()
+        report.facility = target
+        target_field = "facility"
+    report.place = report.building = None
+    report.save(update_fields=["place", "building", target_field])
 
 
 @transaction.atomic
@@ -32,6 +68,8 @@ def confirm_report(report, user, required):
     """
     from .models import ReportConfirmation
 
+    if report.is_facility_report or required is None:
+        raise ConfirmationError("시설 제보는 운영진이 확인해요.")
     if report.status != Report.Status.PENDING:
         raise ConfirmationError("이미 처리된 제보예요.")
     if report.created_by_id == user.pk:
@@ -56,17 +94,18 @@ def place_report_filter(place):
     """이 장소 화면에 나오는 제보: 장소·장소 출입구·건물·건물 출입구"""
     from django.db.models import Q
 
-    q = Q(place=place) | Q(entrance__place=place)
+    q = Q(place=place) | Q(entrance__place=place) | Q(facility__place=place)
     if place.building_id:
-        q |= Q(building_id=place.building_id) | Q(entrance__building_id=place.building_id)
+        q |= Q(building_id=place.building_id) | Q(entrance__building_id=place.building_id) | Q(facility__building_id=place.building_id)
     return q
 
 
 def has_public_info(place):
     """재확인할 공개 정보가 있는지 (반영된 값이 하나라도 있어야 '지금도 맞아요'를 누를 수 있음)"""
-    return Report.objects.filter(
-        place_report_filter(place), status=Report.Status.VERIFIED, values__isnull=False,
-    ).exists()
+    from django.db.models import Q
+
+    return Report.objects.filter(place_report_filter(place), Q(values__isnull=False) | Q(facility__isnull=False),
+                                 status=Report.Status.VERIFIED).exists()
 
 
 def last_checked_at(place):
@@ -74,9 +113,10 @@ def last_checked_at(place):
     최근 확인 시각 = 반영된 값의 가장 최근 확인 시각과 '지금도 맞아요' 중 늦은 쪽.
     반영된 값이 하나도 없으면 None (확인할 정보가 없으므로 '지금도 맞아요'도 세지 않음)
     """
-    from django.db.models import Max
+    from django.db.models import Max, Q
 
-    last = (Report.objects.filter(place_report_filter(place), status=Report.Status.VERIFIED, values__isnull=False)
+    last = (Report.objects.filter(place_report_filter(place), Q(values__isnull=False) | Q(facility__isnull=False),
+                                  status=Report.Status.VERIFIED)
             .aggregate(last=Max("observed_at"))["last"])
     if last is None:
         return None

@@ -6,7 +6,16 @@
 {% block content %}
 <section class="page narrow">
   <h1>접근성 정보 제보</h1>
-  <p class="muted">직접 확인한 장소의 입구 정보를 알려주세요. 다른 주민의 확인이나 운영자 검토를 거쳐 지도에 반영됩니다.</p>
+  <p class="muted">직접 확인한 출입구나 접근 시설을 알려주세요. 확인된 정보만 공개됩니다.</p>
+
+  <form method="get" class="card form-stack">
+    {% if place %}<input type="hidden" name="place" value="{{ place.pk }}">{% endif %}
+    {% if building %}<input type="hidden" name="building" value="{{ building.pk }}">{% endif %}
+    {% include "reports/_field.html" with field=form.facility_kind %}
+    {% include "reports/_field.html" with field=form.ownership %}
+    <button type="submit" class="btn">이 시설의 입력 항목 보기</button>
+    <p class="muted small">시설 종류와 소속을 먼저 선택해 주세요. 입력 중 종류를 바꾸면 작성한 내용은 다시 입력해야 해요.</p>
+  </form>
 
   {% if form.non_field_errors %}
     <div class="alert" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>
@@ -14,56 +23,67 @@
 
   <form method="post" enctype="multipart/form-data" class="form-stack">
     {% csrf_token %}
+    <input type="hidden" name="facility_kind" value="{{ form.kind }}">
+    <input type="hidden" name="ownership" value="{{ selected_ownership }}">
 
     <fieldset class="card">
       <legend>장소 정보</legend>
       {% if place %}
         <input type="hidden" name="place" value="{{ place.pk }}">
         <p><strong>{{ place.name }}</strong>{% if place.address %} <span class="muted">· {{ place.address }}</span>{% endif %}</p>
+      {% elif building %}
+        <input type="hidden" name="building" value="{{ building.pk }}">
+        <p><strong>{{ building }}</strong> · 건물 공용 시설</p>
       {% else %}
         {% include "reports/_field.html" with field=form.suggested_name %}
-        {% include "includes/location_picker.html" with search_enabled=True %}
-        <div class="coord-row">
-          {% include "reports/_field.html" with field=form.lat %}
-          {% include "reports/_field.html" with field=form.lng %}
-        </div>
-        <noscript><p class="notice">지도를 사용하려면 JavaScript를 켜 주세요. 위도·경도나 위치 설명을 직접 입력할 수도 있어요.</p></noscript>
-        {% include "reports/_field.html" with field=form.location_text %}
         {% include "reports/_field.html" with field=form.suggested_category %}
         {% include "reports/_field.html" with field=form.suggested_address %}
         {% include "reports/_field.html" with field=form.suggested_floor %}
         {% include "reports/_field.html" with field=form.suggested_phone %}
       {% endif %}
+      {% if show_picker %}
+        {% include "includes/location_picker.html" with search_enabled=True location_label=kind_label %}
+        <div class="coord-row">
+          {% include "reports/_field.html" with field=form.lat %}
+          {% include "reports/_field.html" with field=form.lng %}
+        </div>
+        <noscript><p class="notice">지도를 사용하려면 JavaScript를 켜 주세요. 위도·경도나 위치 설명을 직접 입력할 수도 있어요.</p></noscript>
+      {% endif %}
+      {% include "reports/_field.html" with field=form.location_text %}
     </fieldset>
 
     <fieldset class="card">
-      <legend>입구 사진</legend>
+      <legend>{{ kind_label }} 선택</legend>
+      {% include "reports/_field.html" with field=form.target_reference %}
+      {% include "reports/_field.html" with field=form.facility_name %}
+      <p class="muted small">기존 시설을 확인했다면 목록에서 골라 주세요. 새 시설 이름은 새 시설을 제안할 때만 사용해요.</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>{{ kind_label }} 사진</legend>
       {% include "reports/_field.html" with field=form.photo %}
       {{ form.photo_token }}
       <p class="muted small">사진으로 값을 자동으로 채워 주는 AI 분석은 준비 중이에요.</p>
     </fieldset>
 
     <fieldset class="card">
-      <legend>입구 정보 <span class="muted small">(아는 것만)</span></legend>
-      {% include "reports/_field.html" with field=form.step_height_cm %}
-      {% include "reports/_field.html" with field=form.step_count %}
-      {% include "reports/_field.html" with field=form.has_ramp %}
-      {% include "reports/_field.html" with field=form.door_width_cm %}
-      {% include "reports/_field.html" with field=form.door_type %}
+      <legend>{{ kind_label }} 정보 <span class="muted small">(아는 것만 · 수치는 선택)</span></legend>
+      {% for field in form.observation_fields %}{% include "reports/_field.html" %}{% endfor %}
     </fieldset>
 
     <fieldset class="card">
       <legend>추가 정보</legend>
       {% include "reports/_field.html" with field=form.note %}
       {% include "reports/_field.html" with field=form.profiles %}
+      {% include "reports/_field.html" with field=form.observed_on %}
     </fieldset>
 
-    <p class="notice small">📋 제보는 다른 주민의 확인 또는 운영자 검토 후 공개됩니다. 가게를 평가하는 곳이 아니라 입구 사실을 기록하는 곳이에요.</p>
+    <p class="notice small">📋 새 시설과 출입구 외 시설은 운영자가 검토한 뒤 공개됩니다. 기존 입구 제보는 주민 확인 또는 운영자 검토로 반영됩니다.</p>
     <button type="submit" class="btn btn-primary btn-block">제보 제출하기</button>
   </form>
 </section>
 {% endblock %}
 
 {% block extra_js %}
-{% if not place %}{% include "includes/location_picker_js.html" %}{% endif %}
+{% if show_picker %}{% include "includes/location_picker_js.html" %}{% endif %}
 {% endblock %}

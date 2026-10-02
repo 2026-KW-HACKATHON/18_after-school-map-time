@@ -8,6 +8,10 @@ from .engine import recompute_place
 
 
 def affected_places(report):
+    if report.facility_id:
+        if report.facility.place_id:
+            return [report.facility.place]
+        return list(report.facility.building.places.all())
     if report.place_id:
         return [report.place]
     if report.entrance_id:

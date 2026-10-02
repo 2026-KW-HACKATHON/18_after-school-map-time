@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from places.models import Building, Entrance, FieldDefinition, Place
+from places.models import AccessFacility, Building, Entrance, FieldDefinition, Place
 
 # 주민 '사진 수정 요청' 표시: 값 없이 사진(선택)과 이유만 담긴 주민 제보의 설명 앞에 붙인다.
 # 운영자만 처리한다 (judgments.services.is_photo_request → required_confirmations 가 None)
@@ -34,7 +34,7 @@ class Report(models.Model):
         VERIFIED = "VERIFIED", "반영됨"
         REJECTED = "REJECTED", "반려"
 
-    # 대상: 장소·건물·출입구 중 정확히 하나 (dev-plan-v2 D1)
+    # 대상: 장소·건물·출입구·접근 시설 중 정확히 하나 (새 장소 제안은 예외).
     place = models.ForeignKey(Place, verbose_name="장소", on_delete=models.CASCADE, null=True, blank=True, related_name="reports")
     building = models.ForeignKey(
         Building, verbose_name="건물", on_delete=models.CASCADE, null=True, blank=True, related_name="reports"
@@ -42,6 +42,11 @@ class Report(models.Model):
     entrance = models.ForeignKey(
         Entrance, verbose_name="출입구", on_delete=models.CASCADE, null=True, blank=True, related_name="reports"
     )
+    facility = models.ForeignKey(AccessFacility, verbose_name="접근 시설", on_delete=models.CASCADE,
+                                 null=True, blank=True, related_name="reports")
+    facility_kind = models.CharField("제안 시설 종류", max_length=20, blank=True,
+                                     choices=[("ENTRANCE", "출입구")] + list(AccessFacility.Kind.choices))
+    facility_name = models.CharField("제안 시설 이름", max_length=50, blank=True)
 
     # 새 장소 제안: 대상이 없을 때만 사용 (운영자가 승인하면서 장소를 만든다)
     suggested_name = models.CharField("새 장소 이름", max_length=100, blank=True)
@@ -83,11 +88,13 @@ class Report(models.Model):
             # 대상(장소·건물·출입구)은 정확히 하나. 대상이 없으면 새 장소 이름이 있어야 함
             models.CheckConstraint(
                 condition=(
-                    models.Q(place__isnull=False, building__isnull=True, entrance__isnull=True)
-                    | models.Q(place__isnull=True, building__isnull=False, entrance__isnull=True)
-                    | models.Q(place__isnull=True, building__isnull=True, entrance__isnull=False)
+                    models.Q(place__isnull=False, building__isnull=True, entrance__isnull=True, facility__isnull=True)
+                    | models.Q(place__isnull=True, building__isnull=False, entrance__isnull=True, facility__isnull=True)
+                    | models.Q(place__isnull=True, building__isnull=True, entrance__isnull=False, facility__isnull=True)
+                    | models.Q(place__isnull=True, building__isnull=True, entrance__isnull=True, facility__isnull=False)
                     | (
                         models.Q(place__isnull=True, building__isnull=True, entrance__isnull=True)
+                        & models.Q(facility__isnull=True)
                         & ~models.Q(suggested_name="")
                     )
                 ),
@@ -97,6 +104,12 @@ class Report(models.Model):
 
     def __str__(self):
         return f"[{self.get_status_display()}] {self.target} ({self.get_source_display()})"
+
+    def clean(self):
+        if self.facility_id and self.facility_kind not in ("", self.facility.kind):
+            raise ValidationError({"facility_kind": "연결된 시설과 제안 종류가 다릅니다."})
+        if self.entrance_id and self.facility_kind not in ("", "ENTRANCE"):
+            raise ValidationError({"facility_kind": "출입구에는 다른 시설 종류를 연결할 수 없습니다."})
 
     def save(self, *args, **kwargs):
         # 새로 올린 사진은 저장 전에 EXIF(촬영 위치 GPS·기기 정보)를 지우고 크기를 줄인다 (core/images.py).
@@ -109,7 +122,15 @@ class Report(models.Model):
 
     @property
     def target(self):
-        return self.place or self.building or self.entrance
+        return self.place or self.building or self.entrance or self.facility
+
+    @property
+    def is_facility_proposal(self):
+        return bool(self.facility_kind and not self.entrance_id and not self.facility_id)
+
+    @property
+    def is_facility_report(self):
+        return bool(self.facility_id or self.is_facility_proposal)
 
     @property
     def is_new_place(self):
@@ -120,6 +141,8 @@ class Report(models.Model):
         """화면 표시용 대상 이름"""
         if self.is_new_place:
             return f"새 장소: {self.suggested_name}"
+        if self.is_facility_proposal:
+            return f"{self.target} · {self.facility_name or self.get_facility_kind_display()} (새 시설 제안)"
         return str(self.target)
 
     @property
@@ -129,12 +152,16 @@ class Report(models.Model):
             return self.place
         if self.entrance_id and self.entrance.place_id:
             return self.entrance.place
+        if self.facility_id:
+            return self.facility.place
         return None
 
     @property
     def target_scope(self):
         """이 제보에 들어갈 수 있는 필드의 대상(FieldDefinition.Scope). 새 장소 제안은 입구 정보를 받는다"""
-        if self.entrance_id or self.is_new_place:
+        if self.facility_id or self.facility_kind in AccessFacility.Kind.values:
+            return FieldDefinition.Scope.FACILITY
+        if self.facility_kind == "ENTRANCE" or self.entrance_id or self.is_new_place:
             return FieldDefinition.Scope.ENTRANCE
         if self.building_id:
             return FieldDefinition.Scope.BUILDING
@@ -216,6 +243,12 @@ class AccessibilityValue(models.Model):
             raise ValidationError(
                 f"{self.field.label}은(는) {self.field.get_scope_display()} 필드라서 이 제보 대상에 넣을 수 없습니다."
             )
+        if self.report_id and self.field.scope == FieldDefinition.Scope.FACILITY:
+            from places.facilities import KIND_FIELDS
+
+            kind = self.report.facility.kind if self.report.facility_id else self.report.facility_kind
+            if self.field_id not in KIND_FIELDS.get(kind, ()):
+                raise ValidationError("선택한 시설 종류에서 사용할 수 없는 관측 항목입니다.")
 
 
 class ReportConfirmation(models.Model):

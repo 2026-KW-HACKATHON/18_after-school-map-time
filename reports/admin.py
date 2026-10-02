@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 
 from .models import AccessibilityValue, Reconfirmation, Report, ReportConfirmation
 from .services import reject_report, verify_report
@@ -22,7 +23,7 @@ class ReportAdmin(admin.ModelAdmin):
     list_display = ["__str__", "source", "status", "created_by", "created_at"]
     list_filter = ["status", "source", "place__region"]
     search_fields = ["place__name", "building__name", "building__address", "note"]
-    autocomplete_fields = ["place", "building", "entrance"]
+    autocomplete_fields = ["place", "building", "entrance", "facility"]
     readonly_fields = ["created_by", "created_at", "reviewed_by", "reviewed_at"]
     inlines = [AccessibilityValueInline, ReportConfirmationInline]
     actions = ["action_verify", "action_reject"]
@@ -35,7 +36,13 @@ class ReportAdmin(admin.ModelAdmin):
     @admin.action(description="선택한 제보 반영 (판정에 사용)")
     def action_verify(self, request, queryset):
         for report in queryset.exclude(status=Report.Status.VERIFIED):
-            verify_report(report, by=request.user)
+            if report.is_new_place:
+                messages.warning(request, "새 장소 제안은 운영자 제보 검토 화면에서 장소를 확인한 뒤 승인해 주세요.")
+                continue
+            try:
+                verify_report(report, by=request.user)
+            except ValidationError as error:
+                messages.error(request, str(error))
         messages.success(request, "반영했습니다. 해당 장소 판정이 다시 계산됩니다.")
 
     @admin.action(description="선택한 제보 반려")
