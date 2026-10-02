@@ -336,6 +336,53 @@ class FacilityReportTests(TempMediaMixin, TestCase):
                                               "target_reference": f"facility:{report.facility_id}"})
         self.assertEqual(response.context["form"]["target_reference"].value(), f"facility:{report.facility_id}")
 
+    def test_switch_partial_uses_each_kind_form_without_creating_records(self):
+        for kind in KIND_FIELDS:
+            with self.subTest(kind=kind):
+                response = self.client.get(self.url, {"place": self.place.pk, "facility_kind": kind,
+                                                      "partial": "facility-fields"})
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertEqual((data["kind"], data["ownership"]), (kind, "PLACE"))
+                for key in KIND_FIELDS[kind]:
+                    self.assertIn(f'name="{key}"', data["fields_html"])
+                for key in set().union(*KIND_FIELDS.values()) - set(KIND_FIELDS[kind]):
+                    self.assertNotIn(f'name="{key}"', data["fields_html"])
+                self.assertNotIn('name="photo"', data["fields_html"])
+                self.assertNotIn('name="note"', data["fields_html"])
+        self.assertFalse(Report.objects.exists())
+        self.assertFalse(Entrance.objects.exists())
+        self.assertFalse(AccessFacility.objects.exists())
+
+    def test_switch_partial_limits_targets_to_selected_kind_and_ownership(self):
+        own = self.proposal("ELEVATOR", facility_name="가게 E/V")
+        common = self.proposal("ELEVATOR", ownership="BUILDING", facility_name="공용 E/V")
+        other_kind = self.proposal("ESCALATOR", ownership="BUILDING", facility_name="공용 E/S")
+        for report in (own, common, other_kind):
+            verify_report(report, by=self.staff)
+        response = self.client.get(self.url, {"place": self.place.pk, "facility_kind": "ELEVATOR",
+                                              "ownership": "BUILDING", "partial": "facility-fields"})
+        data = response.json()
+        self.assertEqual(data["targets"], [[f"facility:{common.facility_id}", "공용 E/V"], ["new", "새 시설 제안"]])
+        self.assertEqual(data["ownership"], "BUILDING")
+
+    def test_switch_partial_rejects_invalid_kind_scope_and_requires_login(self):
+        for params in ({"facility_kind": "INVALID"}, {"ownership": "INVALID"}):
+            response = self.client.get(self.url, {"place": self.place.pk, "partial": "facility-fields", **params})
+            self.assertEqual(response.status_code, 400)
+        self.client.logout()
+        self.assertEqual(self.client.get(self.url, {"partial": "facility-fields"}).status_code, 302)
+
+    def test_switch_page_keeps_no_javascript_fallback(self):
+        response = self.client.get(self.url, {"place": self.place.pk})
+        self.assertContains(response, 'id="facility-observations"')
+        self.assertContains(response, 'js/reports/facility-switcher.js')
+        self.assertContains(response, '<noscript><button type="submit"')
+
+    def test_post_ignores_fields_from_previous_facility_kind(self):
+        report = self.proposal("RAMP", step_height_cm="30", facility_braille="true")
+        self.assertEqual(set(report.values.values_list("field_id", flat=True)), set(SAMPLES["RAMP"]))
+
     def test_rendered_hidden_fields_round_trip_building_ownership_and_facility_kind(self):
         response = self.client.get(self.url, {"place": self.place.pk, "facility_kind": "RAMP", "ownership": "BUILDING"})
         payload = HiddenInputs(response.content.decode()).inputs

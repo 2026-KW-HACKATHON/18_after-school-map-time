@@ -1,0 +1,6 @@
+{% include "includes/location_picker.html" with search_enabled=True location_label=kind_label %}
+<div class="coord-row">
+  {% include "reports/_field.html" with field=form.lat %}
+  {% include "reports/_field.html" with field=form.lng %}
+</div>
+<noscript><p class="notice">지도를 사용하려면 JavaScript를 켜 주세요. 위도·경도나 위치 설명을 직접 입력할 수도 있어요.</p></noscript>

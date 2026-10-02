@@ -3,15 +3,16 @@ from datetime import datetime, time
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from judgments.services import required_confirmations
-from places.facilities import ENTRANCE
+from places.facilities import ENTRANCE, KIND_FIELDS
 from places.models import Building, Entrance, Place, Region
 
 from .forms import PhotoFixForm, ReportForm
@@ -51,6 +52,27 @@ def report_new(request):
     reference = request.GET.get("target_reference")
     if reference in form.targets:
         form.initial["target_reference"] = reference
+    show_picker = ((place is None and building is None) or form.kind != ENTRANCE or
+                   form.ownership == "BUILDING" or "facility_kind" in request.GET)
+    kind_label = dict(form.fields["facility_kind"].choices)[form.kind]
+    region = (place.region if place else building.region if building else
+              Region.objects.filter(is_active=True).order_by("id").first())
+    if request.method == "GET" and request.GET.get("partial") == "facility-fields":
+        # 화면 전환도 실제 제출과 같은 Form으로 만들어 항목·시설 소속 검증을 일치시킨다.
+        if kind not in KIND_FIELDS or ownership not in dict(form.fields["ownership"].choices):
+            return JsonResponse({"error": "시설 종류와 소속을 확인해 주세요."}, status=400)
+        return JsonResponse({
+            "kind": form.kind, "ownership": form.ownership, "label": kind_label,
+            "fields_html": render_to_string("reports/_observation_fields.html", {"form": form}, request=request),
+            "targets": list(form.fields["target_reference"].choices),
+            "target": form.initial["target_reference"],
+            "photo_label": form.fields["photo"].label,
+            "photo_help": form.fields["photo"].help_text,
+            "show_picker": show_picker,
+            "location_html": render_to_string("reports/_location_fields.html", {
+                "form": form, "region": region, "kind_label": kind_label,
+            }, request=request),
+        })
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         with transaction.atomic():
@@ -98,14 +120,10 @@ def report_new(request):
 
     if request.method == "POST":
         form.keep_photo_for_retry()  # 오류가 있으면 올린 사진을 보관해서 다시 고르지 않게
-    region = (place.region if place else building.region if building else
-              Region.objects.filter(is_active=True).order_by("id").first())
     return render(request, "reports/report_form.html", {
         "form": form, "place": place, "building": building, "region": region,
         "selected_ownership": form.ownership,
-        "show_picker": ((place is None and building is None) or form.kind != ENTRANCE or
-                        form.ownership == "BUILDING" or "facility_kind" in request.GET),
-        "kind_label": dict(form.fields["facility_kind"].choices)[form.kind],
+        "show_picker": show_picker, "kind_label": kind_label,
     })
 
 

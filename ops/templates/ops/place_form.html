@@ -18,6 +18,33 @@
     <div class="alert" role="alert"><p>입력 값을 다시 확인해 주세요.</p></div>
   {% endif %}
 
+  {% if place %}
+  <section class="card" aria-labelledby="facility-inventory-title">
+    <h2 id="facility-inventory-title">접근 시설 현황</h2>
+    <p class="small muted">시설 종류와 소속을 확인할 수 있어요. 확인 중인 새 시설은 제보 검토에서 승인하면 등록돼요.</p>
+    {% for section in facility_sections %}
+      <h3>{{ section.label }} · {{ section.parent }}</h3>
+      <ul class="plain-list">
+      {% for item in section.rows %}
+        <li>
+          <strong>{{ item.kind_label }}</strong> · {{ item.name }}
+          {% if item.report %}
+            <span class="badge-neutral">{{ item.report.get_status_display }}</span>
+            <span class="muted small">{{ item.report.observed_at|date:"Y년 n월 j일" }} 확인</span>
+            <a href="{% url 'ops:report-review' item.report.pk %}">제보 내용 확인</a>
+          {% else %}<span class="muted small">제보 기록 없음</span>{% endif %}
+        </li>
+      {% empty %}<li class="muted small">등록된 접근 시설이 없어요.</li>{% endfor %}
+      {% for report in section.pending %}
+        <li><strong>{{ report.get_facility_kind_display }}</strong> · {{ report.facility_name|default:"새 시설" }}
+          <span class="badge-neutral">새 시설 확인 중</span>
+          <a href="{% url 'ops:report-review' report.pk %}">제보 검토</a></li>
+      {% endfor %}
+      </ul>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <form method="post" class="form-stack">
     {% csrf_token %}
     <fieldset class="card">
