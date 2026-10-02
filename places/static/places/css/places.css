@@ -35,7 +35,8 @@
 .map-unavailable, .map:empty { display: flex; align-items: center; justify-content: center; padding: 16px; color: var(--color-muted); background: #eef1f5; text-align: center; }
 
 .panel-label { margin: 0 0 8px; font-weight: 600; }
-.toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
+.toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0 12px; }
+.toggle .toggle-label { white-space: nowrap; }  /* "모든 장소 보기"가 글자 중간에서 줄바꿈되지 않게 */
 
 .legend { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; font-size: 13px; }
 .legend li { display: flex; align-items: center; gap: 8px; }
@@ -66,7 +67,8 @@
 .field-row dt { color: var(--color-muted); }
 .field-row dd { margin: 0; text-align: right; }
 .entrance + .entrance { margin-top: 12px; }
-.entrance-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 8px; margin: 4px 0 8px; }
+/* 입구 사진: 세로 사진도 잘리지 않게 전체를 보여 줌 (문턱·계단이 사진 아래쪽에 있는 경우가 많음). 누르면 원본 크기 */
+.entrance-photo { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--color-bg); border-radius: 8px; margin: 4px 0 8px; }
 .notice { padding: 12px; border-top: 1px solid var(--color-border); }
 .link-disabled { color: var(--color-muted); pointer-events: none; }
 
