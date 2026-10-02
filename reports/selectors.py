@@ -10,9 +10,9 @@ from .models import AccessibilityValue, Report
 
 def _target_filter(target, prefix="report__"):
     """대상(장소·건물·출입구)으로 거르는 조건. Report를 직접 거를 땐 prefix="""""
-    from places.models import Building, Entrance, Place
+    from places.models import AccessFacility, Building, Entrance, Place
 
-    for model, name in ((Entrance, "entrance"), (Building, "building"), (Place, "place")):
+    for model, name in ((AccessFacility, "facility"), (Entrance, "entrance"), (Building, "building"), (Place, "place")):
         if isinstance(target, model):
             return {f"{prefix}{name}": target}
     raise TypeError(f"지원하지 않는 대상: {type(target).__name__}")

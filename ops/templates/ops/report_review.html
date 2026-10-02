@@ -18,7 +18,11 @@
 
   <section class="card">
     <h2>{{ report.target_label }} <span class="badge-neutral">{{ report|ops_status }}</span>{% if owner_kind %} <span class="badge-neutral">{{ owner_kind }}</span>{% endif %}</h2>
-    {% if report.is_new_place %}<p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
+    {% if report.facility_kind %}<p>제안 시설: {{ report.get_facility_kind_display }} · {{ report.facility_name|default:"이름 미입력" }}</p>{% endif %}
+    {% if report.facility %}<p>시설: {{ report.facility.get_kind_display }} · {{ report.facility.name }}</p>{% endif %}
+    <p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>
+    {% if report.lat != None and report.lng != None %}<p class="small">제보 좌표: {{ report.lat }}, {{ report.lng }}</p>{% endif %}
+    <p class="small">현장 확인일: {{ report.observed_at|date:"Y년 n월 j일" }}</p>
     <p class="small">제출자: {{ report.created_by|default:"알 수 없음" }} · 제출 {{ report.created_at|date:"Y년 n월 j일 H:i" }}</p>
     {% if report.created_by and report.created_by.is_new_account %}<p><span class="badge-warn">가입 7일 미만 계정</span></p>{% endif %}
     {% if downgrade_places >= abuse_threshold %}
@@ -53,7 +57,7 @@
             <td>{{ row.proposed }}{% if row.conflict %}<br><span class="badge-warn">값이 달라요</span>{% endif %}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="3" class="muted">입구 값 없이 설명만 있는 제보예요.</td></tr>
+          <tr><td colspan="3" class="muted">관측값 없이 설명만 있는 제보예요.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -75,7 +79,7 @@
     {% if required %}
       <p class="muted small">주민 확인 {{ confirmations|length }}/{{ required }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     {% else %}
-      <p class="muted small">이 제보는 주민 확인 없이 운영자만 처리해요 (사진 교체 요청, 또는 가입 7일 미만 계정의 하향 제보).</p>
+      <p class="muted small">이 제보는 주민 확인 없이 운영자가 검토해요 (시설 제보, 사진 교체 요청, 또는 새 계정의 하향 제보).</p>
     {% endif %}
   </section>
   {% endif %}

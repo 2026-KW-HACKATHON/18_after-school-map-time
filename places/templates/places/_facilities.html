@@ -1,0 +1,18 @@
+<p class="small" aria-label="시설 종류별 개수">{% for count in section.facility_counts %}{% if count.count %}<span class="badge-neutral">{{ count.label }} {{ count.count }}개</span> {% endif %}{% endfor %}</p>
+{% regroup section.facilities by kind_label as facility_groups %}
+{% for group in facility_groups %}
+  <h3>{{ group.grouper }}</h3>
+  {% for facility in group.list %}
+  <section class="entrance" aria-label="{{ facility.name }}">
+    <h4>{{ facility.name }}</h4>
+    {% if facility.photo %}<a href="{{ facility.photo.url }}" target="_blank" rel="noopener" title="사진 크게 보기"><img class="entrance-photo" src="{{ facility.photo.url }}" alt="{{ facility.name }} 사진 (누르면 크게 보기)" loading="lazy"></a>{% endif %}
+    <p class="muted small">최근 확인: {{ facility.checked_at|date:"Y년 n월 j일" }}</p>
+    {% if facility.location_text %}<p>위치: {{ facility.location_text }}</p>{% endif %}
+    {% if facility.lat != None and facility.lng != None %}<p class="muted small">위치 좌표: {{ facility.lat }}, {{ facility.lng }}</p>{% endif %}
+    {% if facility.description %}<p>{{ facility.description }}</p>{% endif %}
+    {% include "places/_fields.html" with fields=facility.fields %}
+    <a class="btn" href="{% url 'reports:new' %}?{% if section.building %}building={{ section.building.pk }}&ownership=BUILDING{% else %}place={{ place.pk }}{% endif %}&facility_kind={{ facility.kind }}&target_reference=facility:{{ facility.id }}">이 시설 정보 제보</a>
+  </section>
+  {% endfor %}
+{% empty %}<p class="muted small">아직 확인된 출입구 외 시설이 없어요. 알고 계시면 제보해 주세요.</p>{% endfor %}
+<p class="muted small">시설 정보는 직접 확인한 사실이에요. 시설 간 이동 경로를 연결한 판정은 아직 제공하지 않아요.</p>

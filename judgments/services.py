@@ -51,7 +51,7 @@ def report_effect(report):
     이 제보를 반영했을 때 장소·이동 조건별 판정 변화 목록.
     새 장소 제안은 비교할 기존 판정이 없으므로 빈 목록.
     """
-    if report.is_new_place:
+    if report.is_new_place or report.is_facility_report:
         return []
     rule_set = RuleSet.active()
     if rule_set is None:
@@ -102,7 +102,7 @@ def required_confirmations(report):
     """
     from reports.models import Report
 
-    if is_photo_request(report):
+    if report.is_facility_report or is_photo_request(report):
         return None
     if report.source == Report.Source.OWNER:
         return OWNER_DECLARATION_CONFIRMATIONS if is_owner_declaration(report) else OWNER_CORRECTION_CONFIRMATIONS

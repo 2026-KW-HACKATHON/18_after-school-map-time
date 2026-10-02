@@ -145,6 +145,10 @@ def approve_report(report, user, review_note="", new_place=None):
     제보 승인 (16·17번). 새 장소 제안이면 장소와 정문을 만들고 제보를 그 정문에 붙인 뒤 승인한다.
     new_place: {"name", "category", "lat", "lng", "address", "floor", "phone"}
     """
+    Report.objects.select_for_update().get(pk=report.pk)
+    report.refresh_from_db()
+    if report.status == Report.Status.VERIFIED:
+        return report
     if report.is_new_place:
         place = Place.objects.create(
             region=Region.objects.filter(is_active=True).order_by("id").first(),
@@ -156,11 +160,15 @@ def approve_report(report, user, review_note="", new_place=None):
             ),
             phone=new_place.get("phone", report.suggested_phone),
         )
-        report.entrance = Entrance.objects.create(place=place, name="정문", is_main=True)
-        report.save(update_fields=["entrance"])
+        if report.facility_kind:
+            report.place = place
+            report.save(update_fields=["place"])
+        else:
+            report.entrance = Entrance.objects.create(place=place, name="정문", is_main=True)
+            report.save(update_fields=["entrance"])
     report.review_note = review_note
     report.save(update_fields=["review_note"])
-    verify_report(report, by=user)  # 커밋 후 신호 → 재판정
+    report = verify_report(report, by=user)  # 커밋 후 신호 → 재판정
     return report
 
 

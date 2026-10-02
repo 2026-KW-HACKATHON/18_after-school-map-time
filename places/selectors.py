@@ -9,7 +9,8 @@ from reports.models import Report
 from reports.services import last_checked_at, place_report_filter, recent_reconfirmations
 from reports.selectors import conflicting_fields, current_values, latest_photo, pending_field_sources
 
-from .models import Building, FieldDefinition, Place
+from .facilities import KIND_FIELDS
+from .models import AccessFacility, Building, FieldDefinition, Place
 
 # 목록·팝업·검색 결과에 보여줄 입구 핵심 값 (순서대로)
 SUMMARY_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type"]
@@ -103,10 +104,13 @@ def _fields_section(target, scope):
     rows = []
     for f in FieldDefinition.objects.filter(scope=scope, is_active=True):
         v = values.get(f.key)
+        shown = v.display_value if v else None
+        if v and f.key in ("facility_available", "entrance_available", "facility_wheelchair"):
+            shown = "이용 가능" if v.value else "이용 불가"
         rows.append({
             "key": f.key,
             "label": f.label,
-            "value": v.display_value if v else None,
+            "value": shown,
             "unit": f.unit if v and f.unit else "",
             "checked_at": v.report.observed_at if v else None,
             "pending": f.key in pending,  # "새 제보 확인 중" (기획 v2 7장)
@@ -117,16 +121,46 @@ def _fields_section(target, scope):
 
 
 def _entrances_section(entrances):
-    return [
-        {
+    rows = []
+    for e in entrances:
+        latest = e.reports.filter(status=Report.Status.VERIFIED).order_by("-observed_at", "-created_at", "-pk").first()
+        rows.append({
             "id": e.id,
+            "place_id": e.place_id,
+            "building_id": e.building_id,
             "name": e.name,
             "is_main": e.is_main,
             "description": e.description,
             "photo": latest_photo(e),  # 입구 사진 (F4) — 검증된 제보 중 가장 최근 사진
             "fields": _fields_section(e, FieldDefinition.Scope.ENTRANCE),
-        }
-        for e in entrances
+            "checked_at": latest.observed_at if latest else None,
+            "observation_note": latest.note if latest else "",
+            "location_text": latest.location_text if latest else "",
+        })
+    return rows
+
+
+def _facilities_section(parent):
+    """운영자가 반영한 시설만 공개한다. 이력 조회 정책은 기존 selector와 같다."""
+    facilities = parent.facilities.filter(reports__status=Report.Status.VERIFIED).distinct().order_by("kind", "id")
+    rows = []
+    for facility in facilities:
+        latest = facility.reports.filter(status=Report.Status.VERIFIED).order_by("-observed_at", "-created_at", "-pk").first()
+        rows.append({
+            "id": facility.pk, "name": facility.name, "kind": facility.kind,
+            "kind_label": facility.get_kind_display(), "photo": latest_photo(facility),
+            "checked_at": latest.observed_at, "description": latest.note,
+            "location_text": latest.location_text, "lat": latest.lat, "lng": latest.lng,
+            "fields": [f for f in _fields_section(facility, FieldDefinition.Scope.FACILITY)
+                       if f["key"] in KIND_FIELDS[facility.kind]],
+        })
+    return rows
+
+
+def _facility_counts(entrances, facilities):
+    return [{"kind": "ENTRANCE", "label": "출입구", "count": len(entrances)}] + [
+        {"kind": kind, "label": label, "count": sum(f["kind"] == kind for f in facilities)}
+        for kind, label in AccessFacility.Kind.choices
     ]
 
 
@@ -157,9 +191,13 @@ def _pending_reports(place):
 
 def building_common_section(building):
     """건물 공용 입구·시설 (장소 상세와 건물주 화면에서 같이 씀)"""
+    entrances = _entrances_section(building.entrances.all())
+    facilities = _facilities_section(building)
     return {
         "building": building,
-        "entrances": _entrances_section(building.entrances.all()),
+        "entrances": entrances,
+        "facilities": facilities,
+        "facility_counts": _facility_counts(entrances, facilities),
         "fields": _fields_section(building, FieldDefinition.Scope.BUILDING),
     }
 
@@ -173,8 +211,12 @@ def place_detail(place):
     building = place.building
 
     building_section = building_common_section(building) if building else None
+    entrances = _entrances_section(place.entrances.all())
+    facilities = _facilities_section(place)
     place_section = {
-        "entrances": _entrances_section(place.entrances.all()),
+        "entrances": entrances,
+        "facilities": facilities,
+        "facility_counts": _facility_counts(entrances, facilities),
         "fields": _fields_section(place, FieldDefinition.Scope.PLACE),
     }
 
@@ -183,6 +225,7 @@ def place_detail(place):
     all_fields = [f for s in sections for f in s["fields"]]
     all_fields += [f for s in sections for e in s["entrances"] for f in e["fields"]]
     checked = [f["checked_at"] for f in all_fields if f["checked_at"]]
+    checked += [f["checked_at"] for s in sections for f in s["facilities"]]
     latest_reconfirm = place.reconfirmations.order_by("-created_at").values_list("created_at", flat=True).first()
     if latest_reconfirm and checked:  # 정보가 있을 때만 '지금도 맞아요'가 확인일을 갱신 (services.last_checked_at 과 같은 규칙)
         checked.append(latest_reconfirm)

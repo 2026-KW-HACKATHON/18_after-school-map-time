@@ -115,12 +115,15 @@
       {% include "places/_entrance.html" %}
     {% endfor %}
     {% include "places/_fields.html" with fields=building.fields %}
+    {% include "places/_facilities.html" with section=building %}
+    <a class="btn" href="{% url 'reports:new' %}?building={{ building.building.pk }}&ownership=BUILDING">건물 공용 시설 제보</a>
   </section>
   {% endif %}
 
   <section class="card" aria-labelledby="inside-title">
     <h2 id="inside-title">가게 안 · 편의시설</h2>
     {% include "places/_fields.html" with fields=place_section.fields %}
+    {% include "places/_facilities.html" with section=place_section %}
   </section>
 
   {% if pending_reports %}
