@@ -35,9 +35,10 @@
 ├── places/                     ← 장소 데이터 (지역·건물·장소·출입구·접근성 필드 정의) + 지도·상세 화면 + 공개 API
 │   ├── models.py
 │   ├── selectors.py            ←   화면·API 공통 조회 (표시 정책 적용: 기본 숨김, 섹션 분리)
+│   ├── facilities.py            ←   출입구·시설 종류별 관측 항목 (값은 기존 제보 이력에 저장)
 │   ├── api.py / api_urls.py    ←   공개 읽기 API /api/v1/ (목록·상세·GeoJSON)
 │   ├── views.py / urls.py      ←   /map/, /places/<id>/
-│   ├── templates/places/       ←   map.html, detail.html, _entrance.html, _fields.html
+│   ├── templates/places/       ←   map.html, detail.html, _entrance.html, _facilities.html, _fields.html
 │   ├── static/places/          ←   css/places.css, js/map-app.js (지도 화면)
 │   ├── data/*.json             ←   기본 데이터 (월계1동, 필드 정의) — 코드 수정 없이 여기서 바꿈
 │   ├── data/survey/            ←   답사 양식 template.csv (+ 팀 답사 결과 wolgye1.csv)
@@ -47,6 +48,8 @@
 │   └── management/commands/seed_base.py  ← 기본 데이터 넣기
 │
 ├── reports/                    ← 접근성 값과 그 출처 (제보 묶음·값·확인)
+│   ├── test_facilities.py       ←   시설별 제보·운영자 검토·공개 조회·기존 판정 회귀 테스트
+│   ├── test_facility_migrations.py ← 기존 출입구 제보·사진·관측값을 보존하는 Migration 테스트
 │   ├── models.py
 │   ├── selectors.py            ←   "지금 쓸 값" 조회 규칙 (검증된 최신 값)
 │   ├── services.py             ←   제보 반영/반려 (처리 기록 + 신호)
@@ -202,10 +205,11 @@
 
 ```
 Region(지역) ─┬─ Building(건물) ─── Entrance(건물 공용 출입구)
-              │        │
+              │        │       └─ AccessFacility(건물 공용 접근 시설)
               └─ Place(가게·시설) ── Entrance(가게 출입구, 대체 출입구 포함)
+                               └─ AccessFacility(가게 전용 접근 시설)
 
-FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리베이터 … 필드마다 대상(장소/건물/출입구)과 값 종류
+FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리베이터 … 필드마다 대상(장소/건물/출입구/접근 시설)과 값 종류
 ```
 
 | 모델 | 핵심 |
@@ -214,7 +218,10 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 | `Building` | 건물 공용 정보(공용 출입구·엘리베이터·공용 화장실)의 주인. 가게 책임과 건물 책임을 나눠 보여주기 위함 |
 | `Place` | 가게·시설. `building`(선택), `category`, `floor`, `is_closed`(삭제 대신 폐업 처리) |
 | `Entrance` | 장소 출입구 **또는** 건물 출입구 (둘 중 정확히 하나 — DB 제약). 출입구마다 따로 판정해 대체 출입구 안내 |
-| `FieldDefinition` | 필드 키를 자유 텍스트로 쓰지 않기 위한 정의 테이블. 대상(`PLACE`/`BUILDING`/`ENTRANCE`), 값 종류(`NUMBER`/`BOOL`/`CHOICE`/`TEXT`), 측정 방법 |
+| `AccessFacility` | 출입구 외 시설 식별자. 장소 또는 건물 중 정확히 한 곳에 연결. E/V·E/S·계단·경사로·장애인 화장실·기타 구분. 위치·사진·사실은 Report 이력에 저장 |
+| `FieldDefinition` | 필드 키를 자유 텍스트로 쓰지 않기 위한 정의 테이블. 대상(`PLACE`/`BUILDING`/`ENTRANCE`/`FACILITY`), 값 종류(`NUMBER`/`BOOL`/`CHOICE`/`TEXT`), 측정 방법 |
+
+시설 확장 Migration: `places/migrations/0002_alter_fielddefinition_scope_accessfacility.py`(시설 모델), `0003_facility_fields.py`(시설용 필드 정의), `reports/migrations/0006_remove_report_report_has_one_target_or_new_place_and_more.py`(제보 연결·제안 필드·대상 제약 확장). 기존 데이터를 시설로 자동 변환하거나 삭제하지 않는다. 실제 DB 적용은 별도 승인 후 진행한다.
 
 **공공데이터 가져오기** (`places/public_data.py`, `import_public_facilities`): 공공데이터포털 "한국사회보장정보원_장애인편의시설 현황"에서 노원구 목록을 받아 **월계동(법정동 코드 1135010200)·영업 중·주거시설 아닌 곳**만 고르고, 시설마다 "설치된 편의시설 항목"을 받는다. 항목은 뜻이 바로 맞는 것만 값으로 옮김 — 주출입구 높이차이 제거 → 입구 단차 0cm, 승강기 → 엘리베이터 있음(건물), 장애인사용가능화장실 → 장애인 화장실 있음. 문 폭처럼 수치가 없는 건 비워 둬서 휠체어는 "정보 없음"으로 남음(지어낸 값으로 판정하지 않음). 출처는 `공공데이터`, 확인 시각은 데이터 등록일이라 이후 답사·제보가 더 최신이면 그 값이 우선. 좌표가 없으면 카카오 주소 검색. 받은 내용은 `places/data/public/*.json` 스냅숏으로 레포에 두어 **호출 없이 누구나 같은 결과**(이용허락 제한 없음 데이터). 하루 호출 100회 제한 → `--limit`, 이미 가져온 시설은 다시 부르지 않음.
 
@@ -243,7 +250,7 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 
 | 모델·파일 | 핵심 |
 | --- | --- |
-| `Report` | 제보 묶음 1건 = 사진 1장 + 값 여러 개. 대상은 장소·건물·출입구 중 정확히 하나(DB 제약). 상태 `PENDING`(확인 중) → `VERIFIED`(반영) / `REJECTED`(반려) |
+| `Report` | 제보 묶음 1건 = 사진 1장 + 값 여러 개. 대상은 장소·건물·출입구·접근 시설 중 정확히 하나(DB 제약), 대상 없이 이름이 있으면 새 장소 제안. `facility_kind`·`facility_name`으로 새 시설 제안, 승인 시 시설을 만들어 대상 연결. 상태 `PENDING`(확인 중) → `VERIFIED`(반영) / `REJECTED`(반려) |
 | `AccessibilityValue` | 값 하나. 값 종류에 맞는 칸(`value_number`/`value_bool`/`value_text`) 하나만 채움. 대상과 필드의 범위가 다르면 저장 불가 |
 | `ReportConfirmation` | 다른 이용자의 "맞아요" 확인 (1인 1회, 본인 제보 확인 불가) |
 | `selectors.py` | `current_values(대상)`: 필드별로 **VERIFIED 제보 중 가장 최근 값**만 → 판정에 사용. `pending_fields(대상)`: "확인 중" 표시용 |
@@ -257,6 +264,7 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 | --- | --- |
 | 판정이 **내려감** (예: 들어갈 수 있어요 → 혼자 들어가기 어려워요) | 다른 주민 **2명** "맞아요" 또는 운영자 승인 |
 | 판정이 내려감 + **가입 7일 미만 계정** | **운영자 승인만** (주민 확인으로 반영 안 됨, 기획 v2 7장) |
+| **새 시설 제안 / 출입구 외 시설 제보** | **운영자 승인만**. 반영 전 시설·사진·관측값은 공개 목록에 노출하지 않음. 기존 입구·장소·건물 판정값에는 자동 복사하지 않음 |
 | 그 외 (올라감·변화 없음·미확인에서 새 정보) | 다른 주민 **1명** "맞아요" 또는 운영자 승인 |
 
 - 확인 전까지 기존 판정 유지, 해당 값에 "새 제보 확인 중" 표시
