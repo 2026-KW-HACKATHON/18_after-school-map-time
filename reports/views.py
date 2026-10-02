@@ -11,6 +11,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from core.validation import parse_pk
 from judgments.services import required_confirmations
 from places.facilities import ENTRANCE, KIND_FIELDS
 from places.models import Building, Entrance, Place, Region
@@ -35,14 +36,16 @@ def report_new(request):
     place = None
     place_id = request.GET.get("place") or request.POST.get("place")
     if place_id:
-        if not place_id.isdigit():  # ?place=abc 같은 잘못된 주소는 500이 아니라 404
+        place_id = parse_pk(place_id)
+        if place_id is None:
             raise Http404("장소를 찾을 수 없어요.")
         place = get_object_or_404(Place, pk=place_id, is_closed=False)
 
     building = None
     building_id = request.GET.get("building") or request.POST.get("building")
     if building_id:
-        if not building_id.isdigit() or place is not None:
+        building_id = parse_pk(building_id)
+        if building_id is None or place is not None:
             raise Http404("건물을 찾을 수 없어요.")
         building = get_object_or_404(Building, pk=building_id, region__is_active=True)
     kind = request.GET.get("facility_kind") or ENTRANCE

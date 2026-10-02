@@ -258,6 +258,16 @@ FieldDefinition(접근성 필드 정의): 입구 단차·출입문 폭·엘리�
 
 관리자 화면: 제보 목록에서 선택 → "반영" / "반려" 액션.
 
+입력 범위는 `places/validation.py`의 `NUMERIC_LIMITS`를 주민·운영자 Form과
+`AccessibilityValue`가 공유한다. 이는 접근성 판정 기준(Rule)이 아니라 잘못된 관측값을
+거르는 입력 검증이다. 기존 단차 0~500cm, 출입문·경사로 폭 및 이동식 경사로 길이
+0~1000cm, 입구 계단 수 0~50, 시설 계단 수 0~10000, 경사 0~90도 범위를 유지한다.
+계단 수는 정수이며 BOOL은 명시적인 참/거짓 값만 허용한다.
+`create()`/`save()`는 Form 없이도 검증하고, 기존 저장 데이터는 자동 변경하지 않는다.
+`bulk_create()`/`QuerySet.update()`/직접 SQL은 Django의 `save()`를 건너뛰므로 관측값을
+쓰는 경로에서 사용하지 않는다. 제보·운영자 요청의 ID는 `core/validation.py`에서
+ASCII 양의 정수 및 BigAutoField 범위를 검사한 뒤 DB에 전달한다.
+
 **주민 제보가 반영되는 길** (기획 v2 7장)
 
 | 제보 효과 (`judgments/services.py`가 판정 엔진으로 미리 계산) | 반영 조건 |
