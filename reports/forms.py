@@ -12,6 +12,7 @@ from core.uploads import KeepPhotoMixin
 from judgments.models import ConditionProfile
 from places.facilities import ENTRANCE, ENTRANCE_KEYS, FIELD_SPECS, KIND_FIELDS
 from places.models import AccessFacility, FieldDefinition, Place
+from places.validation import numeric_form_options
 
 from .models import PHOTO_FIX_PREFIX, Report
 
@@ -44,11 +45,11 @@ class ReportForm(KeepPhotoMixin, forms.Form):
 
     photo = forms.ImageField(label="입구 사진", help_text="입구, 계단, 경사로가 잘 보이게 찍어 주세요. 사람 얼굴·차 번호판은 나오지 않게 해 주세요.")
 
-    step_height_cm = forms.DecimalField(label="입구 단차 (cm)", required=False, min_value=0, max_value=500, decimal_places=1)
-    step_count = forms.IntegerField(label="계단 수 (칸)", required=False, min_value=0, max_value=50)
+    step_height_cm = forms.DecimalField(label="입구 단차 (cm)", required=False, **numeric_form_options("step_height_cm"), decimal_places=1)
+    step_count = forms.IntegerField(label="계단 수 (칸)", required=False, **numeric_form_options("step_count"))
     has_ramp = forms.ChoiceField(label="고정 경사로", required=False,
                                  choices=[(UNKNOWN, "모름"), ("true", "있음"), ("false", "없음")])
-    door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, min_value=0, max_value=1000, decimal_places=1)
+    door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, **numeric_form_options("door_width_cm"), decimal_places=1)
     door_type = forms.ChoiceField(label="출입문 형태", required=False)
 
     note = forms.CharField(label="추가 설명 (선택)", max_length=500, required=False,
@@ -104,7 +105,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
             self.fields["photo"].label = "시설 사진"
             self.fields["photo"].help_text = "시설의 모습과 접근 경로가 보이게 찍어 주세요. 얼굴·차 번호판은 피해 주세요."
         for key in extra_keys:
-            label, value_type, unit, choices, maximum = FIELD_SPECS[key]
+            label, value_type, unit, choices, _ = FIELD_SPECS[key]
             label = f"{label} ({unit}, 선택)" if unit else label
             if value_type == "BOOL":
                 self.fields[key] = forms.ChoiceField(label=label, required=False,
@@ -115,7 +116,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
             elif value_type == "NUMBER":
                 field_cls = forms.IntegerField if key == "facility_step_count" else forms.DecimalField
                 options = {"decimal_places": 1} if field_cls == forms.DecimalField else {}
-                self.fields[key] = field_cls(label=label, required=False, min_value=0, max_value=maximum, **options)
+                self.fields[key] = field_cls(label=label, required=False, **numeric_form_options(key), **options)
             else:
                 self.fields[key] = forms.CharField(label=label, max_length=200, required=False)
                 if key == "facility_connected_floors":

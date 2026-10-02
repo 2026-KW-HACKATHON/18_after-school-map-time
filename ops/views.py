@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
+from core.validation import parse_pk
 from judgments.constants import display
 from judgments.models import Outcome
 from judgments.services import is_owner_declaration, is_photo_request, report_direction, report_effect, required_confirmations
@@ -175,7 +176,7 @@ def reports_delete(request):
     제보 기록 삭제: 목록에서 고른 기록(또는 상세의 한 건) → 확인 화면 → 동의하면 삭제.
     주민 제보·사장님 요청만 (팀 답사·공공데이터 기록은 여기서 지우지 않음)
     """
-    ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+    ids = [pk for raw in request.POST.getlist("ids") if (pk := parse_pk(raw)) is not None]
     back = request.POST.get("back", "")
     back_url = reverse("ops:reports") + (f"?status={back}" if back in OPS_STATUS_LABELS or back == "" else "")
     reports = list(Report.objects.filter(pk__in=ids, source__in=REVIEW_SOURCES)
@@ -347,8 +348,8 @@ def issue_building_claim_code(request, pk):
     building = get_object_or_404(Building, pk=pk)
     code = ClaimCode.issue(building=building)
     messages.success(request, f"건물주 인증 코드 {code.code} 를 발급했어요. 건물주님께 전달해 주세요.")
-    place_id = request.POST.get("place", "")
-    place = building.places.filter(pk=place_id).first() if place_id.isdigit() else None
+    place_id = parse_pk(request.POST.get("place", ""))
+    place = building.places.filter(pk=place_id).first() if place_id is not None else None
     return redirect("ops:place-edit", pk=place.pk) if place else redirect("ops:places")
 
 

@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from judgments.models import ConditionProfile
 from places.models import Place
+from places.validation import numeric_form_options
 
 UNKNOWN = ""
 BOOL_CHOICES = [(UNKNOWN, "모름"), ("true", "있음"), ("false", "없음")]
@@ -21,10 +22,10 @@ class PlaceForm(forms.ModelForm):
     값을 비워 두면(모름) 기존 값을 건드리지 않는다.
     """
 
-    step_height_cm = forms.DecimalField(label="입구 단차 (cm)", required=False, min_value=0, max_value=500, decimal_places=1)
-    step_count = forms.IntegerField(label="계단 수 (칸)", required=False, min_value=0, max_value=50)
+    step_height_cm = forms.DecimalField(label="입구 단차 (cm)", required=False, **numeric_form_options("step_height_cm"), decimal_places=1)
+    step_count = forms.IntegerField(label="계단 수 (칸)", required=False, **numeric_form_options("step_count"))
     has_ramp = forms.ChoiceField(label="고정 경사로", required=False, choices=BOOL_CHOICES)
-    door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, min_value=0, max_value=1000, decimal_places=1)
+    door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, **numeric_form_options("door_width_cm"), decimal_places=1)
     door_type = forms.ChoiceField(label="출입문 형태", required=False)
     profiles = forms.MultipleChoiceField(label="이동 조건 (선택)", required=False,
                                         widget=forms.CheckboxSelectMultiple)
@@ -32,7 +33,7 @@ class PlaceForm(forms.ModelForm):
     accessible_toilet = forms.ChoiceField(label="장애인 화장실", required=False, choices=BOOL_CHOICES)
     assistance_offered = forms.ChoiceField(label="입장 도움", required=False, choices=BOOL_CHOICES)
     portable_ramp = forms.ChoiceField(label="이동식 경사로", required=False, choices=BOOL_CHOICES)
-    portable_ramp_length_cm = forms.DecimalField(label="이동식 경사로 길이 (cm)", required=False, min_value=0, max_value=1000)
+    portable_ramp_length_cm = forms.DecimalField(label="이동식 경사로 길이 (cm)", required=False, **numeric_form_options("portable_ramp_length_cm"))
 
     source_note = forms.CharField(label="답사·확인 출처", max_length=100, required=False,
                                   widget=forms.TextInput(attrs={"placeholder": "예: 운영팀 직접 답사"}))
