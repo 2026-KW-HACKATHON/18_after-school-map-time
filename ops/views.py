@@ -205,10 +205,14 @@ def report_done(request, pk):
 @staff_required
 def place_list(request):
     q = request.GET.get("q", "").replace("\x00", "").strip()  # NUL 문자는 PostgreSQL이 거부 → 500 방지
-    places = Place.objects.order_by("-updated_at")
+    places = Place.objects.select_related("building").prefetch_related(
+        "entrances", "facilities", "building__entrances", "building__facilities").order_by("-updated_at")
     if q:
         places = places.filter(Q(name__icontains=q) | Q(address__icontains=q))
-    return render(request, "ops/place_list.html", {"places": places[:100], "q": q})
+    places = list(places[:100])
+    for place in places:
+        place.facility_sections = services.facility_inventory(place)
+    return render(request, "ops/place_list.html", {"places": places, "q": q})
 
 
 @staff_required
@@ -230,6 +234,7 @@ def place_edit(request, pk=None):
         "place_fields": [form[k] for k in PLACE_KEYS],
         "missing": form.missing_required() if form.is_bound else [],
         "region": _region(),
+        "facility_sections": services.facility_inventory(place, include_reports=True) if place else [],
     })
 
 

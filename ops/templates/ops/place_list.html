@@ -18,6 +18,9 @@
         <a class="card result-card" href="{% url 'ops:place-edit' p.pk %}">
           <strong>{{ p.name }}{% if p.is_closed %} <span class="badge-neutral">폐업</span>{% endif %}</strong>
           <span class="muted small">{{ p.get_category_display }}{% if p.address %} · {{ p.address }}{% endif %} · {{ p.updated_at|date:"n월 j일" }} 수정</span>
+          {% for section in p.facility_sections %}{% if section.counts %}
+            <span class="small">{{ section.label }}: {% for item in section.counts %}{{ item.label }} {{ item.count }}개{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+          {% endif %}{% endfor %}
         </a>
       </li>
     {% empty %}

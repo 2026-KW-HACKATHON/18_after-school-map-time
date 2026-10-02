@@ -1,6 +1,7 @@
 """운영자 작업. 화면(views)과 분리해서 테스트하기 쉽게 둔다."""
 
 from datetime import datetime, time, timedelta
+from collections import Counter
 from decimal import Decimal
 
 from django.db import transaction
@@ -22,6 +23,28 @@ ABUSE_PLACE_COUNT = 5   # 서로 다른 장소 5곳 이상 하향 제보 → 관
 def main_entrance(place):
     entrance = place.entrances.filter(is_main=True).first() or place.entrances.first()
     return entrance or Entrance.objects.create(place=place, name="정문", is_main=True)
+
+
+def facility_inventory(place, include_reports=False):
+    """장소 전용·건물 공용 시설을 운영자에게 구분해 보여 준다. 조회만 하고 값은 바꾸지 않는다."""
+    sections = []
+    for parent, label in ((place, "장소 전용"), (place.building, "건물 공용")):
+        if parent is None:
+            continue
+        rows = []
+        for target in [*parent.entrances.all(), *parent.facilities.all()]:
+            row = {"name": target.name, "kind_label": "출입구" if isinstance(target, Entrance) else target.get_kind_display()}
+            if include_reports:
+                row["report"] = target.reports.order_by("-observed_at", "-created_at", "-pk").first()
+            rows.append(row)
+        pending = (parent.reports.filter(status=Report.Status.PENDING, facility__isnull=True)
+                   .exclude(facility_kind="").order_by("-created_at")) if include_reports else []
+        sections.append({
+            "label": label, "parent": parent, "rows": rows, "pending": pending,
+            "counts": [{"label": kind, "count": count} for kind, count in
+                       Counter(row["kind_label"] for row in rows).items()],
+        })
+    return sections
 
 
 @transaction.atomic
