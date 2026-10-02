@@ -256,6 +256,7 @@ class FacilityReportTests(TempMediaMixin, TestCase):
         self.assertContains(response, "엘리베이터 (E/V) 1개")
         self.assertContains(response, "ELEVATOR 시설")
         self.assertContains(response, "2층 복도 동쪽")
+        self.assertContains(response, f'href="{facility["photo_url"]}" target="_blank" rel="noopener" title="사진 크게 보기"')
         self.assertTrue(has_public_info(self.place))
         self.assertEqual(last_checked_at(self.place), report.observed_at)
 
@@ -281,6 +282,29 @@ class FacilityReportTests(TempMediaMixin, TestCase):
         approve_report(report, self.staff)
         approve_report(stale, self.staff)
         self.assertEqual(self.place.facilities.count(), 1)
+
+    def test_operator_can_delete_place_and_building_facility_reports_without_public_ghosts(self):
+        for ownership in ("PLACE", "BUILDING"):
+            with self.subTest(ownership=ownership):
+                self.client.force_login(self.user)
+                report = self.proposal(ownership=ownership)
+                verify_report(report, by=self.staff)
+                facility_id = report.facility_id
+                photo_name = report.photo.name
+                self.client.force_login(self.staff)
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(reverse("ops:reports-delete"), {
+                        "ids": [report.pk], "confirm_step": "1", "confirm": "on",
+                    })
+                self.assertEqual(response.status_code, 302)
+                self.assertFalse(Report.objects.filter(pk=report.pk).exists())
+                self.assertFalse(AccessibilityValue.objects.filter(report_id=report.pk).exists())
+                self.assertFalse(report.photo.storage.exists(photo_name))
+                self.assertTrue(AccessFacility.objects.filter(pk=facility_id).exists())
+                data = self.client.get(f"/api/v1/places/{self.place.pk}/").json()
+                self.assertEqual(data["place"]["facilities"], [])
+                self.assertEqual(data["building"]["facilities"], [])
+                self.assertFalse(has_public_info(self.place))
 
     def test_operator_review_page_and_approval_use_existing_flow(self):
         report = self.proposal()

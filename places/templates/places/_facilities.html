@@ -5,7 +5,7 @@
   {% for facility in group.list %}
   <section class="entrance" aria-label="{{ facility.name }}">
     <h4>{{ facility.name }}</h4>
-    {% if facility.photo %}<img class="entrance-photo" src="{{ facility.photo.url }}" alt="{{ facility.name }} 사진" loading="lazy">{% endif %}
+    {% if facility.photo %}<a href="{{ facility.photo.url }}" target="_blank" rel="noopener" title="사진 크게 보기"><img class="entrance-photo" src="{{ facility.photo.url }}" alt="{{ facility.name }} 사진 (누르면 크게 보기)" loading="lazy"></a>{% endif %}
     <p class="muted small">최근 확인: {{ facility.checked_at|date:"Y년 n월 j일" }}</p>
     {% if facility.location_text %}<p>위치: {{ facility.location_text }}</p>{% endif %}
     {% if facility.lat != None and facility.lng != None %}<p class="muted small">위치 좌표: {{ facility.lat }}, {{ facility.lng }}</p>{% endif %}
