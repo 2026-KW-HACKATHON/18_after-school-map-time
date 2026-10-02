@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% comment %}와이어프레임 8번 "제보 작성". 디자인은 추후 Figma CSS로 교체 — 기능 구조만{% endcomment %}
 
 {% block title %}접근성 정보 제보 | 턱없네{% endblock %}
@@ -8,23 +9,24 @@
   <h1>접근성 정보 제보</h1>
   <p class="muted">직접 확인한 출입구나 접근 시설을 알려주세요. 확인된 정보만 공개됩니다.</p>
 
-  <form method="get" class="card form-stack">
+  <form method="get" class="card form-stack" id="facility-selector">
     {% if place %}<input type="hidden" name="place" value="{{ place.pk }}">{% endif %}
     {% if building %}<input type="hidden" name="building" value="{{ building.pk }}">{% endif %}
     {% include "reports/_field.html" with field=form.facility_kind %}
     {% include "reports/_field.html" with field=form.ownership %}
-    <button type="submit" class="btn">이 시설의 입력 항목 보기</button>
-    <p class="muted small">시설 종류와 소속을 먼저 선택해 주세요. 입력 중 종류를 바꾸면 작성한 내용은 다시 입력해야 해요.</p>
+    <noscript><button type="submit" class="btn">이 시설의 입력 항목 보기</button>
+      <p class="muted small">JavaScript를 켜면 입력 항목이 자동으로 바뀌어요. 끈 상태에서는 작성 전에 종류를 선택해 주세요.</p></noscript>
+    <p class="muted small" id="facility-switch-status" role="status" aria-live="polite">시설 종류를 선택하면 필요한 입력 항목이 자동으로 바뀌어요.</p>
   </form>
 
   {% if form.non_field_errors %}
     <div class="alert" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data" class="form-stack">
+  <form method="post" enctype="multipart/form-data" class="form-stack" id="report-form">
     {% csrf_token %}
-    <input type="hidden" name="facility_kind" value="{{ form.kind }}">
-    <input type="hidden" name="ownership" value="{{ selected_ownership }}">
+    <input type="hidden" name="facility_kind" value="{{ form.kind }}" id="report-kind">
+    <input type="hidden" name="ownership" value="{{ selected_ownership }}" id="report-ownership">
 
     <fieldset class="card">
       <legend>장소 정보</legend>
@@ -41,34 +43,29 @@
         {% include "reports/_field.html" with field=form.suggested_floor %}
         {% include "reports/_field.html" with field=form.suggested_phone %}
       {% endif %}
-      {% if show_picker %}
-        {% include "includes/location_picker.html" with search_enabled=True location_label=kind_label %}
-        <div class="coord-row">
-          {% include "reports/_field.html" with field=form.lat %}
-          {% include "reports/_field.html" with field=form.lng %}
-        </div>
-        <noscript><p class="notice">지도를 사용하려면 JavaScript를 켜 주세요. 위도·경도나 위치 설명을 직접 입력할 수도 있어요.</p></noscript>
-      {% endif %}
+      <div id="report-location">
+        {% if show_picker %}{% include "reports/_location_fields.html" %}{% endif %}
+      </div>
       {% include "reports/_field.html" with field=form.location_text %}
     </fieldset>
 
     <fieldset class="card">
-      <legend>{{ kind_label }} 선택</legend>
+      <legend>기존 시설 선택 / 새 시설 등록</legend>
       {% include "reports/_field.html" with field=form.target_reference %}
       {% include "reports/_field.html" with field=form.facility_name %}
       <p class="muted small">기존 시설을 확인했다면 목록에서 골라 주세요. 새 시설 이름은 새 시설을 제안할 때만 사용해요.</p>
     </fieldset>
 
     <fieldset class="card">
-      <legend>{{ kind_label }} 사진</legend>
+      <legend><span data-facility-label>{{ kind_label }}</span> 사진</legend>
       {% include "reports/_field.html" with field=form.photo %}
       {{ form.photo_token }}
       <p class="muted small">사진으로 값을 자동으로 채워 주는 AI 분석은 준비 중이에요.</p>
     </fieldset>
 
     <fieldset class="card">
-      <legend>{{ kind_label }} 정보 <span class="muted small">(아는 것만 · 수치는 선택)</span></legend>
-      {% for field in form.observation_fields %}{% include "reports/_field.html" %}{% endfor %}
+      <legend><span data-facility-label>{{ kind_label }}</span> 정보 <span class="muted small">(아는 것만 · 수치는 선택)</span></legend>
+      <div id="facility-observations">{% include "reports/_observation_fields.html" %}</div>
     </fieldset>
 
     <fieldset class="card">
@@ -85,5 +82,6 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if show_picker %}{% include "includes/location_picker_js.html" %}{% endif %}
+{% include "includes/location_picker_js.html" %}
+<script src="{% static 'js/reports/facility-switcher.js' %}"></script>
 {% endblock %}

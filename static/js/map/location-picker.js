@@ -1,9 +1,12 @@
 /** 주민·운영자 공용 위치 선택. SDK 호출은 TeokMap 어댑터에만 둔다. */
-(function () {
+(function initializeLocationPicker() {
+  // 시설 종류 전환으로 지도가 처음 추가됐을 때도 공용 초기화를 재사용한다.
+  document.addEventListener("location-picker-ready", initializeLocationPicker);
   const box = document.getElementById("picker-map");
   const lat = document.getElementById("id_lat");
   const lng = document.getElementById("id_lng");
-  if (!box || !lat || !lng) return;
+  if (!box || !lat || !lng || box.dataset.pickerReady === "true") return;
+  box.dataset.pickerReady = "true";
   const status = document.getElementById("picker-status") || document.getElementById("location-status");
   const search = document.getElementById("place-search");
   const searchButton = document.getElementById("search-place");

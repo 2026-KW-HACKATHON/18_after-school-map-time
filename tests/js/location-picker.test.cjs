@@ -16,7 +16,7 @@ function element(value = "") {
 }
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 async function setup({ lat = "", lng = "", unavailable = false, common = false, noSearch = false,
-                       noTools = false, dataset = {}, adapterMissing = false, searchPlaces = async () => [] } = {}) {
+                       noTools = false, dataset = {}, adapterMissing = false, lazy = false, searchPlaces = async () => [] } = {}) {
   const fields = Object.fromEntries(["picker-map", "id_lat", "id_lng", "location-status", "place-search",
     "search-place", "place-results", "use-location", "id_suggested_name", "id_suggested_address",
     "id_suggested_phone", "id_suggested_category", "id_suggested_floor"].map((id) => [id, element()]));
@@ -34,9 +34,14 @@ async function setup({ lat = "", lng = "", unavailable = false, common = false, 
   const map = { pins: [], pans: [], setMarkers(items) { this.pins.push([items[0].lat, items[0].lng]); },
     panTo(...pos) { this.pans.push(pos); }, onMapClick(fn) { this.click = fn; }, searchPlaces };
   let center;
+  let visible = !lazy;
+  let creations = 0;
+  const listeners = {};
   vm.runInNewContext(source, {
-    document: { getElementById: (id) => fields[id], createElement: () => element() },
+    document: { getElementById: (id) => id === "picker-map" && !visible ? null : fields[id],
+      createElement: () => element(), addEventListener(type, fn) { listeners[type] = fn; } },
     window: adapterMissing ? {} : { TeokMap: { create: (box, options) => {
+      ++creations;
       center = options;
       return unavailable ? Promise.reject(new Error()) : Promise.resolve(map);
     } } },
@@ -44,8 +49,19 @@ async function setup({ lat = "", lng = "", unavailable = false, common = false, 
     navigator: { geolocation: { getCurrentPosition: (success) => success({ coords: { latitude: 37.62, longitude: 127.05 } }) } },
   });
   await flush();
-  return { fields, map, center };
+  return { fields, map, center, creations: () => creations,
+    async reveal() { visible = true; listeners["location-picker-ready"](); await flush(); } };
 }
+
+test("시설 전환으로 뒤늦게 추가된 지도를 초기화하고 이후 전환은 중복 초기화하지 않는다", async () => {
+  const state = await setup({ lazy: true, lat: "37.62", lng: "127.05" });
+  assert.equal(state.creations(), 0);
+  await state.reveal();
+  assert.equal(state.creations(), 1);
+  assert.deepEqual(state.map.pins[0], [37.62, 127.05]);
+  await state.reveal();
+  assert.equal(state.creations(), 1);
+});
 
 test("저장된 좌표 복원 및 지도 클릭으로 소수점 6자리 좌표 갱신", async () => {
   const { fields, map } = await setup({ lat: "0", lng: "0" });

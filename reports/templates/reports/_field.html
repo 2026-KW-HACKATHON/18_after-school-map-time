@@ -9,7 +9,7 @@
     </div>
   {% endif %}
   {{ field }}
-  {% if field.help_text %}<p class="muted small">{{ field.help_text }}</p>{% endif %}
+  {% if field.help_text %}<p class="muted small" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
   {% for e in field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
 </div>
 {% endif %}
