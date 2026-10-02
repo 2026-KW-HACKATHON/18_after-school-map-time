@@ -2,7 +2,7 @@
   <h3>{{ entrance.name }}{% if not entrance.is_main %} <span class="badge-neutral">다른 출입구</span>{% endif %}</h3>
   {% if entrance.description %}<p class="small">{{ entrance.description }}</p>{% endif %}
   {% if entrance.photo %}
-    <img class="entrance-photo" src="{{ entrance.photo.url }}" alt="{{ entrance.name }} 사진" loading="lazy">
+    <a href="{{ entrance.photo.url }}" target="_blank" rel="noopener" title="사진 크게 보기"><img class="entrance-photo" src="{{ entrance.photo.url }}" alt="{{ entrance.name }} 사진 (누르면 크게 보기)" loading="lazy"></a>
     {# 예전 모습이거나 얼굴·번호판이 보이면 운영자에게 수정 요청 (기획 v2 4.4) #}
     <p class="small"><a href="{% url 'reports:photo-fix' entrance.id %}?next={{ request.get_full_path|urlencode }}">사진에 문제가 있나요? 수정 요청하기</a></p>
   {% endif %}

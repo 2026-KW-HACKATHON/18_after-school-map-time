@@ -56,5 +56,10 @@
       <a class="btn" href="{% url 'owners:wishes' %}">가고 싶어요 목록</a>
     </div>
   </section>
+
+  <form method="post" action="{% url 'account_logout' %}" class="center">
+    {% csrf_token %}
+    <button type="submit" class="btn">로그아웃</button>
+  </form>
 </section>
 {% endblock %}

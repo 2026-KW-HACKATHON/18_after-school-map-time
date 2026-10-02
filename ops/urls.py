@@ -8,6 +8,7 @@ urlpatterns = [
     path("login/", views.OpsLoginView.as_view(), name="login"),
     path("", views.dashboard, name="dashboard"),
     path("reports/", views.report_list, name="reports"),
+    path("reports/delete/", views.reports_delete, name="reports-delete"),
     path("reports/<int:pk>/", views.report_review, name="report-review"),
     path("reports/<int:pk>/done/", views.report_done, name="report-done"),
     path("places/", views.place_list, name="places"),

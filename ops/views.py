@@ -28,7 +28,7 @@ from reports.selectors import latest_photo
 from . import district as district_data
 from . import services
 from .templatetags.ops_tags import OPS_STATUS_LABELS
-from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceDeleteForm, PlaceForm, ReviewForm
+from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceDeleteForm, PlaceForm, ReportDeleteForm, ReviewForm
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
 
@@ -165,6 +165,34 @@ def report_review(request, pk):
         "photo_request": is_photo_request(report),
         "current_photo": latest_photo(report.entrance) if report.entrance_id else None,
         "region": _region(),
+    })
+
+
+@staff_required
+@require_POST
+def reports_delete(request):
+    """
+    제보 기록 삭제: 목록에서 고른 기록(또는 상세의 한 건) → 확인 화면 → 동의하면 삭제.
+    주민 제보·사장님 요청만 (팀 답사·공공데이터 기록은 여기서 지우지 않음)
+    """
+    ids = [i for i in request.POST.getlist("ids") if i.isdigit()]
+    back = request.POST.get("back", "")
+    back_url = reverse("ops:reports") + (f"?status={back}" if back in OPS_STATUS_LABELS or back == "" else "")
+    reports = list(Report.objects.filter(pk__in=ids, source__in=REVIEW_SOURCES)
+                   .select_related("place", "entrance__place", "entrance__building", "building", "created_by")
+                   .order_by("-created_at"))
+    if not reports:
+        messages.error(request, "지울 기록을 하나 이상 골라 주세요.")
+        return redirect(back_url)
+    form = ReportDeleteForm(request.POST if "confirm_step" in request.POST else None)
+    if form.is_bound and form.is_valid():
+        count = services.delete_reports(reports)
+        messages.success(request, f"제보 기록 {count}건을 삭제했어요.")
+        return redirect(back_url)
+    return render(request, "ops/report_delete.html", {
+        "form": form, "reports": reports, "back": back,
+        "verified": sum(1 for r in reports if r.status == Report.Status.VERIFIED),
+        "photos": sum(1 for r in reports if r.photo),
     })
 
 

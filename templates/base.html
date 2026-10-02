@@ -43,8 +43,8 @@
       {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
       {% if user.is_authenticated %}
         <a class="nav-wide" href="{% url 'accounts:me' %}" title="내 활동">{{ user.display_name }}님</a>{# 휴대폰에서는 하단 탭의 '내 활동' #}
-        {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지) #}
-        <form method="post" action="{% url 'account_logout' %}" class="inline">
+        {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지). 휴대폰에서는 하단 탭 '내 활동' 화면에 있음 #}
+        <form method="post" action="{% url 'account_logout' %}" class="inline nav-wide">
           {% csrf_token %}
           <button type="submit" class="link-button">로그아웃</button>
         </form>
