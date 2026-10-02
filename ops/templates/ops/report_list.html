@@ -3,6 +3,19 @@
 {% comment %}와이어프레임 15번 "제보 검토 목록"{% endcomment %}
 
 {% block title %}제보 검토 목록 | 턱없네{% endblock %}
+
+{% block extra_js %}
+<script>
+  // 모두 선택: 지금 목록에 보이는 기록 전체 체크·해제
+  (function () {
+    const all = document.getElementById("select-all");
+    if (!all) return;
+    all.addEventListener("change", () => {
+      document.querySelectorAll(".row-check").forEach((box) => { box.checked = all.checked; });
+    });
+  })();
+</script>
+{% endblock %}
 {% block tabbar %}{% endblock %}
 
 {% block content %}
@@ -22,10 +35,22 @@
     {% endfor %}
   </nav>
 
+  {# 기록 정리: 체크한 제보를 확인 화면을 거쳐 삭제 #}
+  <form method="post" action="{% url 'ops:reports-delete' %}" id="report-select-form" class="select-bar">
+    {% csrf_token %}
+    <input type="hidden" name="back" value="{{ status }}">
+    {% if rows %}
+      <label class="small"><input type="checkbox" id="select-all"> 모두 선택</label>
+      <button type="submit" class="btn">선택한 기록 삭제</button>
+    {% endif %}
+  </form>
+
   <ul class="result-list">
     {% for row in rows %}
       {% with r=row.report %}
-      <li>
+      <li class="selectable-row">
+        <input type="checkbox" name="ids" value="{{ r.pk }}" form="report-select-form" class="row-check"
+               aria-label="{{ r.target_label }} 선택">
         <a class="card result-card" href="{% url 'ops:report-review' r.pk %}">
           <span class="muted small">{{ r.created_at|date:"Y.m.d H:i" }} · {{ r|ops_status }}{% if r.created_by %} · {{ r.created_by }}{% endif %}</span>
           <strong>{{ r.target_label }}</strong>

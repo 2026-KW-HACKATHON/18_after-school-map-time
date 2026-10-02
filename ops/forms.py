@@ -81,6 +81,13 @@ class PlaceDeleteForm(forms.Form):
                                  error_messages={"required": "삭제할 내용을 확인하고 동의해 주세요."})
 
 
+class ReportDeleteForm(forms.Form):
+    """제보 기록 삭제 확인 — 되돌릴 수 없어서 동의 체크를 받는다"""
+
+    confirm = forms.BooleanField(label="선택한 제보 기록과 사진을 영구 삭제하는 데 동의합니다.",
+                                 error_messages={"required": "삭제할 내용을 확인하고 동의해 주세요."})
+
+
 class ReviewForm(forms.Form):
     """제보 승인·반려 (16·17번)"""
 

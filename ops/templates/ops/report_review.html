@@ -128,6 +128,15 @@
     {% if report.reject_reason %}<p class="small">반려 사유: {{ report.reject_reason }}</p>{% endif %}
   </section>
   {% endif %}
+
+  {# 기록 정리: 이 제보 기록 삭제 (확인 화면을 거침) #}
+  <form method="post" action="{% url 'ops:reports-delete' %}" class="card">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ report.pk }}">
+    <input type="hidden" name="back" value="{{ report.status }}">
+    <p class="small muted">잘못 들어온 제보나 정리할 기록은 지울 수 있어요. 다음 화면에서 한 번 더 확인해요.</p>
+    <button type="submit" class="btn">이 기록 삭제</button>
+  </form>
 </section>
 {% endblock %}
 

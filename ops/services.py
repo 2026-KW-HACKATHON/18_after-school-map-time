@@ -25,6 +25,30 @@ def main_entrance(place):
 
 
 @transaction.atomic
+@transaction.atomic
+def delete_reports(reports):
+    """
+    제보 기록 삭제 (운영자 정리용). 값·주민 확인은 함께 지워지고, 사진 파일은 저장이 끝난 뒤 지운다.
+    지도에 반영됐던(VERIFIED) 기록이면 그 값이 빠지므로 영향받는 장소를 다시 판정한다.
+    반환: 지운 기록 수
+    """
+    from judgments.receivers import affected_places
+
+    reports = list(reports)
+    places, photos = {}, []
+    for report in reports:
+        if report.status == Report.Status.VERIFIED:
+            for place in affected_places(report):
+                places[place.pk] = place
+        if report.photo:
+            photos.append((report.photo.storage, report.photo.name))
+    Report.objects.filter(pk__in=[r.pk for r in reports]).delete()
+    for place in places.values():
+        recompute_place(place)
+    transaction.on_commit(lambda: [storage.delete(name) for storage, name in photos])
+    return len(reports)
+
+
 def delete_place(place):
     """장소와 연결된 기록을 기존 FK 삭제 규칙에 따라 한 트랜잭션으로 삭제한다."""
     place.delete()

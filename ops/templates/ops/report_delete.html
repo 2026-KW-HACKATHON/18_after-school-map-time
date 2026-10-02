@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load ops_tags %}
+{% comment %}제보 기록 삭제 확인 — 되돌릴 수 없어서 무엇이 지워지는지 보여 주고 동의를 받는다{% endcomment %}
+
+{% block title %}제보 기록 삭제 확인 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  {% include "ops/_nav.html" %}
+  <h1>제보 기록 삭제 확인</h1>
+  <section class="card">
+    <h2>{{ reports|length }}건을 삭제해요</h2>
+    <ul class="plain-list">
+      {% for r in reports %}
+        <li class="small"><strong>{{ r.target_label }}</strong> · {{ r|ops_status }} · {{ r.created_at|date:"Y.m.d" }}{% if r.created_by %} · {{ r.created_by }}{% endif %}{% if r.photo %} · 사진 있음{% endif %}</li>
+      {% endfor %}
+    </ul>
+    <p class="notice">
+      삭제하면 복구할 수 없어요. 제보에 담긴 값·사진({{ photos }}장)·주민 확인 기록이 함께 지워져요.
+      {% if verified %}<br><strong>이 중 {{ verified }}건은 지도에 반영된 기록</strong>이라, 지우면 그 값이 빠지고 해당 가게 판정이 다시 계산돼요.{% endif %}
+    </p>
+    <form method="post" action="{% url 'ops:reports-delete' %}" class="form-stack">
+      {% csrf_token %}
+      <input type="hidden" name="confirm_step" value="1">
+      <input type="hidden" name="back" value="{{ back }}">
+      {% for r in reports %}<input type="hidden" name="ids" value="{{ r.pk }}">{% endfor %}
+      {% include "reports/_field.html" with field=form.confirm %}
+      <div class="actions">
+        <a class="btn" href="{% url 'ops:reports' %}?status={{ back }}">취소</a>
+        <button type="submit" class="btn">확인한 기록 삭제</button>
+      </div>
+    </form>
+  </section>
+</section>
+{% endblock %}
