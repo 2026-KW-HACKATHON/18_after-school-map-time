@@ -306,7 +306,8 @@ nano .env
 # GEMINI_API_KEY=<서버 전용 키>
 # GEMINI_MODEL=gemini-3.5-flash-lite
 # GEMINI_THINKING_LEVEL=low
-# AI_DAILY_LIMIT=50                             ← 1회 약 3원 → 하루 최대 약 150원
+# AI_DAILY_LIMIT=50                             ← 1회 약 3원 → 하루 최대 약 150원 (운영자 분석 + 주민 채우기 합산)
+# AI_PREFILL_USER_DAILY_LIMIT=3                  ← 주민 1명이 'AI로 항목 채우기'를 하루에 누를 수 있는 횟수 (0이면 버튼 숨김)
 # AI_NOTICE_SINCE=2026-10-07T09:00:00+09:00   ← 켜는 시각, 시간대(+09:00) 꼭 포함
 # AI_NOTICE_VERSION=ai-notice-v1                ← 안내 문구 버전. 문구를 바꾸면 SINCE와 함께 올림
 # AI_ENABLED=True
@@ -314,6 +315,8 @@ docker compose -f docker-compose.prod.yml up -d web   # .env 다시 읽기
 ```
 
 3. 확인: 켠 뒤에 들어온 제보만 분석됩니다(안내 버전이 기록된 제보). 이미 열려 있던 제보 화면에서 제출하면 "안내가 바뀌었어요"가 한 번 뜨는 게 정상입니다. 제보 화면 맨 아래에 "Google(미국)로 전송될 수 있습니다" 안내가 보이는지, 운영자 검토 화면에 "AI 검토 보조"가 보이는지.
+안내 문구를 바꾸는 코드가 배포되면 `AI_NOTICE_VERSION`을 올리고(예: `ai-notice-v2`) `AI_NOTICE_SINCE`도 그때 시각으로 바꿉니다. 바꾸기 전에 열어 둔 제보 화면은 제출할 때 새 안내를 한 번 보게 됩니다.
+
 4. 끄기: `AI_ENABLED=False`로 바꾸고 `up -d web`. 이미 저장된 분석 기록·선택 값은 그대로 남습니다.
 
 ---
