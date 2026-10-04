@@ -227,9 +227,13 @@ PUBLIC_DATA_API_KEY = os.getenv("PUBLIC_DATA_API_KEY", "")    # 공공데이터�
 # ── 운영자 AI 검토 보조 (reports/ai.py, 명세 v1.2 A안) ──
 # 제보 사진·설명에서 출입구 항목 후보를 뽑아 운영자에게 보여 준다. 자동 승인은 없다.
 # 팀 결정(모델·예산)과 개인정보 고지 법적 검토가 끝나기 전에는 꺼 둔다 (AI_ENABLED=False).
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")  # 서버 전용. 템플릿·JS로 절대 내보내지 않기
 AI_ENABLED = os.getenv("AI_ENABLED", "False") == "True"
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")      # 이미지 입력 + Structured Outputs 지원 모델 ID (팀 결정)
+# 사진·설명을 보낼 곳: gemini(팀 결정, 결제 연결한 유료 등급만) 또는 openai. 키는 서버 전용, 템플릿·JS로 절대 내보내지 않기
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")  # 이미지 입력 + JSON 출력 형식 지원 모델
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
 
 
 def _daily_limit(raw):
