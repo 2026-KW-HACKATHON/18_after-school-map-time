@@ -7,6 +7,7 @@ Report(제보 묶음) 1건 = 사진 1장 + 필드 값 여러 개.
 판정에는 status=VERIFIED 인 값만 쓴다. PENDING 은 "확인 중"으로만 보여준다 (기획 v2 OP-6).
 """
 
+import uuid
 from decimal import Decimal
 
 from django.conf import settings
@@ -294,3 +295,52 @@ class Reconfirmation(models.Model):
 
     def __str__(self):
         return f"{self.place} · {self.user} ({self.created_at:%Y-%m-%d})"
+
+
+class AIAnalysis(models.Model):
+    """
+    운영자 AI 검토 보조 기록 (AI 명세 v1.2 A안, reports/ai.py).
+    제보 사진·설명에서 뽑은 출입구 항목 '후보'와, 운영자가 그중 골라 제보에 저장한 기록을 남긴다.
+    분석만으로는 제보·값·판정을 바꾸지 않는다. 승인은 기존 운영자 승인 흐름만 한다.
+
+    저장하지 않고 계산하는 값 (레포 규칙: 파생값은 계산):
+      - 운영자 승인 전용 여부: 선택 기록(selection_history)이 있는 분석이 하나라도 있는지 (reports.ai.staff_review_only)
+      - 입력 변경 여부: input_snapshot ↔ 지금 제보 값
+      - 60초 넘게 PROCESSING인 기록 = 실패 (작업자가 강제 종료된 경우)
+    """
+
+    class Status(models.TextChoices):
+        PROCESSING = "PROCESSING", "분석 중"
+        SUCCEEDED = "SUCCEEDED", "완료"
+        FAILED = "FAILED", "실패"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)  # 폼·주소에 넣어도 순서 추측 불가
+    report = models.ForeignKey(Report, verbose_name="제보", on_delete=models.CASCADE, related_name="ai_analyses")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="요청한 운영자", on_delete=models.SET_NULL,
+                                     null=True, blank=True, related_name="+")
+    status = models.CharField("상태", max_length=12, choices=Status.choices, default=Status.PROCESSING)
+    created_at = models.DateTimeField("요청 시각", auto_now_add=True)  # 일일 한도는 이 시각으로 센다
+    completed_at = models.DateTimeField("완료 시각", null=True, blank=True)
+
+    input_snapshot = models.JSONField("분석 시점 입력", default=dict)          # 값이 바뀌었는지 비교용 (외부로 보내지 않음)
+    field_definition_snapshot = models.JSONField("분석 시점 항목 정의", default=dict)
+    result = models.JSONField("검증한 결과", null=True, blank=True)
+    error_code = models.CharField("오류 코드", max_length=40, blank=True)
+    error_message = models.CharField("오류 안내", max_length=200, blank=True)  # 정리한 안내만 (제공자 오류 원문 저장 안 함)
+
+    model_id = models.CharField("모델", max_length=100, blank=True)
+    prompt_version = models.CharField("지시문 버전", max_length=50, blank=True)
+    schema_version = models.CharField("출력 형식 버전", max_length=50, blank=True)
+    provider_response_id = models.CharField("OpenAI 응답 번호", max_length=100, blank=True)
+    usage = models.JSONField("토큰 사용량", null=True, blank=True)
+    # [{"by": 운영자 id, "by_name", "at", "changes": [{"key", "before", "after"}]}] — 분석 하나에 한 번만 저장
+    selection_history = models.JSONField("운영자 선택 기록", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "AI 검토 보조 기록"
+        verbose_name_plural = "AI 검토 보조 기록"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["created_at"], name="ai_analysis_created")]
+
+    def __str__(self):
+        return f"{self.report_id}번 제보 · {self.get_status_display()} ({self.created_at:%Y-%m-%d %H:%M})"
