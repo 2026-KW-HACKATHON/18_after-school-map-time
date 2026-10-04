@@ -31,7 +31,7 @@ from .test_views import TempMediaMixin, photo
 
 KEYS = list(ai.ENTRANCE_KEYS)
 PAST = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
-AI_ON = dict(AI_ENABLED=True, AI_PROVIDER="openai", OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model",
+AI_ON = dict(AI_ENABLED=True, AI_PROVIDER="openai", AI_PREFILL_USER_DAILY_LIMIT=3, OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model",
              GEMINI_API_KEY="gemini-test-key", GEMINI_MODEL="gemini-3-flash-preview", GEMINI_THINKING_LEVEL="low",
              AI_DAILY_LIMIT=100,
              AI_NOTICE_SINCE=PAST, AI_NOTICE_VERSION="notice-test-1")
@@ -955,3 +955,160 @@ class ReportListBadgeTests(AIBase):
         page = self.client.get(reverse("ops:reports"))
         self.assertContains(page, "AI 후보 저장", count=1)
         self.assertContains(page, "AI 분석함", count=1)
+
+
+def jpeg_upload(name="door.jpg"):
+    """EXIF(GPS 자리)가 들어 있는 JPEG — 서버가 지우고 보내는지 확인용"""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    im = Image.new("RGB", (64, 48), (120, 90, 60))
+    exif = Image.Exif()
+    exif[0x010F] = "TestPhone"
+    buf = io_module.BytesIO()
+    im.save(buf, "JPEG", exif=exif.tobytes())
+    return SimpleUploadedFile(name, buf.getvalue(), content_type="image/jpeg")
+
+
+import io as io_module  # noqa: E402
+
+
+class PrefillTests(AIBase):
+    """주민 제보 화면 'AI로 항목 채우기'"""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.neighbor)
+        self.url = reverse("reports:ai-prefill")
+        self.new_url = reverse("reports:new")
+        patcher = mock.patch("reports.ai.get_client", side_effect=lambda: self.fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.fake = good()
+
+    def ask(self, **extra):
+        data = {"facility_kind": "ENTRANCE", "note": "턱 재보니 3cm, 경사로 없음. 사장님 010-1234-5678", "photo": jpeg_upload()}
+        data.update(extra)
+        return self.client.post(self.url, {k: v for k, v in data.items() if v is not None})
+
+    def test_returns_candidates_and_token_without_creating_report(self):
+        before = Report.objects.count()
+        res = self.ask()
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["fields"]["step_height_cm"]["value"], 3)
+        self.assertEqual(data["fields"]["has_ramp"]["certainty"], "분명함")
+        self.assertEqual(data["remaining"], 2)
+        self.assertTrue(data["token"])
+        self.assertEqual(Report.objects.count(), before)
+        row = AIAnalysis.objects.get()
+        self.assertIsNone(row.report_id)
+        self.assertEqual((row.status, row.result, row.input_snapshot), (AIAnalysis.Status.SUCCEEDED, None,
+                                                                         {"prefill": True, "kind": "ENTRANCE"}))
+        sent = self.fake.calls[0]
+        self.assertIn("[전화번호]", sent["text"])
+        self.assertNotIn("010-1234-5678", json.dumps(sent, ensure_ascii=False))
+        from PIL import Image
+        import base64
+        image = Image.open(io_module.BytesIO(base64.b64decode(sent["image"])))
+        self.assertEqual(image.format, "JPEG")
+        self.assertFalse(image.getexif())  # 보내기 전에 EXIF 지움
+
+    def test_login_csrf_and_settings_guard(self):
+        self.client.logout()
+        self.assertEqual(self.ask().status_code, 302)
+        self.client.force_login(self.neighbor)
+        with override_settings(AI_ENABLED=False):
+            res = self.ask()
+            self.assertEqual((res.status_code, res.json()["ok"]), (503, False))
+        with override_settings(AI_NOTICE_SINCE=timezone.now() + timedelta(hours=1)):
+            self.assertEqual(self.ask().status_code, 503)
+        res = self.ask(photo=None, note="  ")
+        self.assertEqual((res.status_code, res.json()["code"]), (400, "EMPTY_INPUT"))
+        self.assertEqual(self.fake.calls, [])
+
+    def test_per_user_and_global_limits(self):
+        with override_settings(AI_PREFILL_USER_DAILY_LIMIT=2):
+            self.assertEqual(self.ask().status_code, 200)
+            self.assertEqual(self.ask().json()["remaining"], 0)
+            res = self.ask()
+            self.assertEqual((res.status_code, res.json()["code"]), (429, "PREFILL_LIMIT_REACHED"))
+            self.client.force_login(self.resident)  # 다른 주민은 따로
+            self.assertEqual(self.ask().status_code, 200)
+        self.assertEqual(ai.attempts_today(), 3)  # 전체 한도도 같이 씀
+        with override_settings(AI_DAILY_LIMIT=3):
+            self.client.force_login(self.staff)
+            self.assertEqual(self.ask().json()["code"], "DAILY_LIMIT_REACHED")
+
+    def test_bad_photo_and_provider_failure_messages_are_for_residents(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        res = self.ask(photo=SimpleUploadedFile("x.jpg", b"not an image", content_type="image/jpeg"))
+        self.assertEqual(res.json()["code"], "IMAGE_UNREADABLE")
+        self.fake = FakeClient(error=ai.AIError("AI_TIMEOUT"))
+        res = self.ask()
+        self.assertEqual(res.status_code, 504)
+        self.assertIn("직접 입력해 주세요", res.json()["message"])
+        self.assertEqual(AIAnalysis.objects.filter(status=AIAnalysis.Status.FAILED).count(), 1)
+
+    def submit(self, token, **values):
+        data = {"place": self.place.pk, "photo": photo(), "notice_token": ai.notice_token(),
+                "ai_prefill_token": token, **values}
+        return self.client.post(self.new_url, data)
+
+    def test_submitting_ai_values_links_result_and_makes_staff_only(self):
+        token = self.ask().json()["token"]
+        res = self.submit(token, step_height_cm="3", has_ramp="false", door_width_cm="85")
+        self.assertRedirects(res, reverse("reports:done"))
+        report = Report.objects.latest("pk")
+        analysis = AIAnalysis.objects.get(report=report)
+        self.assertEqual(analysis.result["fields"]["step_height_cm"]["value"], 3)
+        history = analysis.selection_history[0]
+        self.assertEqual(history["source"], "resident_prefill")
+        self.assertEqual({c["key"] for c in history["changes"]}, {"step_height_cm", "has_ramp"})  # 85는 주민 값
+        self.assertTrue(ai.staff_review_only(report))
+        self.assertIsNone(required_confirmations(report))
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:report-review", args=[report.pk]))
+        self.assertContains(page, "'AI로 항목 채우기' 값을 그대로 제출")
+
+    def test_all_values_changed_links_without_staff_only(self):
+        token = self.ask().json()["token"]
+        self.submit(token, step_height_cm="12", has_ramp="true")
+        report = Report.objects.latest("pk")
+        analysis = AIAnalysis.objects.get(report=report)
+        self.assertEqual(analysis.selection_history, [])
+        self.assertFalse(ai.staff_review_only(report))
+        # 운영자는 다시 부르지 않고 그 후보를 고를 수 있음
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:report-review", args=[report.pk]))
+        self.assertContains(page, 'name="selected_keys"')
+        self.assertEqual(len(self.fake.calls), 1)
+
+    def test_bad_tokens_are_ignored_but_report_is_saved(self):
+        token = self.ask().json()["token"]
+        self.client.force_login(self.staff)  # 다른 사람의 표
+        before = Report.objects.count()
+        self.submit(token, step_height_cm="3")
+        self.assertEqual(Report.objects.count(), before + 1)  # 제보는 저장되고 표만 무시
+        self.assertFalse(AIAnalysis.objects.filter(report__isnull=False).exists())
+        other = User.objects.create_user(username="other2", date_joined=timezone.now() - timedelta(days=30))
+        self.client.force_login(other)
+        self.submit("tampered", step_height_cm="3")
+        self.assertEqual(Report.objects.count(), before + 2)
+        self.assertFalse(AIAnalysis.objects.filter(report__isnull=False).exists())
+        self.client.force_login(self.neighbor)
+        res = self.client.post(self.new_url, {"place": self.place.pk, "photo": photo(), "notice_token": ai.notice_token(),
+                                              "ai_prefill_token": token, "facility_kind": "RAMP",
+                                              "target_reference": "new", "facility_available": "true"})
+        self.assertRedirects(res, reverse("reports:done"))
+        self.assertFalse(AIAnalysis.objects.filter(report__isnull=False).exists())  # 시설 종류가 다르면 연결 안 함
+
+    def test_button_shown_only_when_available(self):
+        page = self.client.get(self.new_url, {"place": self.place.pk})
+        self.assertContains(page, 'id="ai-prefill-button"')
+        self.assertContains(page, "ai-prefill.js")
+        with override_settings(AI_PREFILL_USER_DAILY_LIMIT=0):
+            self.assertNotContains(self.client.get(self.new_url, {"place": self.place.pk}), 'id="ai-prefill-button"')
+        with override_settings(AI_ENABLED=False):
+            self.assertNotContains(self.client.get(self.new_url, {"place": self.place.pk}), 'id="ai-prefill-button"')
