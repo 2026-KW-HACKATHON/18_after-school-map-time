@@ -60,7 +60,14 @@
       <legend><span data-facility-label>{{ kind_label }}</span> 사진</legend>
       {% include "reports/_field.html" with field=form.photo %}
       {{ form.photo_token }}
-      <p class="muted small">사진으로 값을 자동으로 채워 주는 AI 분석은 준비 중이에요.</p>
+      {% if ai_prefill %}{# 주민이 누를 때만 사진·설명을 보냄 (reports.views.ai_prefill). 결과 표는 제출할 때 제보에 연결 #}
+        <div class="ai-prefill" id="ai-prefill" data-url="{% url 'reports:ai-prefill' %}">
+          <button type="button" class="btn" id="ai-prefill-button">AI로 항목 채우기</button>
+          <p class="muted small">누르면 고른 사진과 아래 '추가 설명'이 {{ ai_recipient }}의 AI로 전송돼 빈 칸을 채워요(사진 위치 정보는 지우고 얼굴은 가린 뒤 전송). 설명을 먼저 적으면 더 정확해요. AI 값은 틀릴 수 있으니 꼭 확인해 주세요. AI 값을 그대로 내면 운영진이 확인한 뒤 반영돼요. 하루 {{ ai_prefill_limit }}번까지.</p>
+          <p class="small" id="ai-prefill-status" role="status" aria-live="polite"></p>
+          <input type="hidden" name="ai_prefill_token" id="ai-prefill-token" value="{{ ai_prefill_token }}">
+        </div>
+      {% endif %}
     </fieldset>
 
     <fieldset class="card">
@@ -88,4 +95,5 @@
 {% block extra_js %}
 {% include "includes/location_picker_js.html" %}
 <script src="{% static 'js/reports/facility-switcher.js' %}"></script>
+{% if ai_prefill %}<script src="{% static 'js/reports/ai-prefill.js' %}"></script>{% endif %}
 {% endblock %}

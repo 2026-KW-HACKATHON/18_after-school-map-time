@@ -262,7 +262,9 @@ def _aware_datetime(raw):
     return value if value.tzinfo else None
 
 
-AI_DAILY_LIMIT = _daily_limit(os.getenv("AI_DAILY_LIMIT", "100"))  # 서울 시간 하루 동안 전체 운영자 합산
+AI_DAILY_LIMIT = _daily_limit(os.getenv("AI_DAILY_LIMIT", "100"))  # 서울 시간 하루 동안 전체 합산 (운영자 분석 + 주민 채우기)
+# 주민 제보 화면 'AI로 항목 채우기' 1명당 하루 횟수 (0이면 버튼 숨김)
+AI_PREFILL_USER_DAILY_LIMIT = _daily_limit(os.getenv("AI_PREFILL_USER_DAILY_LIMIT", "3"))
 # 제보 화면에 AI 활용 안내를 붙인 시각. 이보다 먼저 들어온 제보는 외부로 보내지 않는다 (비어 있으면 아무것도 안 보냄)
 AI_NOTICE_SINCE_RAW = os.getenv("AI_NOTICE_SINCE", "").strip()  # 형식이 틀렸을 때 운영자 화면에 알려 주려고 원문도 둠
 AI_NOTICE_SINCE = _aware_datetime(AI_NOTICE_SINCE_RAW)
