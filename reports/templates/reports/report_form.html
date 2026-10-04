@@ -76,7 +76,10 @@
     </fieldset>
 
     <p class="notice small">📋 새 시설과 출입구 외 시설은 운영자가 검토한 뒤 공개됩니다. 기존 입구 제보는 주민 확인 또는 운영자 검토로 반영됩니다.</p>
-    {% if ai_notice %}<p class="muted small" id="ai-notice">{{ ai_notice }}</p>{% endif %}{# AI 검토 보조를 켰을 때만 (reports/ai.py NOTICE_TEXT) #}
+    {% if ai_notice %}{# AI 검토 보조를 켰을 때만 (reports/ai.py NOTICE_TEXT). 표는 안내 버전 기록용 #}
+      <p class="muted small" id="ai-notice">{{ ai_notice }}</p>
+      <input type="hidden" name="notice_token" value="{{ form.notice_token_value }}">
+    {% endif %}
     <button type="submit" class="btn btn-primary btn-block">제보 제출하기</button>
   </form>
 </section>

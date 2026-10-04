@@ -14,6 +14,7 @@ from places.facilities import ENTRANCE, ENTRANCE_KEYS, FIELD_SPECS, KIND_FIELDS,
 from places.models import AccessFacility, FieldDefinition, Place
 from places.validation import numeric_form_options
 
+from . import ai
 from .models import PHOTO_FIX_PREFIX, Report
 
 UNKNOWN = ""  # "모름" — 값을 넣지 않음
@@ -134,9 +135,23 @@ class ReportForm(KeepPhotoMixin, forms.Form):
             for name in ("suggested_name", "suggested_category", "suggested_address", "suggested_floor", "suggested_phone"):
                 del self.fields[name]
         self.setup_kept_photo()  # 칸을 잘못 적어 다시 보여 줄 때 올린 사진 유지
+        # AI 활용 안내를 붙였으면 안내 버전을 서명해 숨겨 두고, 제출할 때 지금 버전과 같은지 본다 (AI 명세 v1.3 7.1)
+        self.notice_required = ai.notice_active()
+        self.notice_version = ""
+
+    @property
+    def notice_token_value(self):
+        """다시 보여 줄 때도 언제나 새 표 (이전 버전 표를 그대로 돌려주지 않게)"""
+        return ai.notice_token() if self.notice_required else ""
 
     def clean(self):
         data = super().clean()
+        if self.notice_required:
+            version = ai.notice_version_from(self.data.get("notice_token"))
+            if version is None:  # 표가 없거나 고쳐졌거나 안내가 바뀌기 전에 연 화면
+                self.add_error(None, "AI 활용 안내가 바뀌었거나 확인되지 않았어요. 아래 안내를 다시 확인하고 제출해 주세요.")
+            else:
+                self.notice_version = version
         if (data.get("lat") is None) != (data.get("lng") is None):
             self.add_error("lat" if data.get("lat") is None else "lng", "위도와 경도를 함께 입력해 주세요.")
         if data.get("observed_on") and data["observed_on"] > timezone.localdate():

@@ -1,6 +1,5 @@
 from datetime import datetime, time
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -17,7 +16,7 @@ from judgments.services import required_confirmations
 from places.facilities import ENTRANCE, KIND_FIELDS
 from places.models import Building, Entrance, Place, Region
 
-from .ai import NOTICE_TEXT
+from . import ai
 from .forms import PhotoFixForm, ReportForm
 from .models import PHOTO_FIX_PREFIX, AccessibilityValue, Report
 from .services import ConfirmationError, confirm_report, reconfirm_place
@@ -91,6 +90,7 @@ def report_new(request):
                 lat=data.get("lat"),
                 lng=data.get("lng"),
                 location_text=data.get("location_text", ""),
+                ai_notice_version=form.notice_version,  # 이 폼에 붙어 있던 AI 안내 버전 (없으면 빈 값)
             )
             observed_on = data.get("observed_on")
             if observed_on and observed_on < timezone.localdate():
@@ -130,7 +130,7 @@ def report_new(request):
         "selected_ownership": form.ownership,
         "show_picker": show_picker, "kind_label": kind_label,
         # AI 검토 보조를 켜면 사진·설명이 OpenAI로 갈 수 있음을 안내 (AI_NOTICE_SINCE를 이 문구를 붙인 시각으로)
-        "ai_notice": NOTICE_TEXT if settings.AI_ENABLED else "",
+        "ai_notice": ai.NOTICE_TEXT if ai.notice_active() else "",
     })
 
 
