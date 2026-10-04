@@ -77,6 +77,8 @@
   {% endblock %}
 
   <script src="{% static 'js/common.js' %}"></script>
+  {# 사진 올리기 전에 브라우저에서 줄이기 (사진 업로드 폼에만 동작) #}
+  <script src="{% static 'js/photo-resize.js' %}" defer></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>
