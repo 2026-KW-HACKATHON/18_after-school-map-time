@@ -112,6 +112,10 @@ def report_list(request):
     if status:
         reports = reports.filter(status=status)
     rows = []
+    # AI 검토 보조 표시: 후보를 제보에 저장함(운영자만 승인) / 분석만 함
+    ai_saved = set(ai.staff_review_report_ids())
+    ai_analysed = set(AIAnalysis.objects.filter(report__isnull=False, status=AIAnalysis.Status.SUCCEEDED)
+                      .values_list("report_id", flat=True))
     for r in reports[:100]:
         pending = r.status == Report.Status.PENDING
         rows.append({
@@ -120,6 +124,7 @@ def report_list(request):
             "downgrade": pending and report_direction(r) == "DOWN",
             "new_account": pending and r.created_by is not None and r.created_by.is_new_account(),
             "owner_kind": _owner_kind(r),
+            "ai": "AI 후보 저장" if r.pk in ai_saved else ("AI 분석함" if r.pk in ai_analysed else ""),
         })
     return render(request, "ops/report_list.html", {
         "rows": rows, "status": status, "tabs": STATUS_TABS, "counts": counts,

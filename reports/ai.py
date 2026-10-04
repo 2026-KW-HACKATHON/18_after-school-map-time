@@ -342,7 +342,7 @@ def staff_review_only(report):
 
 def staff_review_report_ids():
     """AI 후보를 저장한 제보 번호들 (내 활동의 확인 수·배지에서 그 제보에 한 확인을 뺄 때)"""
-    return AIAnalysis.objects.filter(report__isnull=False).exclude(selection_history=[]).values("report_id")
+    return AIAnalysis.objects.filter(report__isnull=False).exclude(selection_history=[]).values_list("report_id", flat=True)
 
 
 def effective_confirmations(report):

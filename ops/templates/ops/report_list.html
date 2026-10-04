@@ -63,6 +63,7 @@
             {% if r.is_new_place %}<span class="badge-neutral">새 장소</span>{% endif %}
             {% if row.owner_kind %}<span class="badge-neutral">{{ row.owner_kind }}</span>{% endif %}
             {% if row.new_account %}<span class="badge-warn">가입 7일 미만</span>{% endif %}
+            {% if row.ai %}<span class="badge-neutral">{{ row.ai }}</span>{% endif %}
             {% if r.status == "REJECTED" and r.reject_reason %}<span class="muted small">반려: {{ r.reject_reason }}</span>{% endif %}
           </span>
         </a>
