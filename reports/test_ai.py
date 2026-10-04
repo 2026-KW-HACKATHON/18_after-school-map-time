@@ -943,3 +943,15 @@ class FacilityAnalysisTests(AIBase):
         self.assertRedirects(res, url + "#ai", fetch_redirect_response=False)
         self.assertEqual(self.values(self.facility_report),
                          {"facility_connected_floors": "1층 → 3층", "facility_door_width_cm": Decimal("90.00")})
+
+
+class ReportListBadgeTests(AIBase):
+    def test_list_shows_ai_state(self):
+        other = self.make_report()
+        ai.analyze(other, self.staff, client=good())
+        analysis, _ = ai.analyze(self.report, self.staff, client=good())
+        ai.save_selection(analysis, self.staff, {"has_ramp": False})
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:reports"))
+        self.assertContains(page, "AI 후보 저장", count=1)
+        self.assertContains(page, "AI 분석함", count=1)
