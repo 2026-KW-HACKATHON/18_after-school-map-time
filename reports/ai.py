@@ -1,5 +1,5 @@
 """
-운영자 AI 검토 보조 (AI 명세 v1.2 A안).
+운영자 AI 검토 보조 (AI 명세 v1.3 A안).
 
 주민 제보의 사진·설명을 OpenAI로 보내 출입구 항목 '후보'를 받고, 운영자가 고른 값만 그 제보에 저장한다.
   분석 요청 → 대상·설정 확인 → 전화번호 가림 → OpenAI(Responses API, 구조화 출력) → 서버 재검증 → AIAnalysis 저장
@@ -25,8 +25,11 @@ from decimal import Decimal, InvalidOperation
 
 import requests
 from django.conf import settings
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 from places.facilities import ENTRANCE_KEYS, active_keys
@@ -37,12 +40,14 @@ from .models import AccessibilityValue, AIAnalysis, Report
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "entrance-extract-v2"
-SCHEMA_VERSION = "entrance-analysis-v2"
+PROMPT_VERSION = "entrance-extract-v3"
+SCHEMA_VERSION = "entrance-analysis-v3"  # 이전(v2) 결과는 바꿔 쓰거나 재사용하지 않고 다시 분석
 OPENAI_URL = "https://api.openai.com/v1/responses"
 OPENAI_TIMEOUT = 20          # 초. gunicorn(60초)·nginx(60초) 제한보다 짧게
 MAX_OUTPUT_TOKENS = 2500
-PROCESSING_STALE = timedelta(seconds=60)  # 이보다 오래 '분석 중'이면 작업자가 죽은 것 → 실패로 계산
+ACCEPT_DEADLINE = timedelta(seconds=25)   # 요청한 지 이보다 늦게 온 응답은 후보로 쓰지 않음 (시간 초과)
+PROCESSING_STALE = timedelta(seconds=60)  # 이만큼 '분석 중'이면 작업자가 죽은 것 → 실패(시간 초과)로 계산
+NOTICE_SALT = "teokeopne.ai-notice"
 ADVISORY_LOCK_ID = 7_310_001  # PostgreSQL에서 일일 한도 검사를 한 번에 하나씩 하기 위한 잠금 번호
 AUTOMATIC_DOOR = "자동문"     # 자동문 여부는 entrance_automatic_door에 기록. 새 AI 후보의 문 형태로는 쓰지 않음
 TEXT_LIMIT = 200
@@ -88,6 +93,8 @@ MESSAGES = {
     "STALE_ANALYSIS": "분석한 뒤에 제보 내용이나 항목 설정이 바뀌었어요. 다시 분석해 주세요.",
     "SELECTION_ALREADY_SAVED": "이 분석의 후보는 이미 저장했어요.",
     "INVALID_REQUEST": "저장할 값을 확인해 주세요.",
+    "UNSUPPORTED_SCHEMA_VERSION": "이전 버전으로 분석한 결과라 다시 분석해야 해요.",
+    "REPORT_NOT_FOUND": "제보를 찾을 수 없어요. 그사이 삭제됐을 수 있어요.",
 }
 
 
@@ -112,6 +119,26 @@ def mask_phone(text):
     return PHONE_PATTERN.sub("[전화번호]", unicodedata.normalize("NFKC", text or ""))
 
 
+# ── 제보 화면 안내 버전 (명세 7.1) ──
+def notice_active():
+    """제보 화면에 AI 안내를 붙이고 버전을 기록하는가"""
+    return settings.AI_ENABLED and bool(settings.AI_NOTICE_VERSION)
+
+
+def notice_token():
+    """제보 폼에 숨겨 두는 서명된 안내 버전. 고친 값·이전 버전 폼은 제출할 때 거부한다"""
+    return signing.dumps(settings.AI_NOTICE_VERSION, salt=NOTICE_SALT)
+
+
+def notice_version_from(token):
+    """폼에서 받은 표 → 지금 안내 버전과 같으면 그 버전, 아니면 None"""
+    try:
+        version = signing.loads(token or "", salt=NOTICE_SALT)
+    except signing.BadSignature:
+        return None
+    return version if version and version == settings.AI_NOTICE_VERSION else None
+
+
 # ── 대상·설정 ──
 def config_error():
     """AI를 쓸 수 없는 설정이면 오류 코드"""
@@ -132,8 +159,9 @@ def unsupported_reason(report):
         return "UNSUPPORTED_REPORT_TYPE"
     if report.target_scope != FieldDefinition.Scope.ENTRANCE:
         return "UNSUPPORTED_SCOPE"
-    since = settings.AI_NOTICE_SINCE
-    if since is None or report.created_at < since:
+    since, version = settings.AI_NOTICE_SINCE, settings.AI_NOTICE_VERSION
+    if (since is None or not version or report.created_at < since
+            or report.ai_notice_version != version):  # 안내 적용 시각·버전이 모두 맞아야 (재사용 전에도 검사)
         return "NOTICE_NOT_APPLIED"
     if not report.photo and not report.note.strip():
         return "EMPTY_INPUT"
@@ -172,18 +200,31 @@ def input_snapshot(report):
         "place": report.place_id, "building": report.building_id, "entrance": report.entrance_id,
         "facility": report.facility_id, "facility_kind": report.facility_kind,
         "note": report.note, "photo": report.photo.name or "",
-        "observed_at": report.observed_at.isoformat(),
+        "observed_at": report.observed_at.isoformat(), "ai_notice_version": report.ai_notice_version,
         "values": dict(sorted(values.items())),
     }
 
 
 def is_stuck(analysis):
     return (analysis.status == AIAnalysis.Status.PROCESSING
-            and timezone.now() - analysis.created_at > PROCESSING_STALE)
+            and timezone.now() >= analysis.created_at + PROCESSING_STALE)
 
 
 def effective_status(analysis):
+    """화면·재사용·선택 저장이 같이 쓰는 상태: 60초 넘게 '분석 중'이면 실패"""
     return AIAnalysis.Status.FAILED if is_stuck(analysis) else analysis.status
+
+
+def effective_error(analysis):
+    """(오류 코드, 안내). 60초 넘게 '분석 중'인 기록은 시간 초과로 본다"""
+    if is_stuck(analysis):
+        return "AI_TIMEOUT", MESSAGES["AI_TIMEOUT"]
+    return analysis.error_code, analysis.error_message
+
+
+def analysis_active_keys(analysis):
+    """분석할 때 켜져 있던 항목 (결과에 들어 있는 항목)"""
+    return list(analysis.field_definition_snapshot or {})
 
 
 def input_changed(analysis):
@@ -197,6 +238,18 @@ def staff_review_only(report):
     if report.pk is None:
         return False
     return any(a.selection_history for a in report.ai_analyses.only("selection_history"))
+
+
+def staff_review_report_ids():
+    """AI 후보를 저장한 제보 번호들 (내 활동의 확인 수·배지에서 그 제보에 한 확인을 뺄 때)"""
+    return AIAnalysis.objects.filter(report__isnull=False).exclude(selection_history=[]).values("report_id")
+
+
+def effective_confirmations(report):
+    """반영 조건에 세는 주민 확인. AI 후보를 저장한 제보는 0건 (기록은 DB에 그대로 둠)"""
+    if staff_review_only(report):
+        return []
+    return list(report.confirmations.select_related("user"))
 
 
 def attempts_today():
@@ -348,8 +401,26 @@ def parse_response(body):
         raise AIError("AI_REFUSAL")
     if body.get("status") != "completed" or not texts:
         raise AIError("AI_INVALID_OUTPUT")
+    return strict_json("".join(texts)), *meta
+
+
+def _no_duplicate_keys(pairs):
+    out = {}
+    for key, value in pairs:
+        if key in out:  # 기본 json.loads는 뒤 값으로 조용히 덮어씀 → 어느 값이 맞는지 알 수 없으니 거부
+            raise ValueError(f"중복 키: {key}")
+        out[key] = value
+    return out
+
+
+def _reject_constant(name):
+    raise ValueError(f"허용하지 않는 수: {name}")  # NaN, Infinity
+
+
+def strict_json(text):
+    """AI 출력 파싱: 어느 깊이든 같은 키가 두 번 나오거나 NaN·Infinity가 있으면 형식 오류"""
     try:
-        return json.loads("".join(texts)), *meta
+        return json.loads(text, object_pairs_hook=_no_duplicate_keys, parse_constant=_reject_constant)
     except ValueError as e:
         raise AIError("AI_INVALID_OUTPUT") from e
 
@@ -431,11 +502,34 @@ def _lock_daily_counter():
 
 
 def _fail(analysis, code):
-    analysis.status = AIAnalysis.Status.FAILED
-    analysis.error_code = code
-    analysis.error_message = MESSAGES.get(code, MESSAGES["INTERNAL_ERROR"])[:200]
-    analysis.completed_at = timezone.now()
-    analysis.save()
+    """아직 '분석 중'이고 제보가 남아 있을 때만 실패로 닫는다 (삭제로 비운 내용이 되살아나지 않게 필요한 칸만 갱신)"""
+    AIAnalysis.objects.filter(pk=analysis.pk, status=AIAnalysis.Status.PROCESSING, report__isnull=False).update(
+        status=AIAnalysis.Status.FAILED, error_code=code,
+        error_message=MESSAGES.get(code, MESSAGES["INTERNAL_ERROR"])[:200], completed_at=timezone.now(),
+        provider_response_id=analysis.provider_response_id, usage=analysis.usage,
+    )
+
+
+def _finish(analysis, report, snapshot, result):
+    """늦은 응답·삭제·변경을 다시 확인하고 조건이 맞을 때만 한 번 성공으로 저장 → 실패 코드 또는 None"""
+    with transaction.atomic():
+        locked = Report.objects.select_for_update().filter(pk=report.pk).first()
+        row = AIAnalysis.objects.select_for_update().filter(pk=analysis.pk).first()
+        if locked is None or row is None or row.report_id is None:
+            return "REPORT_NOT_FOUND"
+        if row.status != AIAnalysis.Status.PROCESSING:
+            return "STALE_ANALYSIS"
+        if timezone.now() > row.created_at + ACCEPT_DEADLINE:
+            return "AI_TIMEOUT"
+        if locked.status != Report.Status.PENDING or input_snapshot(locked) != snapshot:
+            return "STALE_ANALYSIS"
+        row.status = AIAnalysis.Status.SUCCEEDED
+        row.result = result
+        row.completed_at = timezone.now()
+        row.provider_response_id, row.usage = analysis.provider_response_id, analysis.usage
+        row.save(update_fields=["status", "result", "completed_at", "provider_response_id", "usage"])
+    analysis.refresh_from_db()
+    return None
 
 
 def analyze(report, user, client=None):
@@ -452,7 +546,8 @@ def analyze(report, user, client=None):
     snapshot, def_snapshot = input_snapshot(report), definition_snapshot(defs)
     for old in report.ai_analyses.filter(status=AIAnalysis.Status.SUCCEEDED, model_id=settings.OPENAI_MODEL,
                                          prompt_version=PROMPT_VERSION, schema_version=SCHEMA_VERSION):
-        if not old.selection_history and old.input_snapshot == snapshot and old.field_definition_snapshot == def_snapshot:
+        if (effective_status(old) == AIAnalysis.Status.SUCCEEDED and not old.selection_history
+                and old.input_snapshot == snapshot and old.field_definition_snapshot == def_snapshot):
             return old, True
     payload = build_payload(report, defs)  # 사진을 못 읽으면 여기서 멈춤 (호출 횟수에 안 셈)
 
@@ -481,17 +576,11 @@ def analyze(report, user, client=None):
         _fail(analysis, "INTERNAL_ERROR")
         raise AIError("INTERNAL_ERROR") from e
 
-    with transaction.atomic():
-        locked = Report.objects.select_for_update().get(pk=report.pk)
-        stale = locked.status != Report.Status.PENDING or input_snapshot(locked) != snapshot
-        if not stale:
-            analysis.status = AIAnalysis.Status.SUCCEEDED
-            analysis.result = result
-            analysis.completed_at = timezone.now()
-            analysis.save()
-    if stale:  # 분석하는 동안 승인·반려되거나 값이 바뀜 → 오래된 후보는 쓰지 않음
-        _fail(analysis, "STALE_ANALYSIS")
-        raise AIError("STALE_ANALYSIS")
+    # 25초 넘게 걸렸거나, 그사이 제보가 바뀌거나 처리·삭제됐으면 후보를 쓰지 않음
+    code = _finish(analysis, report, snapshot, result)
+    if code:
+        _fail(analysis, code)
+        raise AIError(code)
     return analysis, False
 
 
@@ -503,9 +592,13 @@ def save_selection(analysis, user, selections):
     """
     if not selections:
         raise AIError("INVALID_REQUEST", "저장할 항목을 하나 이상 골라 주세요.")
+    if analysis.schema_version != SCHEMA_VERSION:
+        raise AIError("UNSUPPORTED_SCHEMA_VERSION")
     with transaction.atomic():
-        report = Report.objects.select_for_update().get(pk=analysis.report_id)
-        analysis = AIAnalysis.objects.select_for_update().get(pk=analysis.pk)
+        report = Report.objects.select_for_update().filter(pk=analysis.report_id).first()
+        analysis = AIAnalysis.objects.select_for_update().filter(pk=analysis.pk, report__isnull=False).first()
+        if report is None or analysis is None:
+            raise AIError("REPORT_NOT_FOUND")
         if report.status != Report.Status.PENDING:
             raise AIError("REPORT_NOT_PENDING")
         if effective_status(analysis) != AIAnalysis.Status.SUCCEEDED:
@@ -516,7 +609,8 @@ def save_selection(analysis, user, selections):
         if (input_snapshot(report) != analysis.input_snapshot
                 or definition_snapshot(defs) != analysis.field_definition_snapshot):
             raise AIError("STALE_ANALYSIS")
-        allowed = {f.key: f for f in defs}
+        # 분석할 때와 지금 모두 켜져 있는 항목만 (꺼진 항목은 '분석 제외')
+        allowed = {f.key: f for f in defs if f.key in analysis.field_definition_snapshot}
         if set(selections) - set(allowed) or any(v is None for v in selections.values()):
             raise AIError("INVALID_REQUEST")
         if selections.get("door_type") == AUTOMATIC_DOOR:
@@ -547,3 +641,17 @@ def save_selection(analysis, user, selections):
         }]
         analysis.save(update_fields=["selection_history"])
     return changes
+
+
+# ── 제보 삭제 (명세 v1.3 6장) ──
+@receiver(pre_delete, sender=Report)
+def clear_on_report_delete(sender, instance, **kwargs):
+    """
+    제보를 지우면 AI 기록의 내용(입력·결과·선택·요청자·사용량)을 비우고, 진행 중이던 것은 실패로 닫는다.
+    행(번호·요청 시각·상태)은 남겨 오늘 호출 횟수에 계속 센다 → 제보를 지워 한도를 되돌릴 수 없음.
+    연결(report)은 지운 뒤 SET_NULL로 끊긴다. 관리자·운영자·장소 삭제로 함께 지워지는 경우 모두 여기를 거친다.
+    """
+    rows = AIAnalysis.objects.filter(report_id=instance.pk)
+    rows.filter(status=AIAnalysis.Status.PROCESSING).update(status=AIAnalysis.Status.FAILED, completed_at=timezone.now())
+    rows.update(input_snapshot={}, field_definition_snapshot={}, result=None, selection_history=[],
+                requested_by=None, provider_response_id="", usage=None, error_message="")
