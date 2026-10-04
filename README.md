@@ -149,7 +149,11 @@ docker compose exec web python manage.py createsuperuser
 | `KAKAO_JAVASCRIPT_KEY` | 카카오맵 JS 키 (브라우저 노출 → 카카오 개발자센터에 허용 도메인 등록 필수) | (발급값) |
 | `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**, 카카오 로그인 client_id로도 사용) | (발급값) |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (보안 설정에서 '사용함'일 때만) | |
-| `AI_VISION_API_KEY` | AI 사진 판별 API 키 (서비스 미정) | |
+| `OPENAI_API_KEY` | 운영자 AI 검토 보조용 OpenAI 키 (**서버 전용**) | |
+| `AI_ENABLED` | AI 검토 보조 켜기. 모델·예산·개인정보 고지 확정 전에는 `False` | `False` |
+| `OPENAI_MODEL` | 이미지 입력 + Structured Outputs 지원 모델 ID (팀 결정) | |
+| `AI_DAILY_LIMIT` | 서울 시간 하루 외부 분석 시도 한도 (전체 운영자 합산, 0이면 호출 안 함) | `100` |
+| `AI_NOTICE_SINCE` | 제보 화면 AI 안내를 붙인 시각 (시간대 포함 ISO 8601). 이전 제보는 보내지 않음 | |
 | `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
 | `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
 | `IMAGE_TAG` | 배포 이미지 태그. 롤백할 때만 이전 커밋 SHA로 변경 | `latest` |

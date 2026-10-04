@@ -151,7 +151,7 @@
 | 배포 보안 | `DEBUG=False`일 때만: HTTPS 판단 헤더, 쿠키 Secure. HSTS는 의도적으로 보류(주석에 이유) |
 | 로깅 | 콘솔 출력 → `docker compose logs web`으로 확인 |
 | DRF | 세션 인증 (같은 도메인의 템플릿 페이지에서 fetch로 호출) |
-| 외부 API 키 | `KAKAO_JAVASCRIPT_KEY`(브라우저용), `KAKAO_REST_API_KEY`(서버 전용), `AI_VISION_API_KEY` |
+| 외부 API 키 | `KAKAO_JAVASCRIPT_KEY`(브라우저용), `KAKAO_REST_API_KEY`(서버 전용), `OPENAI_API_KEY`·`AI_ENABLED`·`OPENAI_MODEL`·`AI_DAILY_LIMIT`·`AI_NOTICE_SINCE` (운영자 AI 검토 보조) |
 
 ### `config/urls.py`
 
