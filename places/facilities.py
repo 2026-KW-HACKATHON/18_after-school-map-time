@@ -1,6 +1,7 @@
 """시설별 관측 항목. 실제 값은 기존 FieldDefinition / AccessibilityValue에 저장한다."""
 
 from .validation import NUMERIC_LIMITS
+
 ENTRANCE = "ENTRANCE"
 ENTRANCE_KEYS = (
     "step_height_cm", "step_count", "has_ramp", "door_width_cm", "door_type",
@@ -39,3 +40,11 @@ KIND_FIELDS = {
     "TOILET": ("facility_available", "facility_wheelchair", "facility_door_width_cm", "facility_handrail"),
     "OTHER": ("facility_available",),
 }
+
+
+def active_keys(keys):
+    """DB에 있고 켜져 있는 항목만 순서대로 (관리자가 끄거나 지운 항목은 입력 화면에서 뺀다)"""
+    from .models import FieldDefinition
+
+    active = set(FieldDefinition.objects.filter(key__in=keys, is_active=True).values_list("key", flat=True))
+    return [key for key in keys if key in active]

@@ -18,7 +18,7 @@ from judgments.models import Judgment
 from judgments.services import report_effect, required_confirmations
 from ops.services import approve_report
 from places.facilities import KIND_FIELDS
-from places.models import AccessFacility, Building, Entrance
+from places.models import AccessFacility, Building, Entrance, FieldDefinition
 from places.tests import make_place, make_region
 
 from .forms import ReportForm
@@ -433,3 +433,34 @@ class FacilityReportTests(TempMediaMixin, TestCase):
                           place=self.place, user=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.entrance_values(), {"step_height_cm": Decimal("0")})
+
+    def test_inactive_or_deleted_definitions_are_not_offered_or_saved(self):
+        """관리자가 끄거나 지운 항목은 입력칸도 없고 저장도 안 된다 (QA-02)"""
+        FieldDefinition.objects.filter(key="facility_available").update(is_active=False)
+        FieldDefinition.objects.filter(key="facility_braille").delete()  # 저장된 값이 없는 항목은 지울 수 있다
+        form = ReportForm(place=self.place, user=self.user, kind="ELEVATOR")
+        self.assertNotIn("facility_available", form.fields)
+        self.assertNotIn("facility_braille", form.fields)
+        self.assertIn("facility_wheelchair", [f.name for f in form.observation_fields])
+
+        report = self.proposal("ELEVATOR")  # 꺼진 항목 값을 보내도 500 없이 나머지만 저장
+        saved = set(report.values.values_list("field_id", flat=True))
+        self.assertEqual(saved, set(SAMPLES["ELEVATOR"]) - {"facility_available", "facility_braille"})
+
+    def test_inactive_entrance_definition_is_removed_from_entrance_form(self):
+        FieldDefinition.objects.filter(key="step_count").update(is_active=False)
+        form = ReportForm(place=self.place, user=self.user)
+        self.assertNotIn("step_count", form.fields)
+        report = self.proposal("ENTRANCE")
+        self.assertNotIn("step_count", set(report.values.values_list("field_id", flat=True)))
+
+    def test_ops_place_form_locks_inactive_definitions(self):
+        from ops.forms import PlaceForm
+
+        FieldDefinition.objects.filter(key="has_ramp").update(is_active=False)
+        form = PlaceForm()
+        self.assertTrue(form.fields["has_ramp"].disabled)
+        self.assertIn("사용 중지", form.fields["has_ramp"].label)
+        self.assertFalse(form.fields["step_height_cm"].disabled)
+        form.cleaned_data = {"has_ramp": "true", "step_height_cm": Decimal("2")}
+        self.assertEqual(form.values_for(["has_ramp", "step_height_cm"]), {"step_height_cm": Decimal("2")})
