@@ -31,7 +31,8 @@ from .test_views import TempMediaMixin, photo
 
 KEYS = list(ai.ENTRANCE_KEYS)
 PAST = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
-AI_ON = dict(AI_ENABLED=True, OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model", AI_DAILY_LIMIT=100,
+AI_ON = dict(AI_ENABLED=True, AI_PROVIDER="openai", OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model",
+             GEMINI_API_KEY="gemini-test-key", GEMINI_MODEL="gemini-2.5-flash-lite", AI_DAILY_LIMIT=100,
              AI_NOTICE_SINCE=PAST, AI_NOTICE_VERSION="notice-test-1")
 
 
@@ -60,13 +61,14 @@ class FakeClient:
     def __init__(self, response=None, error=None, on_call=None):
         self.response, self.error, self.on_call, self.calls = response, error, on_call, []
 
-    def create(self, payload):
-        self.calls.append(payload)
+    def create(self, request):
+        """공통 요청을 받아 OpenAI 응답 모양을 해석해 돌려줌 (실제 클라이언트와 같은 반환 모양)"""
+        self.calls.append(request)
         if self.on_call:
             self.on_call()
         if self.error:
             raise self.error
-        return self.response
+        return ai.parse_response(self.response)
 
 
 def good():
@@ -146,8 +148,8 @@ class AnalyzeTests(AIBase):
     def test_payload_sends_masked_note_photo_and_strict_schema_only(self):
         client = good()
         ai.analyze(self.report, self.staff, client=client)
-        payload = client.calls[0]
-        sent = json.dumps(payload, ensure_ascii=False)
+        payload = ai.OpenAIClient().payload(client.calls[0])
+        sent = json.dumps(client.calls[0], ensure_ascii=False)
         self.assertNotIn("010-1234-5678", sent)
         self.assertIn("[전화번호]", sent)
         self.assertNotIn(self.resident.username, sent)  # 계정은 보내지 않음
@@ -173,7 +175,7 @@ class AnalyzeTests(AIBase):
         keys = [k for k in KEYS if k != "entrance_available"]
         client = FakeClient(body(output(keys=keys, step_height_cm=clear(3))))
         analysis, _ = ai.analyze(self.report, self.staff, client=client)
-        self.assertNotIn("entrance_available", client.calls[0]["text"]["format"]["schema"]["properties"]["fields"]["properties"])
+        self.assertNotIn("entrance_available", client.calls[0]["schema"]["properties"]["fields"]["properties"])
         self.assertEqual(set(analysis.result["fields"]), set(keys))
 
     def test_reports_that_are_not_for_ai_are_never_sent(self):
@@ -287,12 +289,16 @@ class AnalyzeTests(AIBase):
         self.assertEqual(AIAnalysis.objects.get().status, AIAnalysis.Status.FAILED)
 
 
+REQUEST = {"instructions": "지시문", "text": "주민 설명: 턱 3cm", "image": "QUJD", "schema": {"type": "object"},
+           "max_output_tokens": 2500}
+
+
 class OpenAIClientTests(TestCase):
     """실제 호출부: 네트워크 대신 requests.post를 바꿔 오류 분류만 확인"""
 
     def call(self, **post):
         with mock.patch("reports.ai.requests.post", **post), self.assertRaises(ai.AIError) as e:
-            ai.OpenAIClient().create({})
+            ai.OpenAIClient().create(REQUEST)
         return e.exception.code
 
     def response(self, status, payload):
@@ -312,8 +318,9 @@ class OpenAIClientTests(TestCase):
 
     @override_settings(OPENAI_API_KEY="sk-test")
     def test_request_uses_timeout_and_server_key(self):
-        with mock.patch("reports.ai.requests.post", return_value=self.response(200, {"ok": True})) as post:
-            self.assertEqual(ai.OpenAIClient().create({"a": 1}), {"ok": True})
+        with mock.patch("reports.ai.requests.post", return_value=self.response(200, body(output()))) as post:
+            data, response_id, usage = ai.OpenAIClient().create(REQUEST)
+        self.assertEqual((data["report_type"], response_id, usage["total_tokens"]), ("ACCESSIBILITY_OBSERVATION", "resp_test", 120))
         kwargs = post.call_args.kwargs
         self.assertEqual(kwargs["timeout"], ai.OPENAI_TIMEOUT)
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer sk-test")
@@ -434,7 +441,7 @@ class OpsReviewScreenTests(AIBase):
         super().setUp()
         self.url = reverse("ops:report-review", args=[self.report.pk])
         self.client.force_login(self.staff)
-        patcher = mock.patch("reports.ai.OpenAIClient", side_effect=lambda: self.fake)
+        patcher = mock.patch("reports.ai.get_client", side_effect=lambda: self.fake)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.fake = good()
@@ -676,3 +683,117 @@ class NoticeTokenTests(AIBase):
     def test_no_token_needed_when_ai_off(self):
         self.assertRedirects(self.post(None), reverse("reports:done"))
         self.assertEqual(Report.objects.latest("pk").ai_notice_version, "")
+
+
+def gemini_body(data, finish="STOP", text=None, **extra):
+    return {"responseId": "gem_test", "candidates": [{"finishReason": finish, "content": {"role": "model", "parts": [
+        {"text": text if text is not None else json.dumps(data, ensure_ascii=False)}]}}],
+            "usageMetadata": {"promptTokenCount": 900, "candidatesTokenCount": 150, "totalTokenCount": 1050}, **extra}
+
+
+class GeminiTests(AIBase):
+    """Google Gemini 호출부 (AI_PROVIDER=gemini, 결제 연결한 유료 등급 키)"""
+
+    def response(self, status, payload):
+        res = mock.Mock(status_code=status)
+        res.json.return_value = payload
+        return res
+
+    def test_schema_is_converted_to_gemini_form_without_changing_meaning(self):
+        schema = ai.gemini_schema(ai.output_schema(ai.active_definitions()))
+        text = json.dumps(schema, ensure_ascii=False)
+        self.assertNotIn('"null"]', text)  # ["number", "null"] 같은 배열 type 없음
+        fields = schema["properties"]["fields"]
+        self.assertEqual(fields["required"], KEYS)
+        door = fields["properties"]["door_type"]["properties"]["value"]
+        self.assertEqual(door["anyOf"][1], {"type": "null"})
+        self.assertNotIn(None, door["anyOf"][0]["enum"])
+        self.assertNotIn("자동문", door["anyOf"][0]["enum"])
+        self.assertNotIn("enum", fields["properties"]["has_ramp"]["properties"]["needs_manual_check"])
+        self.assertEqual(fields["properties"]["step_count"]["properties"]["value"]["anyOf"][0], {"type": "integer"})
+
+    @override_settings(AI_PROVIDER="gemini")
+    def test_analyze_with_gemini_end_to_end(self):
+        data = output(step_height_cm=clear(3), has_ramp=clear(False))
+        with mock.patch("reports.ai.requests.post", return_value=self.response(200, gemini_body(data))) as post:
+            analysis, _ = ai.analyze(self.report, self.staff)
+        url, kwargs = post.call_args.args[0], post.call_args.kwargs
+        self.assertIn("models/gemini-2.5-flash-lite:generateContent", url)
+        self.assertEqual(kwargs["headers"], {"x-goog-api-key": "gemini-test-key"})  # 키는 주소가 아니라 헤더로
+        self.assertEqual(kwargs["timeout"], ai.OPENAI_TIMEOUT)
+        sent = kwargs["json"]
+        parts = sent["contents"][0]["parts"]
+        self.assertIn("[전화번호]", parts[0]["text"])
+        self.assertNotIn("010-1234-5678", json.dumps(sent, ensure_ascii=False))
+        self.assertEqual(parts[1]["inline_data"]["mime_type"], "image/jpeg")
+        self.assertEqual(sent["generationConfig"]["responseMimeType"], "application/json")
+        self.assertIn("system_instruction", sent)
+        self.assertEqual(analysis.status, AIAnalysis.Status.SUCCEEDED)
+        self.assertEqual(analysis.model_id, "gemini:gemini-2.5-flash-lite")
+        self.assertEqual(analysis.usage, {"input_tokens": 900, "output_tokens": 150, "total_tokens": 1050})
+        self.assertEqual(analysis.result["fields"]["step_height_cm"]["value"], 3)
+
+    def test_gemini_response_states(self):
+        good_data = output()
+        self.assertEqual(ai.parse_gemini_response(gemini_body(good_data))[1], "gem_test")
+        thought = gemini_body(good_data)
+        thought["candidates"][0]["content"]["parts"].insert(0, {"text": "생각 중", "thought": True})
+        self.assertEqual(ai.parse_gemini_response(thought)[0]["report_type"], "ACCESSIBILITY_OBSERVATION")
+        cases = {
+            "AI_INCOMPLETE": gemini_body(good_data, finish="MAX_TOKENS"),
+            "AI_REFUSAL": gemini_body(good_data, finish="SAFETY"),
+            "AI_REFUSAL ": {"promptFeedback": {"blockReason": "SAFETY"}},
+            "AI_INVALID_OUTPUT": gemini_body(None, text="JSON 아님"),
+            "AI_INVALID_OUTPUT ": {"candidates": []},
+            "AI_INVALID_OUTPUT  ": gemini_body(None, text='{"a": 1, "a": 2}'),
+        }
+        for code, response in cases.items():
+            with self.subTest(code=code), self.assertRaises(ai.AIError) as e:
+                ai.parse_gemini_response(response)
+            self.assertEqual(e.exception.code, code.strip())
+
+    @override_settings(AI_PROVIDER="gemini")
+    def test_gemini_http_errors(self):
+        cases = [
+            (dict(side_effect=requests.Timeout()), "AI_TIMEOUT"),
+            (dict(return_value=self.response(429, {"error": {"status": "RESOURCE_EXHAUSTED",
+                                                             "message": "Your prepayment credits are depleted."}})),
+             "AI_BUDGET_EXCEEDED"),
+            (dict(return_value=self.response(429, {"error": {"status": "RESOURCE_EXHAUSTED",
+                                                             "message": "Quota exceeded for requests per minute."}})),
+             "AI_UNAVAILABLE"),
+            (dict(return_value=self.response(400, {"error": {"status": "INVALID_ARGUMENT", "message": "bad key"}})),
+             "AI_UNAVAILABLE"),
+        ]
+        for post, code in cases:
+            with self.subTest(code=code), mock.patch("reports.ai.requests.post", **post), \
+                    mock.patch("reports.ai.logger"), self.assertRaises(ai.AIError) as e:
+                ai.GeminiClient().create(REQUEST)
+            self.assertEqual(e.exception.code, code)
+
+    def test_provider_settings_and_notice_recipient(self):
+        with override_settings(AI_PROVIDER="gemini"):
+            self.assertIn("Google(미국)", ai.notice_text())
+            self.assertIsNone(ai.config_error())
+            with override_settings(GEMINI_API_KEY=""):
+                self.assertEqual(ai.config_error(), "AI_UNAVAILABLE")
+        with override_settings(AI_PROVIDER="claude"):
+            self.assertEqual(ai.config_error(), "AI_UNAVAILABLE")
+        self.assertIn("OpenAI(미국)", ai.notice_text())
+
+    def test_switching_provider_does_not_reuse_old_result(self):
+        ai.analyze(self.report, self.staff, client=good())
+        with override_settings(AI_PROVIDER="gemini"):
+            client = good()
+            _, reused = ai.analyze(self.report, self.staff, client=client)
+        self.assertFalse(reused)
+        self.assertEqual(len(client.calls), 1)
+
+    @override_settings(AI_PROVIDER="gemini")
+    def test_screens_name_google_as_recipient(self):
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:report-review", args=[self.report.pk]))
+        self.assertContains(page, "<strong>Google(미국)</strong>로 전송돼요")
+        self.client.force_login(self.neighbor)
+        page = self.client.get(reverse("reports:new"), {"place": self.place.pk})
+        self.assertContains(page, "Google(미국)로 전송될 수 있습니다")
