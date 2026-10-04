@@ -1,8 +1,9 @@
 """
 운영자 AI 검토 보조 (AI 명세 v1.3 A안).
 
-주민 제보의 사진·설명을 OpenAI로 보내 출입구 항목 '후보'를 받고, 운영자가 고른 값만 그 제보에 저장한다.
-  분석 요청 → 대상·설정 확인 → 전화번호 가림 → OpenAI(Responses API, 구조화 출력) → 서버 재검증 → AIAnalysis 저장
+주민 제보의 사진·설명을 AI(기본 Google Gemini, 설정으로 OpenAI)로 보내 출입구 항목 '후보'를 받고,
+운영자가 고른 값만 그 제보에 저장한다.
+  분석 요청 → 대상·설정 확인 → 전화번호 가림 → AI(구조화 JSON 출력) → 서버 재검증 → AIAnalysis 저장
   → 운영자가 후보를 고르고 고쳐 저장(제보는 계속 '확인 중') → 기존 운영자 승인으로만 반영
 
 지키는 원칙
@@ -12,7 +13,10 @@
   - 외부로 보내는 것: 정리된 사진 1장, 전화번호를 가린 설명, 항목 목록. 이름·계정·좌표·이동 조건은 보내지 않는다.
   - 테스트는 가짜 클라이언트를 쓴다 (analyze(client=...)). CI는 실제 키·네트워크 없이 돈다.
 
-OpenAI 호출은 이미 쓰는 requests로 한다 (SDK와 그 의존 패키지 8개를 늘리지 않고, 재시도 0회·제한 시간을 직접 정함).
+호출은 이미 쓰는 requests로 한다 (SDK와 그 의존 패키지를 늘리지 않고, 재시도 0회·제한 시간을 직접 정함).
+제공자는 AI_PROVIDER(gemini / openai)로 고른다. 요청 내용(build_request)은 공통이고, 각 클라이언트가
+자기 형식으로 바꿔 보내고 응답을 같은 모양 (출력 JSON, 응답 번호, 토큰 사용량)으로 돌려준다 → 나머지 흐름은 같음.
+Gemini는 결제를 연결한 유료 등급만 쓴다 (무료 등급은 입력이 구글 제품 개선·사람 검토에 쓰일 수 있음).
 """
 
 import base64
@@ -43,7 +47,8 @@ logger = logging.getLogger(__name__)
 PROMPT_VERSION = "entrance-extract-v3"
 SCHEMA_VERSION = "entrance-analysis-v3"  # 이전(v2) 결과는 바꿔 쓰거나 재사용하지 않고 다시 분석
 OPENAI_URL = "https://api.openai.com/v1/responses"
-OPENAI_TIMEOUT = 20          # 초. gunicorn(60초)·nginx(60초) 제한보다 짧게
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+OPENAI_TIMEOUT = 20          # 초. gunicorn(60초)·nginx(60초) 제한보다 짧게 (두 제공자 공통)
 MAX_OUTPUT_TOKENS = 2500
 ACCEPT_DEADLINE = timedelta(seconds=25)   # 요청한 지 이보다 늦게 온 응답은 후보로 쓰지 않음 (시간 초과)
 PROCESSING_STALE = timedelta(seconds=60)  # 이만큼 '분석 중'이면 작업자가 죽은 것 → 실패(시간 초과)로 계산
@@ -65,11 +70,22 @@ WARNINGS = {
     "NON_ACCESSIBILITY_CONTENT": "접근성과 관계없는 내용이에요",
 }
 
-# 제보 화면 안내 (명세 7.1 초안 — 신지현 법적 검토 후 확정. AI_ENABLED일 때만 보임)
-NOTICE_TEXT = ("제보한 사진과 설명은 운영자 검토 시 접근성 항목을 추출하기 위한 AI 분석에 활용될 수 있습니다. "
-               "AI 분석 시 사진과 설명이 OpenAI(미국)로 전송될 수 있습니다. "
-               "이름·전화번호 등 개인정보와 얼굴·차량 번호판이 나오지 않도록 해 주세요. "
-               "AI 결과는 운영자가 확인하며 자동으로 승인되지 않습니다.")
+# 사진·설명을 받는 곳 (안내 문구와 운영자 화면에 그대로 씀)
+RECIPIENTS = {"gemini": "Google(미국)", "openai": "OpenAI(미국)"}
+
+# 제보 화면 안내 (명세 7.1 초안 — 신지현 법적 검토 후 확정. 받는 곳이 바뀌면 AI_NOTICE_VERSION도 올린다)
+NOTICE_TEMPLATE = ("제보한 사진과 설명은 운영자 검토 시 접근성 항목을 추출하기 위한 AI 분석에 활용될 수 있습니다. "
+                   "AI 분석 시 사진과 설명이 {recipient}로 전송될 수 있습니다. "
+                   "이름·전화번호 등 개인정보와 얼굴·차량 번호판이 나오지 않도록 해 주세요. "
+                   "AI 결과는 운영자가 확인하며 자동으로 승인되지 않습니다.")
+
+
+def recipient():
+    return RECIPIENTS.get(settings.AI_PROVIDER, "외부 AI 서비스")
+
+
+def notice_text():
+    return NOTICE_TEMPLATE.format(recipient=recipient())
 
 MESSAGES = {
     "AI_DISABLED": "AI 검토 보조가 꺼져 있어요.",
@@ -144,9 +160,19 @@ def config_error():
     """AI를 쓸 수 없는 설정이면 오류 코드"""
     if not settings.AI_ENABLED:
         return "AI_DISABLED"
-    if not settings.OPENAI_API_KEY or not settings.OPENAI_MODEL:
+    if settings.AI_PROVIDER not in RECIPIENTS or not api_key() or not current_model():
         return "AI_UNAVAILABLE"
     return None
+
+
+def api_key():
+    return settings.GEMINI_API_KEY if settings.AI_PROVIDER == "gemini" else settings.OPENAI_API_KEY
+
+
+def current_model():
+    """기록·재사용 비교용 모델 이름 (제공자가 바뀌면 이전 결과를 다시 쓰지 않게 앞에 붙임)"""
+    model = settings.GEMINI_MODEL if settings.AI_PROVIDER == "gemini" else settings.OPENAI_MODEL
+    return f"{settings.AI_PROVIDER}:{model}" if model else ""
 
 
 def unsupported_reason(report):
@@ -325,8 +351,8 @@ def instructions(defs):
     ])
 
 
-def _photo_data_url(report):
-    """저장된 사진(core/images.py에서 EXIF 지우고 얼굴 가린 JPEG) → data URL"""
+def _photo_base64(report):
+    """저장된 사진(core/images.py에서 EXIF 지우고 얼굴 가린 JPEG) → base64"""
     try:
         with report.photo.open("rb") as f:
             data = f.read()
@@ -334,50 +360,161 @@ def _photo_data_url(report):
         raise AIError("IMAGE_UNREADABLE") from e
     if not data:
         raise AIError("IMAGE_UNREADABLE")
-    return "data:image/jpeg;base64," + base64.b64encode(data).decode("ascii")
+    return base64.b64encode(data).decode("ascii")
 
 
-def build_payload(report, defs):
+def build_request(report, defs):
+    """제공자와 상관없는 요청 내용. 보내는 것은 이것뿐: 지시문, 가린 설명, 사진 1장, 출력 형식"""
     note = mask_phone(report.note).strip()
-    content = [{"type": "input_text", "text": f"주민 설명: {note}" if note else "주민 설명 없음. 사진만 보고 판단한다."}]
-    if report.photo:
-        content.append({"type": "input_image", "image_url": _photo_data_url(report), "detail": "auto"})
     return {
-        "model": settings.OPENAI_MODEL,
-        "store": False,
         "instructions": instructions(defs),
-        "input": [{"role": "user", "content": content}],
-        "text": {"format": {"type": "json_schema", "name": "entrance_analysis", "strict": True,
-                            "schema": output_schema(defs)}},
+        "text": f"주민 설명: {note}" if note else "주민 설명 없음. 사진만 보고 판단한다.",
+        "image": _photo_base64(report) if report.photo else None,  # JPEG
+        "schema": output_schema(defs),
         "max_output_tokens": MAX_OUTPUT_TOKENS,
     }
 
 
+def _post(url, payload, headers, provider):
+    """공통 HTTP 호출: 재시도 0회, 20초. 실패 → (상태 코드, 오류 본문) / 성공 → 응답 JSON"""
+    try:
+        res = requests.post(url, json=payload, timeout=OPENAI_TIMEOUT, headers=headers)
+    except requests.Timeout as e:
+        raise AIError("AI_TIMEOUT") from e
+    except requests.RequestException as e:
+        raise AIError("AI_UNAVAILABLE") from e
+    try:
+        body = res.json()
+    except ValueError:
+        body = None
+    if res.status_code >= 400:
+        error = (body or {}).get("error") if isinstance(body, dict) else None
+        error = error if isinstance(error, dict) else {}
+        logger.warning("%s 요청 실패: HTTP %s %s", provider, res.status_code, error.get("code") or error.get("status") or "")
+        return res.status_code, error
+    if body is None:
+        raise AIError("AI_INVALID_OUTPUT")
+    return None, body
+
+
 class OpenAIClient:
-    """실제 호출. 재시도 0회, 20초 제한. 오류 원문·키·사진은 기록하지 않는다"""
+    """OpenAI Responses API + 구조화 출력(strict). 오류 원문·키·사진은 기록하지 않는다"""
 
     BUDGET_CODES = {"insufficient_quota", "billing_hard_limit_reached",
                     "project_spend_limit_exceeded", "organization_spend_limit_exceeded"}
 
-    def create(self, payload):
-        try:
-            res = requests.post(OPENAI_URL, json=payload, timeout=OPENAI_TIMEOUT,
-                                headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"})
-        except requests.Timeout as e:
-            raise AIError("AI_TIMEOUT") from e
-        except requests.RequestException as e:
-            raise AIError("AI_UNAVAILABLE") from e
-        if res.status_code >= 400:
-            try:
-                code = (res.json().get("error") or {}).get("code")
-            except ValueError:
-                code = None
-            logger.warning("OpenAI 요청 실패: HTTP %s %s", res.status_code, code or "")
-            raise AIError("AI_BUDGET_EXCEEDED" if code in self.BUDGET_CODES else "AI_UNAVAILABLE")
-        try:
-            return res.json()
-        except ValueError as e:
-            raise AIError("AI_INVALID_OUTPUT") from e
+    def payload(self, request):
+        content = [{"type": "input_text", "text": request["text"]}]
+        if request["image"]:
+            content.append({"type": "input_image", "image_url": "data:image/jpeg;base64," + request["image"],
+                            "detail": "auto"})
+        return {
+            "model": settings.OPENAI_MODEL,
+            "store": False,  # 응답 상태를 OpenAI에 저장하지 않음
+            "instructions": request["instructions"],
+            "input": [{"role": "user", "content": content}],
+            "text": {"format": {"type": "json_schema", "name": "entrance_analysis", "strict": True,
+                                "schema": request["schema"]}},
+            "max_output_tokens": request["max_output_tokens"],
+        }
+
+    def create(self, request):
+        """→ (출력 JSON, 응답 번호, 토큰 사용량)"""
+        status, body = _post(OPENAI_URL, self.payload(request), {"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+                             "OpenAI")
+        if status:
+            raise AIError("AI_BUDGET_EXCEEDED" if body.get("code") in self.BUDGET_CODES else "AI_UNAVAILABLE")
+        return parse_response(body)
+
+
+class GeminiClient:
+    """Google Gemini generateContent + JSON 출력 형식(responseJsonSchema). 유료 등급 키만 쓴다"""
+
+    REFUSAL_REASONS = {"SAFETY", "RECITATION", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY"}
+
+    def payload(self, request):
+        parts = [{"text": request["text"]}]
+        if request["image"]:
+            parts.append({"inline_data": {"mime_type": "image/jpeg", "data": request["image"]}})
+        return {
+            "system_instruction": {"parts": [{"text": request["instructions"]}]},
+            "contents": [{"role": "user", "parts": parts}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseJsonSchema": gemini_schema(request["schema"]),
+                "maxOutputTokens": request["max_output_tokens"],
+                "temperature": 0,  # 같은 입력이면 최대한 같은 후보 (추출 작업)
+            },
+        }
+
+    def create(self, request):
+        """→ (출력 JSON, 응답 번호, 토큰 사용량)"""
+        url = GEMINI_URL.format(model=requests.utils.quote(settings.GEMINI_MODEL, safe="-._"))
+        status, body = _post(url, self.payload(request), {"x-goog-api-key": settings.GEMINI_API_KEY}, "Gemini")
+        if status:
+            message = str(body.get("message") or "").lower()
+            budget = status == 429 and any(w in message for w in ("billing", "credit", "prepay", "spend"))
+            raise AIError("AI_BUDGET_EXCEEDED" if budget else "AI_UNAVAILABLE")
+        return parse_gemini_response(body)
+
+
+def get_client():
+    return GeminiClient() if settings.AI_PROVIDER == "gemini" else OpenAIClient()
+
+
+def gemini_schema(schema):
+    """
+    Gemini JSON 출력 형식에 맞게 바꾼다 (뜻은 같음):
+      - "type": ["number", "null"] → anyOf [{number}, {null}]  (null 허용은 anyOf로)
+      - 예/아니오의 enum [true] 제거 (enum은 글자·숫자만) → needs_manual_check=true는 서버 검증에서 강제
+    """
+    if isinstance(schema, list):
+        return [gemini_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {k: gemini_schema(v) for k, v in schema.items()}
+    kind = out.get("type")
+    if out.get("type") == "boolean" and "enum" in out:
+        out.pop("enum")
+    if isinstance(kind, list) and "null" in kind:
+        others = [t for t in kind if t != "null"]
+        enum = out.pop("enum", None)
+        out.pop("type")
+        first = {"type": others[0]}
+        if enum is not None:
+            first["enum"] = [e for e in enum if e is not None]
+        out["anyOf"] = [first, {"type": "null"}]
+    return out
+
+
+def parse_gemini_response(body):
+    """generateContent 응답 → (출력 JSON, 응답 번호, 사용량). 차단·잘림을 먼저 확인한다"""
+    if not isinstance(body, dict):
+        raise AIError("AI_INVALID_OUTPUT")
+    meta = body.get("usageMetadata")
+    usage = None
+    if isinstance(meta, dict):
+        output_tokens = int(meta.get("candidatesTokenCount") or 0) + int(meta.get("thoughtsTokenCount") or 0)
+        usage = {"input_tokens": int(meta.get("promptTokenCount") or 0), "output_tokens": output_tokens,
+                 "total_tokens": int(meta.get("totalTokenCount") or 0)}
+    response_id = str(body.get("responseId") or "")[:100]
+    if (body.get("promptFeedback") or {}).get("blockReason"):
+        raise AIError("AI_REFUSAL")
+    candidates = body.get("candidates") or []
+    if not candidates or not isinstance(candidates[0], dict):
+        raise AIError("AI_INVALID_OUTPUT")
+    reason = candidates[0].get("finishReason")
+    if reason == "MAX_TOKENS":
+        raise AIError("AI_INCOMPLETE")
+    if reason in GeminiClient.REFUSAL_REASONS:
+        raise AIError("AI_REFUSAL")
+    if reason not in (None, "STOP"):
+        raise AIError("AI_INVALID_OUTPUT")
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    text = "".join(p.get("text") or "" for p in parts if isinstance(p, dict) and not p.get("thought"))
+    if not text:
+        raise AIError("AI_INVALID_OUTPUT")
+    return strict_json(text), response_id, usage
 
 
 def parse_response(body):
@@ -544,12 +681,12 @@ def analyze(report, user, client=None):
     if not defs:
         raise AIError("NO_ACTIVE_FIELDS")
     snapshot, def_snapshot = input_snapshot(report), definition_snapshot(defs)
-    for old in report.ai_analyses.filter(status=AIAnalysis.Status.SUCCEEDED, model_id=settings.OPENAI_MODEL,
+    for old in report.ai_analyses.filter(status=AIAnalysis.Status.SUCCEEDED, model_id=current_model(),
                                          prompt_version=PROMPT_VERSION, schema_version=SCHEMA_VERSION):
         if (effective_status(old) == AIAnalysis.Status.SUCCEEDED and not old.selection_history
                 and old.input_snapshot == snapshot and old.field_definition_snapshot == def_snapshot):
             return old, True
-    payload = build_payload(report, defs)  # 사진을 못 읽으면 여기서 멈춤 (호출 횟수에 안 셈)
+    request = build_request(report, defs)  # 사진을 못 읽으면 여기서 멈춤 (호출 횟수에 안 셈)
 
     with transaction.atomic():
         Report.objects.select_for_update().get(pk=report.pk)
@@ -561,12 +698,12 @@ def analyze(report, user, client=None):
             raise AIError("DAILY_LIMIT_REACHED")
         analysis = AIAnalysis.objects.create(
             report=report, requested_by=user, input_snapshot=snapshot, field_definition_snapshot=def_snapshot,
-            model_id=settings.OPENAI_MODEL, prompt_version=PROMPT_VERSION, schema_version=SCHEMA_VERSION,
+            model_id=current_model(), prompt_version=PROMPT_VERSION, schema_version=SCHEMA_VERSION,
         )
 
     # 외부 호출 동안에는 DB를 잠그지 않는다
     try:
-        data, analysis.provider_response_id, analysis.usage = parse_response((client or OpenAIClient()).create(payload))
+        data, analysis.provider_response_id, analysis.usage = (client or get_client()).create(request)
         result = validate_output(data, defs)
     except AIError as e:
         _fail(analysis, e.code)

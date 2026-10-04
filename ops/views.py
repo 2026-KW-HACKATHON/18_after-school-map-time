@@ -241,7 +241,7 @@ def _ai_panel(report, selection_form=None):
     labels = _entrance_labels()
     panel = {
         "enabled": settings.AI_ENABLED, "blocked": ai.MESSAGES[blocked] if blocked else "",
-        "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(),
+        "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(), "recipient": ai.recipient(),
         "attempts": ai.attempts_today(), "limit": settings.AI_DAILY_LIMIT,
         "staff_only": staff_only, "excluded_confirmations": report.confirmations.count() if staff_only else 0,
         "history": [

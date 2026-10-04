@@ -134,7 +134,7 @@
     {% elif report.status == "PENDING" %}
       <form method="post" class="form-stack" action="#ai">
         {% csrf_token %}
-        <p class="small">분석을 누르면 이 제보의 사진 1장과 아래 설명(전화번호는 가림)이 <strong>OpenAI(미국)</strong>로 전송돼요. 이름·계정·좌표·이동 조건은 보내지 않아요.</p>
+        <p class="small">분석을 누르면 이 제보의 사진 1장과 아래 설명(전화번호는 가림)이 <strong>{{ ai.recipient }}</strong>로 전송돼요. 이름·계정·좌표·이동 조건은 보내지 않아요.</p>
         <blockquote class="small">{{ ai.masked_note|default:"(설명 없음)" }}</blockquote>
         <div class="field"><label><input type="checkbox" name="privacy_checked"> {{ ai.analyze_form.privacy_checked.label }}</label></div>
         <button type="submit" name="action" value="ai_analyze" class="btn">{% if ai.latest %}AI 후보 다시 불러오기{% else %}AI 후보 불러오기{% endif %}</button>

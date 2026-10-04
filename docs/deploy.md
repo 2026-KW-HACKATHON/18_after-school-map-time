@@ -296,14 +296,15 @@ https://<도메인>/accounts/kakao/login/callback/
 
 기본은 꺼져 있습니다(`AI_ENABLED=False`). 모델·예산이 정해지고, 신지현 님 법적 검토로 제보 화면 안내 문구가 확정된 뒤에 켭니다.
 
-1. OpenAI 프로젝트에 **월 예산 + hard limit**를 걸고(알림만으로는 호출이 안 멈춤), 서버 전용 API 키를 만듭니다.
+1. Google AI Studio(aistudio.google.com) → API 키에서 키를 만들고, 그 프로젝트에 **결제를 연결**합니다(유료 등급 Tier 1 이상). 무료 등급 키는 쓰지 않습니다 — 입력이 구글 제품 개선·사람 검토에 쓰일 수 있습니다. 선불 결제면 충전액이 곧 사용 한도입니다.
 2. 서버 `.env`를 고칩니다. `AI_NOTICE_SINCE`는 **지금 시각**(이 순간부터 제보 화면에 안내가 붙음)으로 넣습니다. 이보다 먼저 들어온 제보는 외부로 보내지 않습니다.
 
 ```bash
 cd ~/teokeopne
 nano .env
-# OPENAI_API_KEY=<서버 전용 키>
-# OPENAI_MODEL=<팀이 정한 모델 ID>
+# AI_PROVIDER=gemini
+# GEMINI_API_KEY=<서버 전용 키>
+# GEMINI_MODEL=gemini-2.5-flash-lite
 # AI_DAILY_LIMIT=100
 # AI_NOTICE_SINCE=2026-10-07T09:00:00+09:00   ← 켜는 시각, 시간대(+09:00) 꼭 포함
 # AI_NOTICE_VERSION=ai-notice-v1                ← 안내 문구 버전. 문구를 바꾸면 SINCE와 함께 올림
@@ -311,7 +312,7 @@ nano .env
 docker compose -f docker-compose.prod.yml up -d web   # .env 다시 읽기
 ```
 
-3. 확인: 켠 뒤에 들어온 제보만 분석됩니다(안내 버전이 기록된 제보). 이미 열려 있던 제보 화면에서 제출하면 "안내가 바뀌었어요"가 한 번 뜨는 게 정상입니다. 제보 화면 맨 아래에 "OpenAI(미국)로 전송될 수 있습니다" 안내가 보이는지, 운영자 검토 화면에 "AI 검토 보조"가 보이는지.
+3. 확인: 켠 뒤에 들어온 제보만 분석됩니다(안내 버전이 기록된 제보). 이미 열려 있던 제보 화면에서 제출하면 "안내가 바뀌었어요"가 한 번 뜨는 게 정상입니다. 제보 화면 맨 아래에 "Google(미국)로 전송될 수 있습니다" 안내가 보이는지, 운영자 검토 화면에 "AI 검토 보조"가 보이는지.
 4. 끄기: `AI_ENABLED=False`로 바꾸고 `up -d web`. 이미 저장된 분석 기록·선택 값은 그대로 남습니다.
 
 ---
