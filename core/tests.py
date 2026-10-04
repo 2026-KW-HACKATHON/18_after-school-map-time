@@ -35,3 +35,23 @@ class StaticStorageTests(TestCase):
         with tempfile.TemporaryDirectory() as root:
             storage = CacheBustingStaticStorage(location=root, base_url="/static/")
             self.assertEqual(storage.url("js/new.js"), "/static/js/new.js")
+
+
+class NotFoundTests(TestCase):
+    def test_api_paths_answer_json_404(self):
+        for path in ("/api/v1/places/abc/", "/api/v1/nope/", "/api/v1/places/999999/"):
+            with self.subTest(path=path):
+                res = self.client.get(path)
+                self.assertEqual(res.status_code, 404)
+                self.assertEqual(res["Content-Type"], "application/json")
+                self.assertIn("detail", res.json())
+
+    def test_api_without_trailing_slash_still_redirects(self):
+        res = self.client.get("/api/v1/places")
+        self.assertEqual(res.status_code, 301)
+        self.assertEqual(res["Location"], "/api/v1/places/")
+
+    def test_pages_keep_html_404(self):
+        res = self.client.get("/places/abc/")
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("text/html", res["Content-Type"])

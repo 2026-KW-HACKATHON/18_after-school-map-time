@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from core.uploads import KeepPhotoMixin
 from judgments.models import ConditionProfile
-from places.facilities import ENTRANCE, ENTRANCE_KEYS, FIELD_SPECS, KIND_FIELDS
+from places.facilities import ENTRANCE, ENTRANCE_KEYS, FIELD_SPECS, KIND_FIELDS, active_keys
 from places.models import AccessFacility, FieldDefinition, Place
 from places.validation import numeric_form_options
 
@@ -96,12 +96,15 @@ class ReportForm(KeepPhotoMixin, forms.Form):
         targets.append(("new", "새 시설 제안"))
         self.fields["target_reference"].choices = targets
         self.initial["target_reference"] = targets[0][0]
-        if self.kind == ENTRANCE:
-            extra_keys = ENTRANCE_KEYS[len(ENTRANCE_FIELDS):]
-        else:
-            for key in ENTRANCE_FIELDS:
+        # 관리자가 끄거나 지운 항목(FieldDefinition)은 입력칸을 만들지 않는다 (공개 화면과 같은 기준)
+        self.observation_keys = active_keys(KIND_FIELDS[self.kind])
+        for key in ENTRANCE_FIELDS:
+            if self.kind != ENTRANCE or key not in self.observation_keys:
                 del self.fields[key]
-            extra_keys = KIND_FIELDS[self.kind]
+        if self.kind == ENTRANCE:
+            extra_keys = [k for k in ENTRANCE_KEYS[len(ENTRANCE_FIELDS):] if k in self.observation_keys]
+        else:
+            extra_keys = self.observation_keys
             self.fields["photo"].label = "시설 사진"
             self.fields["photo"].help_text = "시설의 모습과 접근 경로가 보이게 찍어 주세요. 얼굴·차 번호판은 피해 주세요."
         for key in extra_keys:
@@ -121,7 +124,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
                 self.fields[key] = forms.CharField(label=label, max_length=200, required=False)
                 if key == "facility_connected_floors":
                     self.fields[key].help_text = "예: 지하 1층 → 1층 → 2층. 직접 확인한 연결 층을 적어 주세요."
-        self.observation_fields = [self[key] for key in KIND_FIELDS[self.kind]]
+        self.observation_fields = [self[key] for key in self.observation_keys]
         door_type = FieldDefinition.objects.filter(key="door_type").first()
         choices = door_type.choices if door_type else []
         if "door_type" in self.fields:
@@ -144,7 +147,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
             has_point = data.get("lat") is not None and data.get("lng") is not None
             if not has_point and not data.get("location_text"):
                 self.add_error("lat", "지도를 눌러 위치를 표시하거나, 위치 설명을 적어 주세요.")
-        values = {k: data.get(k) for k in KIND_FIELDS[self.kind]}
+        values = {k: data.get(k) for k in self.observation_keys}
         if all(v in (None, UNKNOWN) for v in values.values()) and not data.get("note"):
             label = "입구" if self.kind == ENTRANCE else "시설"
             raise forms.ValidationError(f"{label} 정보를 하나 이상 고르거나, 추가 설명을 적어 주세요.")
@@ -169,7 +172,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
     def entrance_values(self):
         """{필드 키: 값} — '모름'과 빈 칸은 뺌"""
         out = {}
-        for key in KIND_FIELDS[self.kind]:
+        for key in self.observation_keys:
             v = self.cleaned_data.get(key)
             if v in (None, UNKNOWN):
                 continue

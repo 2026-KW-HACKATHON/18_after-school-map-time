@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from judgments.models import ConditionProfile
+from places.facilities import active_keys
 from places.models import Place
 from places.validation import numeric_form_options
 
@@ -58,6 +59,12 @@ class PlaceForm(forms.ModelForm):
         ]
         if not self.instance.pk:
             self.fields["observed_on"].initial = timezone.localdate()
+        # 관리자가 끄거나 지운 접근성 항목은 잠그고 저장하지 않는다 (주민 제보 폼과 같은 기준)
+        self.active_keys = set(active_keys(ENTRANCE_KEYS + PLACE_KEYS))
+        for key in ENTRANCE_KEYS + PLACE_KEYS:
+            if key not in self.active_keys:
+                self.fields[key].disabled = True
+                self.fields[key].label += " (사용 중지)"
 
     def missing_required(self):
         """와이어프레임 13번 '필수 항목 누락' 안내용: 비어 있는 필수 항목 이름 (중복 제거)"""
@@ -70,6 +77,8 @@ class PlaceForm(forms.ModelForm):
     def values_for(self, keys):
         out = {}
         for key in keys:
+            if key not in self.active_keys:
+                continue
             v = self.cleaned_data.get(key)
             if v in (None, UNKNOWN):
                 continue

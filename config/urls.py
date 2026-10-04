@@ -20,3 +20,6 @@ urlpatterns = [
 # 개발(DEBUG=True) 중 업로드 파일(media) 서빙. 배포에서는 nginx가 /media/를 직접 서빙
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# 404: /api/ 아래는 JSON, 나머지는 templates/404.html (core/views.py)
+handler404 = "core.views.not_found"
