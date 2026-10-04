@@ -811,3 +811,9 @@ class GeminiTests(AIBase):
             config = ai.GeminiClient().generation_config(REQUEST)
         self.assertEqual((config["temperature"], config["maxOutputTokens"]), (0, 2500))
         self.assertNotIn("thinkingConfig", config)
+
+    def test_unsupported_thinking_level_falls_back_to_low(self):
+        from config.settings import _thinking_level
+
+        self.assertEqual([_thinking_level(v) for v in ("minimal", "", None, "HIGH", "medium")],
+                         ["low", "low", "low", "high", "medium"])

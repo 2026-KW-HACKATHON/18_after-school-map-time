@@ -154,8 +154,8 @@ docker compose exec web python manage.py createsuperuser
 | `AI_ENABLED` | AI 검토 보조 켜기. 개인정보 고지 확정 전에는 `False` | `False` |
 | `AI_PROVIDER` | 사진·설명을 보낼 곳: `gemini` 또는 `openai` | `gemini` |
 | `GEMINI_API_KEY` | Google AI Studio 키 (**서버 전용**, 결제 연결한 유료 등급 프로젝트만) | |
-| `GEMINI_MODEL` | 이미지 입력 + JSON 출력 형식 지원 모델 (안정판 `gemini-3.8-flash`, 더 싼 `gemini-3.5-flash-lite`도 가능) | `gemini-3-flash-preview` |
-| `GEMINI_THINKING_LEVEL` | Gemini 3 이후 생각 단계 (`minimal`/`low`/`medium`/`high`) | `low` |
+| `GEMINI_MODEL` | 이미지 입력 + JSON 출력 형식 지원 모델 (사진 판단을 더 원하면 `gemini-3.8-flash`) | `gemini-3.5-flash-lite` |
+| `GEMINI_THINKING_LEVEL` | Gemini 3 이후 생각 단계 (`low`/`medium`/`high`, `minimal`은 형식이 깨져 `low`로 바뀜) | `low` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | `AI_PROVIDER=openai`일 때만 | |
 | `AI_DAILY_LIMIT` | 서울 시간 하루 외부 분석 시도 한도 (전체 운영자 합산, 0이면 호출 안 함) | `100` |
 | `AI_NOTICE_SINCE` | 제보 화면 AI 안내를 붙인 시각 (시간대 포함 ISO 8601). 이전 제보는 보내지 않음 | |
