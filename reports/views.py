@@ -130,7 +130,7 @@ def report_new(request):
         "selected_ownership": form.ownership,
         "show_picker": show_picker, "kind_label": kind_label,
         # AI 검토 보조를 켜면 사진·설명이 OpenAI로 갈 수 있음을 안내 (AI_NOTICE_SINCE를 이 문구를 붙인 시각으로)
-        "ai_notice": ai.NOTICE_TEXT if ai.notice_active() else "",
+        "ai_notice": ai.notice_text() if ai.notice_active() else "",
     })
 
 
