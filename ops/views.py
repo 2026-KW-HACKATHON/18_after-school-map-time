@@ -211,8 +211,9 @@ def _ai_save(request, report):
         analysis = report.ai_analyses.get(pk=uuid.UUID(request.POST.get("analysis_id", "")))
     except (ValueError, AIAnalysis.DoesNotExist):
         raise Http404("분석 기록을 찾을 수 없어요.")
-    form = AISelectionForm(request.POST, analysis=analysis, definitions=ai.active_definitions(),
-                           report_values=_report_values(report), labels=_entrance_labels())
+    form = AISelectionForm(request.POST, analysis=analysis, definitions=ai.active_definitions(report),
+                           report_values=_report_values(report), labels=_field_labels(report),
+                           all_keys=ai.analysis_keys(report))
     if not form.is_valid():
         return form, None
     try:
@@ -224,8 +225,8 @@ def _ai_save(request, report):
     return None, redirect(_ai_back(report))
 
 
-def _entrance_labels():
-    return dict(FieldDefinition.objects.filter(key__in=ai.ENTRANCE_KEYS).values_list("key", "label"))
+def _field_labels(report):
+    return dict(FieldDefinition.objects.filter(key__in=ai.analysis_keys(report)).values_list("key", "label"))
 
 
 def _report_values(report):
@@ -242,7 +243,7 @@ def _ai_panel(report, selection_form=None):
     staff_only = any(a.selection_history for a in analyses)
     blocked = ai.config_error() or ai.unsupported_reason(report)
     blocked_message = ai.notice_reason(report) if blocked == "NOTICE_NOT_APPLIED" else ai.MESSAGES.get(blocked, "")
-    labels = _entrance_labels()
+    labels = _field_labels(report)
     panel = {
         "enabled": settings.AI_ENABLED, "blocked": blocked_message, "warnings": ai.config_warnings(),
         "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(), "recipient": ai.recipient(),
@@ -263,7 +264,7 @@ def _ai_panel(report, selection_form=None):
     panel["error_code"], panel["error_message"] = ai.effective_error(latest)
     if panel["status"] != AIAnalysis.Status.SUCCEEDED:
         return panel
-    if latest.schema_version != ai.SCHEMA_VERSION:  # 이전 버전 결과는 바꿔 쓰지 않음
+    if latest.schema_version != ai.schema_version_for(report):  # 이전 버전 결과는 바꿔 쓰지 않음
         panel["old_schema"] = True
         return panel
     result = latest.result
@@ -276,7 +277,8 @@ def _ai_panel(report, selection_form=None):
         panel["input_changed"] = True
         return panel
     panel["selection_form"] = selection_form or AISelectionForm(
-        analysis=latest, definitions=ai.active_definitions(), report_values=_report_values(report), labels=labels)
+        analysis=latest, definitions=ai.active_definitions(report), report_values=_report_values(report),
+        labels=labels, all_keys=ai.analysis_keys(report))
     return panel
 
 
