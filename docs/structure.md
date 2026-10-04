@@ -87,6 +87,7 @@
 ├── static/                     ← 전역 정적 파일
 │   ├── css/common.css          ←   디자인 변수(색·간격)와 공통 컴포넌트
 │   ├── js/common.js            ←   api() fetch 헬퍼 (CSRF 자동 처리)
+│   ├── js/photo-resize.js      ←   사진 올리기 전 브라우저에서 1600px JPEG로 줄이기 (사진 업로드 폼 공통)
 │   ├── js/map/kakao-adapter.js ←   카카오맵 호출은 여기 한 곳만 (지도 SDK 교체 대비)
 │   ├── js/map/location-picker.js ← 지도를 눌러 위치 고르기 (새 장소 제보·운영자 공용)
 │   └── img/
