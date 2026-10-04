@@ -156,6 +156,7 @@ docker compose exec web python manage.py createsuperuser
 | `OPENAI_MODEL` | 이미지 입력 + Structured Outputs 지원 모델 ID (팀 결정) | |
 | `AI_DAILY_LIMIT` | 서울 시간 하루 외부 분석 시도 한도 (전체 운영자 합산, 0이면 호출 안 함) | `100` |
 | `AI_NOTICE_SINCE` | 제보 화면 AI 안내를 붙인 시각 (시간대 포함 ISO 8601). 이전 제보는 보내지 않음 | |
+| `AI_NOTICE_VERSION` | 제보 화면 AI 안내 문구 버전. 제보에 기록된 버전과 같아야 보냄 (문구를 바꾸면 SINCE와 함께 올림) | |
 | `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
 | `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
 | `IMAGE_TAG` | 배포 이미지 태그. 롤백할 때만 이전 커밋 SHA로 변경 | `latest` |

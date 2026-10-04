@@ -253,3 +253,5 @@ def _aware_datetime(raw):
 AI_DAILY_LIMIT = _daily_limit(os.getenv("AI_DAILY_LIMIT", "100"))  # 서울 시간 하루 동안 전체 운영자 합산
 # 제보 화면에 AI 활용 안내를 붙인 시각. 이보다 먼저 들어온 제보는 외부로 보내지 않는다 (비어 있으면 아무것도 안 보냄)
 AI_NOTICE_SINCE = _aware_datetime(os.getenv("AI_NOTICE_SINCE", ""))
+# 배포한 안내 문구의 버전 (예: ai-notice-v1). 제보에 기록된 버전과 같아야 보낸다. 문구를 바꾸면 SINCE와 함께 올림
+AI_NOTICE_VERSION = os.getenv("AI_NOTICE_VERSION", "").strip()[:40]
