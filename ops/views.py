@@ -76,6 +76,9 @@ def dashboard(request):
         "public_places": places.count(),
         "new_places_week": places.filter(created_at__gte=timezone.now() - timedelta(days=7)).count(),
         "recent_places": places.order_by("-updated_at")[:5],
+        # AI 검토 보조: 켰을 때만 오늘 사용량과 설정 경고
+        "ai_enabled": settings.AI_ENABLED, "ai_warnings": ai.config_warnings(),
+        "ai_attempts": ai.attempts_today(), "ai_limit": settings.AI_DAILY_LIMIT,
     })
 
 
@@ -238,9 +241,10 @@ def _ai_panel(report, selection_form=None):
     analyses = list(report.ai_analyses.select_related("requested_by"))
     staff_only = any(a.selection_history for a in analyses)
     blocked = ai.config_error() or ai.unsupported_reason(report)
+    blocked_message = ai.notice_reason(report) if blocked == "NOTICE_NOT_APPLIED" else ai.MESSAGES.get(blocked, "")
     labels = _entrance_labels()
     panel = {
-        "enabled": settings.AI_ENABLED, "blocked": ai.MESSAGES[blocked] if blocked else "",
+        "enabled": settings.AI_ENABLED, "blocked": blocked_message, "warnings": ai.config_warnings(),
         "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(), "recipient": ai.recipient(),
         "attempts": ai.attempts_today(), "limit": settings.AI_DAILY_LIMIT,
         "staff_only": staff_only, "excluded_confirmations": report.confirmations.count() if staff_only else 0,

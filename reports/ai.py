@@ -166,6 +166,59 @@ def config_error():
     return None
 
 
+KEY_SETTINGS = {"gemini": ("GEMINI_API_KEY", "GEMINI_MODEL"), "openai": ("OPENAI_API_KEY", "OPENAI_MODEL")}
+
+
+def config_warnings():
+    """
+    AI를 켰는데 설정이 틀린 곳 → 운영자 화면에 보여 줄 문장들 (켜지 않았으면 빈 목록).
+    설정 실수는 오류 없이 '분석 대상 아님'으로만 보이기 쉬워서 원인을 바로 알려 준다. 키 값은 보여 주지 않는다.
+    """
+    if not settings.AI_ENABLED:
+        return []
+    warnings = []
+    provider = settings.AI_PROVIDER
+    if provider not in RECIPIENTS:
+        warnings.append(f"AI_PROVIDER '{provider}'는 지원하지 않아요. gemini 또는 openai로 넣어 주세요.")
+    else:
+        key_name, model_name = KEY_SETTINGS[provider]
+        if not getattr(settings, key_name):
+            warnings.append(f"{key_name}가 비어 있어요.")
+        if not getattr(settings, model_name):
+            warnings.append(f"{model_name}가 비어 있어요.")
+    if not settings.AI_NOTICE_VERSION:
+        warnings.append("AI_NOTICE_VERSION이 비어 있어요. 제보 화면에 AI 안내가 붙지 않고, 어떤 제보도 분석할 수 없어요.")
+    since = settings.AI_NOTICE_SINCE
+    if since is None:
+        if getattr(settings, "AI_NOTICE_SINCE_RAW", ""):
+            warnings.append("AI_NOTICE_SINCE 형식이 잘못됐어요. 시간대까지 2026-10-07T09:00:00+09:00처럼 넣어 주세요.")
+        else:
+            warnings.append("AI_NOTICE_SINCE가 비어 있어요. 안내를 붙인 시각을 넣어야 분석할 수 있어요.")
+    elif since > timezone.now():
+        warnings.append(f"AI_NOTICE_SINCE({timezone.localtime(since):%m월 %d일 %H:%M})가 아직 오지 않았어요. "
+                        "이 시각 전에 들어온 제보는 분석하지 않아요. 서버에서 date -Iseconds로 지금 시각을 확인해 넣어 주세요.")
+    if settings.AI_DAILY_LIMIT <= 0:
+        warnings.append("AI_DAILY_LIMIT이 0이라 분석할 수 없어요.")
+    elif attempts_today() >= settings.AI_DAILY_LIMIT:
+        warnings.append(f"오늘 분석 한도({settings.AI_DAILY_LIMIT}회)를 다 썼어요. 내일 0시(서울)에 다시 열려요.")
+    return warnings
+
+
+def notice_reason(report):
+    """안내 조건 때문에 분석할 수 없을 때 이 제보의 구체적인 이유"""
+    since, version = settings.AI_NOTICE_SINCE, settings.AI_NOTICE_VERSION
+    if since is None or not version:
+        return "AI 안내 설정(AI_NOTICE_SINCE·AI_NOTICE_VERSION)이 비었거나 잘못돼 분석할 수 없어요."
+    if report.created_at < since:
+        return (f"이 제보는 AI 안내를 붙인 시각({timezone.localtime(since):%m월 %d일 %H:%M}) 전에 들어와서 "
+                "외부로 보내지 않아요. 직접 검토해 주세요.")
+    if report.ai_notice_version != version:
+        submitted = f"'{report.ai_notice_version}'" if report.ai_notice_version else "없음"
+        return (f"이 제보는 지금 안내('{version}')와 다른 안내로 제출됐어요 (제출 당시: {submitted}). "
+                "외부로 보내지 않아요. 직접 검토해 주세요.")
+    return MESSAGES["NOTICE_NOT_APPLIED"]
+
+
 def api_key():
     return settings.GEMINI_API_KEY if settings.AI_PROVIDER == "gemini" else settings.OPENAI_API_KEY
 
