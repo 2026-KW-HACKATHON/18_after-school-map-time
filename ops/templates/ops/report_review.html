@@ -63,6 +63,81 @@
     </table>
   </section>
 
+  {% if ai.enabled or ai.latest %}
+  {# 운영자 AI 검토 보조 (reports/ai.py, AI 명세 v1.2 A안): 후보만 보여 주고 자동 승인은 없음 #}
+  <section class="card" id="ai">
+    <h2>AI 검토 보조 <span class="badge-neutral">후보만 보여 줘요</span></h2>
+    <p class="muted small">AI는 사진·설명에서 출입구 항목 후보를 뽑을 뿐이에요. 맞는 항목만 골라 저장하고, 승인은 아래에서 직접 해요. AI 후보를 저장한 제보는 운영자만 승인할 수 있어요.</p>
+
+    {% if ai.latest %}
+      {% if ai.status == "FAILED" %}
+        <p class="alert small">AI 분석을 완료하지 못했어요. 사진과 설명을 직접 검토해 주세요.{% if ai.latest.error_message %} ({{ ai.latest.error_message }}){% endif %}</p>
+      {% elif ai.status == "PROCESSING" %}
+        <p class="small">분석 중이에요. 잠시 뒤 새로고침해 주세요.</p>
+      {% else %}
+        <p><strong>요약</strong> {{ ai.summary|default:"없음" }}</p>
+        {% if ai.warnings %}<ul class="plain-list small">{% for w in ai.warnings %}<li><span class="badge-warn">확인</span> {{ w }}</li>{% endfor %}</ul>{% endif %}
+        {% if ai.manual_check_items %}<p class="small"><strong>직접 확인할 것</strong></p><ul class="small">{% for m in ai.manual_check_items %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+        {% if ai.input_changed %}<p class="alert small">분석한 뒤에 제보 내용이나 항목 설정이 바뀌었어요. 다시 분석해 주세요.</p>{% endif %}
+
+        {% if ai.selection_form %}
+          {% with f=ai.selection_form %}
+          <form method="post" class="form-stack" action="#ai">
+            {% csrf_token %}
+            {{ f.analysis_id }}
+            {% if f.non_field_errors %}<div class="alert">{{ f.non_field_errors }}</div>{% endif %}
+            {% for e in f.selected_keys.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
+            <div class="table-scroll">
+            <table class="diff-table ai-table">
+              <thead><tr><th>저장</th><th>항목</th><th>제보 값</th><th>AI 후보 (근거)</th><th>저장할 값</th></tr></thead>
+              <tbody>
+                {% for row in f.rows %}
+                  <tr>
+                    <td><input type="checkbox" name="selected_keys" value="{{ row.key }}" id="ai-pick-{{ row.key }}" aria-label="{{ row.label }} 저장"{% if row.key in f.selected_keys.value %} checked{% endif %}></td>
+                    <th scope="row"><label for="ai-pick-{{ row.key }}">{{ row.label }}</label></th>
+                    <td>{% if row.current %}{{ row.current }}{{ row.unit }}{% else %}<span class="muted">-</span>{% endif %}</td>
+                    <td>{% if row.candidate != "" %}<strong>{{ row.candidate }}{{ row.unit }}</strong>{% else %}<span class="muted">모름</span>{% endif %}
+                      {% if row.evidence %}<br><span class="muted small">{{ row.certainty }} · {{ row.source }} — {{ row.evidence }}</span>{% endif %}</td>
+                    <td>{{ row.field }}{% for e in row.field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+            <div class="field"><label><input type="checkbox" name="privacy_checked"{% if f.privacy_checked.value %} checked{% endif %}> {{ f.privacy_checked.label }}</label>
+              {% for e in f.privacy_checked.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</div>
+            <button type="submit" name="action" value="ai_save" class="btn">고른 값 제보에 저장</button>
+            <p class="muted small">저장해도 제보는 '확인 중'이에요. 고르지 않은 항목은 그대로 두고, 분석 하나에 한 번만 저장할 수 있어요.</p>
+          </form>
+          {% endwith %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    {% if ai.history %}
+      <p class="small"><strong>AI 후보 저장 기록</strong></p>
+      <ul class="small">
+        {% for h in ai.history %}
+          <li>{{ h.by_name }} · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.before }} → {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if ai.blocked %}
+      <p class="muted small">{{ ai.blocked }}</p>
+    {% elif report.status == "PENDING" %}
+      <form method="post" class="form-stack" action="#ai">
+        {% csrf_token %}
+        <p class="small">분석을 누르면 이 제보의 사진 1장과 아래 설명(전화번호는 가림)이 <strong>OpenAI(미국)</strong>로 전송돼요. 이름·계정·좌표·이동 조건은 보내지 않아요.</p>
+        <blockquote class="small">{{ ai.masked_note|default:"(설명 없음)" }}</blockquote>
+        <div class="field"><label><input type="checkbox" name="privacy_checked"> {{ ai.analyze_form.privacy_checked.label }}</label></div>
+        <button type="submit" name="action" value="ai_analyze" class="btn">{% if ai.latest %}AI 후보 다시 불러오기{% else %}AI 후보 불러오기{% endif %}</button>
+        <p class="muted small">오늘 {{ ai.attempts }}/{{ ai.limit }}회 사용. 같은 내용은 다시 부르지 않고 이전 결과를 보여 줘요.</p>
+      </form>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% if report.status == "PENDING" and not report.is_new_place %}
   <section class="card">
     <h2>승인하면 판정이 이렇게 바뀌어요</h2>
@@ -79,7 +154,11 @@
     {% if required %}
       <p class="muted small">주민 확인 {{ confirmations|length }}/{{ required }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     {% else %}
-      <p class="muted small">이 제보는 주민 확인 없이 운영자가 검토해요 (시설 제보, 사진 교체 요청, 또는 새 계정의 하향 제보).</p>
+      {% if ai.staff_only %}
+        <p class="muted small">운영자가 AI 후보로 값을 고친 제보라 운영자만 승인해요.{% if ai.excluded_confirmations %} 고치기 전에 받은 주민 확인 {{ ai.excluded_confirmations }}건은 바뀐 값에 대한 확인이 아니라서 반영 조건에서 뺐어요.{% endif %}</p>
+      {% else %}
+        <p class="muted small">이 제보는 주민 확인 없이 운영자가 검토해요 (시설 제보, 사진 교체 요청, 또는 새 계정의 하향 제보).</p>
+      {% endif %}
     {% endif %}
   </section>
   {% endif %}

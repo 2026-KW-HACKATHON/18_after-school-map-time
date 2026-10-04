@@ -99,10 +99,12 @@ def required_confirmations(report):
     반영에 필요한 주민 확인 수. None = 주민 확인으로는 반영하지 않고 운영자만 처리:
       - 사진 교체 요청: 얼굴·번호판이 없는지 운영자가 봐야 함 (기획 v2 4.4)
       - 가입 7일 미만 계정의 판정 하향 제보: 관리자 검수 큐로 (기획 v2 7장)
+      - 운영자가 AI 후보를 골라 값을 고친 제보: 이전 주민 확인은 고치기 전 값에 대한 것 (AI 명세 v1.2 6장)
     """
+    from reports.ai import staff_review_only
     from reports.models import Report
 
-    if report.is_facility_report or is_photo_request(report):
+    if report.is_facility_report or is_photo_request(report) or staff_review_only(report):
         return None
     if report.source == Report.Source.OWNER:
         return OWNER_DECLARATION_CONFIRMATIONS if is_owner_declaration(report) else OWNER_CORRECTION_CONFIRMATIONS

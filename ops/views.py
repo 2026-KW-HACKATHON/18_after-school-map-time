@@ -4,13 +4,15 @@ Django 관리자(/admin/)는 데이터 전체를 다루는 도구로 남겨 두�
 """
 
 import csv
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import views as auth_views
 from django.db.models import Max, Q
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 from django.urls import reverse, reverse_lazy
@@ -22,14 +24,16 @@ from judgments.models import Outcome
 from judgments.services import is_owner_declaration, is_photo_request, report_direction, report_effect, required_confirmations
 from owners.models import ClaimCode, OwnerClaim
 from owners.services import CORRECTION_OVERDUE_DAYS
-from places.models import Building, Place, Region
-from reports.models import Report
+from places.models import Building, FieldDefinition, Place, Region
+from reports import ai
+from reports.models import AIAnalysis, Report
 from reports.selectors import latest_photo
 
 from . import district as district_data
 from . import services
 from .templatetags.ops_tags import OPS_STATUS_LABELS
-from .forms import ENTRANCE_KEYS, PLACE_KEYS, PlaceDeleteForm, PlaceForm, ReportDeleteForm, ReviewForm
+from .forms import (ENTRANCE_KEYS, PLACE_KEYS, AIAnalyzeForm, AISelectionForm, PlaceDeleteForm, PlaceForm,
+                    ReportDeleteForm, ReviewForm)
 
 staff_required = staff_member_required(login_url=reverse_lazy("ops:login"))
 
@@ -123,13 +127,22 @@ def report_list(request):
 def report_review(request, pk):
     """제보 상세 검토 (16번) + 충돌 정보 확인 (17번). 승인·반려는 확인 창을 거친다"""
     report = get_object_or_404(Report.objects.select_related("created_by", "entrance__place"), pk=pk)
-    form = ReviewForm(request.POST or None, report=report, initial={
+    action = request.POST.get("action") if request.method == "POST" else None
+    if action == "ai_analyze":
+        return _ai_analyze(request, report)
+    selection_form = None
+    if action == "ai_save":
+        selection_form, response = _ai_save(request, report)
+        if response is not None:
+            return response
+    # AI 폼을 다시 보여 줄 때는 승인·반려 폼을 검증하지 않는다 (action별로 해당 폼만)
+    form = ReviewForm(request.POST if request.method == "POST" and action != "ai_save" else None, report=report, initial={
         "place_name": report.suggested_name, "lat": report.lat, "lng": report.lng,
         "category": report.suggested_category,
         "address": report.suggested_address or report.location_text,
         "floor": report.suggested_floor, "phone": report.suggested_phone,
     })
-    if request.method == "POST" and report.status == Report.Status.PENDING and form.is_valid():
+    if form.is_bound and report.status == Report.Status.PENDING and form.is_valid():
         data = form.cleaned_data
         if data["action"] == "approve":
             if data.get("remove_current_photo") and is_photo_request(report) and report.entrance_id:
@@ -166,7 +179,93 @@ def report_review(request, pk):
         "photo_request": is_photo_request(report),
         "current_photo": latest_photo(report.entrance) if report.entrance_id else None,
         "region": _region(),
+        "ai": _ai_panel(report, selection_form),
     })
+
+
+def _ai_back(report):
+    return reverse("ops:report-review", args=[report.pk]) + "#ai"
+
+
+def _ai_analyze(request, report):
+    """'AI 후보 불러오기' → 분석하거나 같은 입력의 이전 결과를 다시 씀. 실패해도 제보·판정은 그대로"""
+    if not AIAnalyzeForm(request.POST).is_valid():
+        messages.error(request, "보내기 전에 개인정보 확인에 체크해 주세요.")
+        return redirect(_ai_back(report))
+    try:
+        _, reused = ai.analyze(report, request.user)
+    except ai.AIError as e:
+        messages.error(request, e.message)
+    else:
+        messages.success(request, "이전에 분석한 결과를 다시 보여 드려요." if reused
+                         else "AI 후보를 불러왔어요. 근거를 보고 맞는 항목만 골라 저장해 주세요.")
+    return redirect(_ai_back(report))
+
+
+def _ai_save(request, report):
+    """고른 후보 저장 → (다시 보여 줄 폼, 응답). 칸 오류면 폼을 돌려주고 같은 화면에 오류 표시"""
+    try:
+        analysis = report.ai_analyses.get(pk=uuid.UUID(request.POST.get("analysis_id", "")))
+    except (ValueError, AIAnalysis.DoesNotExist):
+        raise Http404("분석 기록을 찾을 수 없어요.")
+    form = AISelectionForm(request.POST, analysis=analysis, definitions=ai.active_definitions(),
+                           report_values=_report_values(report))
+    if not form.is_valid():
+        return form, None
+    try:
+        changes = ai.save_selection(analysis, request.user, form.selections())
+    except ai.AIError as e:
+        messages.error(request, e.message)
+    else:
+        messages.success(request, f"{len(changes)}개 항목을 제보에 저장했어요. 이 제보는 이제 운영자만 승인할 수 있어요.")
+    return None, redirect(_ai_back(report))
+
+
+def _report_values(report):
+    return {v.field_id: v for v in report.values.select_related("field")}
+
+
+def _shown(value):
+    return ("있음" if value else "없음") if isinstance(value, bool) else ("-" if value is None else value)
+
+
+def _ai_panel(report, selection_form=None):
+    """운영자 검토 화면의 AI 영역: 보낼 내용 미리보기, 최근 분석 결과, 후보 선택 폼, 선택 기록"""
+    analyses = list(report.ai_analyses.select_related("requested_by"))
+    staff_only = any(a.selection_history for a in analyses)
+    blocked = ai.config_error() or ai.unsupported_reason(report)
+    labels = dict(FieldDefinition.objects.filter(key__in=ai.ENTRANCE_KEYS).values_list("key", "label"))
+    panel = {
+        "enabled": settings.AI_ENABLED, "blocked": ai.MESSAGES[blocked] if blocked else "",
+        "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(),
+        "attempts": ai.attempts_today(), "limit": settings.AI_DAILY_LIMIT,
+        "staff_only": staff_only, "excluded_confirmations": report.confirmations.count() if staff_only else 0,
+        "history": [
+            {**entry, "at": datetime.fromisoformat(entry["at"]),
+             "changes": [{"label": labels.get(c["key"], c["key"]), "before": _shown(c["before"]),
+                                   "after": _shown(c["after"])} for c in entry["changes"]]}
+            for a in analyses for entry in a.selection_history
+        ],
+        "latest": analyses[0] if analyses else None,
+    }
+    latest = panel["latest"]
+    if latest is None:
+        return panel
+    panel["status"] = ai.effective_status(latest)
+    if panel["status"] != AIAnalysis.Status.SUCCEEDED:
+        return panel
+    result = latest.result
+    panel["summary"] = result["summary"]
+    panel["warnings"] = [ai.WARNINGS[w] for w in result["warnings"]]
+    panel["manual_check_items"] = result["manual_check_items"]
+    if latest.selection_history or report.status != Report.Status.PENDING:
+        return panel
+    if ai.input_changed(latest):
+        panel["input_changed"] = True
+        return panel
+    panel["selection_form"] = selection_form or AISelectionForm(
+        analysis=latest, definitions=ai.active_definitions(), report_values=_report_values(report))
+    return panel
 
 
 @staff_required

@@ -11,10 +11,14 @@ from .signals import report_reviewed
 @transaction.atomic
 def verify_report(report, by=None):
     """제보를 반영한다 → 이 값이 판정에 쓰이기 시작함"""
+    from .ai import staff_review_only
+
     Report.objects.select_for_update().get(pk=report.pk)
     report.refresh_from_db()
     if report.status == Report.Status.VERIFIED:
         return report
+    if staff_review_only(report) and (by is None or not (by.is_staff and by.is_active)):
+        raise PermissionDenied("AI 후보를 골라 고친 제보는 운영자가 승인해야 합니다.")
     if report.is_facility_report:
         if by is None or not by.is_staff:
             raise PermissionDenied("시설 제보는 운영자가 검토해야 합니다.")
@@ -59,6 +63,7 @@ class ConfirmationError(Exception):
 
 
 @transaction.atomic
+@transaction.atomic
 def confirm_report(report, user, required):
     """
     다른 주민의 "맞아요" 확인. 확인 수가 required 이상이 되면 자동 반영한다.
@@ -66,8 +71,14 @@ def confirm_report(report, user, required):
     (judgments.services.required_confirmations: 하향 2명, 그 외 1명 — 기획 v2 7장)
     반환: 반영됐으면 True
     """
+    from .ai import staff_review_only
     from .models import ReportConfirmation
 
+    # 같은 제보를 운영자가 AI 후보로 고치는 중일 수 있어 잠그고 다시 확인한다 (부르는 쪽 required만 믿지 않음)
+    Report.objects.select_for_update().get(pk=report.pk)
+    report.refresh_from_db()
+    if staff_review_only(report):
+        raise ConfirmationError("운영진이 고친 정보로 검토 중이라 운영진이 확인해요.")
     if report.is_facility_report or required is None:
         raise ConfirmationError("시설 제보는 운영진이 확인해요.")
     if report.status != Report.Status.PENDING:

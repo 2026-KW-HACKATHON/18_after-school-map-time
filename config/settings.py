@@ -4,6 +4,7 @@
 """
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 import dj_database_url
@@ -221,5 +222,34 @@ REST_FRAMEWORK = {
 # ── 외부 API 키 ──
 KAKAO_JAVASCRIPT_KEY = os.getenv("KAKAO_JAVASCRIPT_KEY", "")  # 브라우저용: 템플릿에서 지도 SDK 로드
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")      # 서버 전용: 주소→좌표 등. 템플릿/JS로 절대 내보내지 않기
-AI_VISION_API_KEY = os.getenv("AI_VISION_API_KEY", "")        # AI 사진 판별 (서비스 미정)
 PUBLIC_DATA_API_KEY = os.getenv("PUBLIC_DATA_API_KEY", "")    # 공공데이터포털 일반 인증키 (장애인편의시설 현황, 서버 전용)
+
+# ── 운영자 AI 검토 보조 (reports/ai.py, 명세 v1.2 A안) ──
+# 제보 사진·설명에서 출입구 항목 후보를 뽑아 운영자에게 보여 준다. 자동 승인은 없다.
+# 팀 결정(모델·예산)과 개인정보 고지 법적 검토가 끝나기 전에는 꺼 둔다 (AI_ENABLED=False).
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")  # 서버 전용. 템플릿·JS로 절대 내보내지 않기
+AI_ENABLED = os.getenv("AI_ENABLED", "False") == "True"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")      # 이미지 입력 + Structured Outputs 지원 모델 ID (팀 결정)
+
+
+def _daily_limit(raw):
+    """하루 외부 분석 시도 한도. 잘못된 값은 무제한이 아니라 0(호출 안 함)으로 본다"""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 0
+    return max(value, 0)
+
+
+def _aware_datetime(raw):
+    """시간대가 있는 ISO 8601 시각만 받는다 (예: 2026-10-07T00:00:00+09:00). 없거나 잘못되면 None"""
+    try:
+        value = datetime.fromisoformat(raw.strip())
+    except (AttributeError, ValueError):
+        return None
+    return value if value.tzinfo else None
+
+
+AI_DAILY_LIMIT = _daily_limit(os.getenv("AI_DAILY_LIMIT", "100"))  # 서울 시간 하루 동안 전체 운영자 합산
+# 제보 화면에 AI 활용 안내를 붙인 시각. 이보다 먼저 들어온 제보는 외부로 보내지 않는다 (비어 있으면 아무것도 안 보냄)
+AI_NOTICE_SINCE = _aware_datetime(os.getenv("AI_NOTICE_SINCE", ""))

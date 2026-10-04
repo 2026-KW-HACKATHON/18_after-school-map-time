@@ -62,6 +62,8 @@
 
 **사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드 + QR 안내 쪽지, 상단 "내 가게" 메뉴), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, 입구 사진 교체 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
 
+**운영자 AI 검토 보조 (✅ 구현, 기본 꺼짐):** 운영자 검토 화면에서 주민 출입구 제보의 사진·설명(전화번호 가림)을 OpenAI로 보내 입구 단차·경사로·문 형태 등 **후보와 근거**만 받음. 운영자가 고른 값만 제보에 저장하고 승인은 직접. 자동 승인 없음, 후보를 저장한 제보는 운영자만 승인(이전 주민 확인 제외). 모델·예산·개인정보 고지 확정 전까지 `AI_ENABLED=False` (명세: AI 명세서 v1.2 A안)
+
 **공공데이터 연동 (✅):** 공공데이터포털 장애인편의시설 현황에서 월계동 공공·업무시설 46곳을 초기 데이터로 (주거시설 제외, 뜻이 바로 맞는 항목만 값으로, 출처 "공공데이터" 표시)
 
 ### 장소별 접근 시설 제보
@@ -149,7 +151,11 @@ docker compose exec web python manage.py createsuperuser
 | `KAKAO_JAVASCRIPT_KEY` | 카카오맵 JS 키 (브라우저 노출 → 카카오 개발자센터에 허용 도메인 등록 필수) | (발급값) |
 | `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**, 카카오 로그인 client_id로도 사용) | (발급값) |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (보안 설정에서 '사용함'일 때만) | |
-| `AI_VISION_API_KEY` | AI 사진 판별 API 키 (서비스 미정) | |
+| `OPENAI_API_KEY` | 운영자 AI 검토 보조용 OpenAI 키 (**서버 전용**) | |
+| `AI_ENABLED` | AI 검토 보조 켜기. 모델·예산·개인정보 고지 확정 전에는 `False` | `False` |
+| `OPENAI_MODEL` | 이미지 입력 + Structured Outputs 지원 모델 ID (팀 결정) | |
+| `AI_DAILY_LIMIT` | 서울 시간 하루 외부 분석 시도 한도 (전체 운영자 합산, 0이면 호출 안 함) | `100` |
+| `AI_NOTICE_SINCE` | 제보 화면 AI 안내를 붙인 시각 (시간대 포함 ISO 8601). 이전 제보는 보내지 않음 | |
 | `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
 | `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
 | `IMAGE_TAG` | 배포 이미지 태그. 롤백할 때만 이전 커밋 SHA로 변경 | `latest` |
