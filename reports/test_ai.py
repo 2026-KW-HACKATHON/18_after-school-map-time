@@ -817,3 +817,52 @@ class GeminiTests(AIBase):
 
         self.assertEqual([_thinking_level(v) for v in ("minimal", "", None, "HIGH", "medium")],
                          ["low", "low", "low", "high", "medium"])
+
+
+class ConfigWarningTests(AIBase):
+    """AI를 켰는데 설정이 틀리면 운영자 화면에 원인을 알려 준다"""
+
+    def test_no_warnings_when_ok_or_ai_off(self):
+        self.assertEqual(ai.config_warnings(), [])
+        with override_settings(AI_ENABLED=False, AI_NOTICE_VERSION=""):
+            self.assertEqual(ai.config_warnings(), [])
+
+    def test_each_misconfiguration_is_explained(self):
+        future = timezone.now() + timedelta(hours=12)
+        cases = [
+            (dict(AI_NOTICE_SINCE=future), "아직 오지 않았어요"),
+            (dict(AI_NOTICE_SINCE=None, AI_NOTICE_SINCE_RAW="2026-10-05T14:30:00"), "형식이 잘못됐어요"),
+            (dict(AI_NOTICE_SINCE=None, AI_NOTICE_SINCE_RAW=""), "AI_NOTICE_SINCE가 비어 있어요"),
+            (dict(AI_NOTICE_VERSION=""), "AI_NOTICE_VERSION이 비어 있어요"),
+            (dict(OPENAI_API_KEY=""), "OPENAI_API_KEY가 비어 있어요"),
+            (dict(AI_PROVIDER="gemini", GEMINI_MODEL=""), "GEMINI_MODEL가 비어 있어요"),
+            (dict(AI_PROVIDER="claude"), "지원하지 않아요"),
+            (dict(AI_DAILY_LIMIT=0), "AI_DAILY_LIMIT이 0"),
+        ]
+        for overrides, text in cases:
+            with self.subTest(text=text), override_settings(**overrides):
+                self.assertTrue(any(text in w for w in ai.config_warnings()), ai.config_warnings())
+        with override_settings(AI_NOTICE_SINCE=future):
+            self.assertNotIn("test-key", " ".join(ai.config_warnings()))  # 키 값은 보여 주지 않음
+
+    def test_daily_limit_reached_is_shown(self):
+        with override_settings(AI_DAILY_LIMIT=1):
+            ai.analyze(self.report, self.staff, client=good())
+            self.assertTrue(any("한도(1회)를 다 썼어요" in w for w in ai.config_warnings()))
+
+    def test_review_and_dashboard_show_warning_and_specific_reason(self):
+        self.client.force_login(self.staff)
+        future = timezone.now() + timedelta(hours=12)
+        with override_settings(AI_NOTICE_SINCE=future):
+            page = self.client.get(reverse("ops:report-review", args=[self.report.pk]))
+            self.assertContains(page, "AI 설정 확인")
+            self.assertContains(page, "AI 안내를 붙인 시각")  # 이 제보가 왜 안 되는지
+            dashboard = self.client.get(reverse("ops:dashboard"))
+            self.assertContains(dashboard, "아직 오지 않았어요")
+        self.assertContains(self.client.get(reverse("ops:dashboard")), "AI 검토 보조 오늘 0/100회 사용")
+
+    def test_notice_reason_for_version_mismatch(self):
+        report = self.make_report(ai_notice_version="")
+        self.assertIn("제출 당시: 없음", ai.notice_reason(report))
+        report = self.make_report(ai_notice_version="notice-old")
+        self.assertIn("'notice-old'", ai.notice_reason(report))
