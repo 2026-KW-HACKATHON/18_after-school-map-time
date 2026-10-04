@@ -7,7 +7,7 @@ Report(제보 묶음) 1건 = 사진 1장 + 필드 값 여러 개.
 판정에는 status=VERIFIED 인 값만 쓴다. PENDING 은 "확인 중"으로만 보여준다 (기획 v2 OP-6).
 """
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -15,6 +15,7 @@ from django.db import models
 from django.utils import timezone
 
 from places.models import AccessFacility, Building, Entrance, FieldDefinition, Place
+from places.validation import parse_boolean, validate_number
 
 # 주민 '사진 수정 요청' 표시: 값 없이 사진(선택)과 이유만 담긴 주민 제보의 설명 앞에 붙인다.
 # 운영자만 처리한다 (judgments.services.is_photo_request → required_confirmations 가 None)
@@ -214,14 +215,9 @@ class AccessibilityValue(models.Model):
         vt = FieldDefinition.ValueType
         self.value_number, self.value_bool, self.value_text = None, None, ""
         if self.field.value_type == vt.NUMBER:
-            try:
-                self.value_number = Decimal(str(raw))
-            except (InvalidOperation, ValueError):
-                raise ValidationError({"value": f"{self.field.label}: 숫자를 입력하세요."})
+            self.value_number = validate_number(self.field_id, raw, self.field.label)
         elif self.field.value_type == vt.BOOL:
-            if isinstance(raw, str):
-                raw = raw.strip().lower() in ("true", "1", "yes", "y", "있음", "예")
-            self.value_bool = bool(raw)
+            self.value_bool = parse_boolean(raw)
         else:
             self.value_text = str(raw).strip()
 
@@ -235,8 +231,10 @@ class AccessibilityValue(models.Model):
         }
         if not filled[self.field.value_type]:
             raise ValidationError(f"{self.field.label}: 값 종류({self.field.get_value_type_display()})에 맞는 값이 없습니다.")
-        if self.field.value_type == vt.NUMBER and self.value_number < 0:
-            raise ValidationError(f"{self.field.label}: 0 이상이어야 합니다.")
+        if self.field.value_type == vt.NUMBER:
+            validate_number(self.field_id, self.value_number, self.field.label)
+        if self.field.value_type == vt.BOOL:
+            self.value_bool = parse_boolean(self.value_bool)
         if self.field.value_type == vt.CHOICE and self.value_text not in self.field.choices:
             raise ValidationError(f"{self.field.label}: 선택지({', '.join(self.field.choices)}) 중 하나여야 합니다.")
         if self.report_id and self.field.scope != self.report.target_scope:
@@ -249,6 +247,11 @@ class AccessibilityValue(models.Model):
             kind = self.report.facility.kind if self.report.facility_id else self.report.facility_kind
             if self.field_id not in KIND_FIELDS.get(kind, ()):
                 raise ValidationError("선택한 시설 종류에서 사용할 수 없는 관측 항목입니다.")
+
+    def save(self, *args, **kwargs):
+        # Form을 통하지 않는 create/save도 검증한다. unique 제약은 기존처럼 DB에서 보장한다.
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        return super().save(*args, **kwargs)
 
 
 class ReportConfirmation(models.Model):
