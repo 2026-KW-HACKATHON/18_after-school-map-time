@@ -32,7 +32,8 @@ from .test_views import TempMediaMixin, photo
 KEYS = list(ai.ENTRANCE_KEYS)
 PAST = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
 AI_ON = dict(AI_ENABLED=True, AI_PROVIDER="openai", OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model",
-             GEMINI_API_KEY="gemini-test-key", GEMINI_MODEL="gemini-2.5-flash-lite", AI_DAILY_LIMIT=100,
+             GEMINI_API_KEY="gemini-test-key", GEMINI_MODEL="gemini-3-flash-preview", GEMINI_THINKING_LEVEL="low",
+             AI_DAILY_LIMIT=100,
              AI_NOTICE_SINCE=PAST, AI_NOTICE_VERSION="notice-test-1")
 
 
@@ -718,7 +719,7 @@ class GeminiTests(AIBase):
         with mock.patch("reports.ai.requests.post", return_value=self.response(200, gemini_body(data))) as post:
             analysis, _ = ai.analyze(self.report, self.staff)
         url, kwargs = post.call_args.args[0], post.call_args.kwargs
-        self.assertIn("models/gemini-2.5-flash-lite:generateContent", url)
+        self.assertIn("models/gemini-3-flash-preview:generateContent", url)
         self.assertEqual(kwargs["headers"], {"x-goog-api-key": "gemini-test-key"})  # 키는 주소가 아니라 헤더로
         self.assertEqual(kwargs["timeout"], ai.OPENAI_TIMEOUT)
         sent = kwargs["json"]
@@ -729,7 +730,7 @@ class GeminiTests(AIBase):
         self.assertEqual(sent["generationConfig"]["responseMimeType"], "application/json")
         self.assertIn("system_instruction", sent)
         self.assertEqual(analysis.status, AIAnalysis.Status.SUCCEEDED)
-        self.assertEqual(analysis.model_id, "gemini:gemini-2.5-flash-lite")
+        self.assertEqual(analysis.model_id, "gemini:gemini-3-flash-preview")
         self.assertEqual(analysis.usage, {"input_tokens": 900, "output_tokens": 150, "total_tokens": 1050})
         self.assertEqual(analysis.result["fields"]["step_height_cm"]["value"], 3)
 
@@ -797,3 +798,16 @@ class GeminiTests(AIBase):
         self.client.force_login(self.neighbor)
         page = self.client.get(reverse("reports:new"), {"place": self.place.pk})
         self.assertContains(page, "Google(미국)로 전송될 수 있습니다")
+
+    def test_generation_config_per_model_family(self):
+        with override_settings(GEMINI_MODEL="gemini-3-flash-preview"):
+            config = ai.GeminiClient().generation_config(REQUEST)
+        self.assertEqual(config["thinkingConfig"], {"thinkingLevel": "low"})
+        self.assertNotIn("temperature", config)  # Gemini 3은 기본 1.0 그대로 (구글 권장)
+        self.assertEqual(config["maxOutputTokens"], ai.GEMINI3_MAX_OUTPUT_TOKENS)
+        with override_settings(GEMINI_MODEL="gemini-3.8-flash", GEMINI_THINKING_LEVEL="minimal"):
+            self.assertEqual(ai.GeminiClient().generation_config(REQUEST)["thinkingConfig"], {"thinkingLevel": "minimal"})
+        with override_settings(GEMINI_MODEL="gemini-2.5-flash-lite"):
+            config = ai.GeminiClient().generation_config(REQUEST)
+        self.assertEqual((config["temperature"], config["maxOutputTokens"]), (0, 2500))
+        self.assertNotIn("thinkingConfig", config)
