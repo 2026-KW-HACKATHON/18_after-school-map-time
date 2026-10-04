@@ -142,7 +142,9 @@ legend { font-weight: 700; padding: 0 4px; }
 .diff-table th, .diff-table td { padding: 8px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
 .diff-table tr.conflict { background: #fffbeb; }
 .table-scroll { overflow-x: auto; }  /* 칸이 많은 표는 휴대폰에서 표만 가로로 밀어 보기 */
-.ai-table th { white-space: nowrap; }  /* AI 후보 표 머리글이 세로로 꺾이지 않게 */
+.ai-table th { white-space: nowrap; }
+.ai-filled { outline: 2px solid var(--color-primary); outline-offset: 1px; }  /* 주민 'AI로 항목 채우기'가 채운 칸 */
+.ai-filled-note { margin: 4px 0 0; font-size: 13px; color: var(--color-primary-dark); }  /* AI 후보 표 머리글이 세로로 꺾이지 않게 */
 .card blockquote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--color-border); background: var(--color-bg); white-space: pre-wrap; }  /* 외부로 보낼 설명 미리보기 */
 .picker-map { height: 280px; border-radius: 8px; background: #eef1f5; margin: 8px 0; }
 .picker-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
