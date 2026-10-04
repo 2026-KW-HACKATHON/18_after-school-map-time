@@ -360,29 +360,95 @@ cd ~/teokeopne
 docker compose -f docker-compose.prod.yml logs -f --tail 100 web     # Ctrl+C로 종료
 ```
 
-**롤백 (이전 버전으로 되돌리기)**
+### 7-1. 롤백 · DB 복구 정책 (먼저 읽기)
 
-배포마다 Docker Hub에 `latest`와 **커밋 SHA 태그**가 같이 올라갑니다.
+| 상황 | 할 일 | DB |
+| --- | --- | --- |
+| 새 배포 뒤 화면 오류·기능 고장 (데이터는 멀쩡) | **앱 롤백**: 이전 커밋 SHA 이미지로 되돌림 (7-2) | 그대로 둠 |
+| 잘못된 데이터가 대량으로 들어가거나 지워짐 (예: 잘못된 가져오기 명령) | **DB 복원**: 백업 시점으로 되돌림 (7-3) | 백업으로 덮어씀 |
+| 둘 다 | 앱 롤백 먼저 → 원인 확인 → 필요하면 DB 복원 | |
+
+- ⛔ **운영 DB 마이그레이션을 되돌리지 않습니다** (`migrate <앱> <이전 번호>` 금지).
+  예: `reports 0006` 이후 시설만 있는 제보가 있으면 `0005`로 되돌릴 때 예전 제약조건을 다시 걸지 못해 실패합니다.
+  억지로 맞추려고 데이터를 지우거나 바꾸지 않습니다.
+- 그래서 마이그레이션은 **이전 코드가 새 DB에서도 돌아가게** 만듭니다 (칼럼 추가는 비워도 되게, 제약은 완화 위주, 칼럼 삭제·이름 변경은 피함). 앱 롤백이 DB를 건드리지 않아도 되는 이유입니다.
+- 앱 롤백과 DB 복원은 **PM(강성훈)이 결정**하고, 팀 단톡방에 "롤백 중 — develop 머지 금지"를 알린 뒤 시작합니다.
+
+### 7-2. 앱 롤백 (이전 버전 이미지로)
+
+배포마다 Docker Hub에 `latest`와 **커밋 SHA 태그**가 같이 올라갑니다. `docker-compose.prod.yml`의 web 이미지는 `cjs1004ounds/teokeopne:${IMAGE_TAG:-latest}` 입니다.
+
+**① 되돌릴 SHA 고르기**: GitHub `develop` 커밋 목록(머지 커밋) 또는 Actions의 성공한 "Deploy to EC2" 실행. 문제가 생기기 직전 배포의 SHA 40자리.
+
+**② 호환성 확인 (내 PC 레포에서)**: 그 SHA 이후에 들어온 마이그레이션이 이전 코드를 깨뜨리지 않는지 봅니다.
+
+```bash
+git fetch origin
+git diff --stat <이전 SHA> origin/develop -- '*/migrations/*'
+git diff <이전 SHA> origin/develop -- '*/migrations/*' | grep -nE "RemoveField|RenameField|DeleteModel|RenameModel|null=False"
+```
+
+- 아무것도 안 나오면 안전합니다 (칼럼 추가·제약 완화만 있음).
+- 무언가 나오면 이전 코드가 없어진 칼럼을 찾다가 500이 날 수 있습니다. 이때는 롤백 대신 **고치는 PR을 빨리 머지**하는 쪽이 낫습니다.
+
+**③ 서버에서 되돌리기**
 
 ```bash
 cd ~/teokeopne
-# 되돌릴 커밋 SHA 확인: GitHub 커밋 목록 또는 Docker Hub Tags 탭
-sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=<이전 커밋 SHA 40자리>/' .env
+sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=<이전 SHA 40자리>/' .env
 docker compose -f docker-compose.prod.yml pull web
 docker compose -f docker-compose.prod.yml up -d web
-# 문제 해결 후 원래대로: IMAGE_TAG=latest 로 바꾸고 다시 pull / up -d
 ```
 
-> ⚠️ 롤백 중에는 자동 배포가 `latest`를 pull 해도 `IMAGE_TAG`가 SHA로 고정돼 있어 반영되지 않습니다. 꼭 `latest`로 되돌려 두세요.
+**④ 확인**: `curl -fsS https://<도메인>/health/` → 200, 지도·장소 상세·제보 화면을 폰으로 한 번씩 열어 봅니다.
 
-> ⚠️ **DB 마이그레이션은 되돌리지 않습니다** (`migrate <앱> <이전 번호>` 금지).
-> 롤백은 위처럼 **이미지(코드)만** 이전 버전으로 바꿉니다. 우리 마이그레이션은 칼럼 추가·제약 완화처럼
-> 이전 코드가 새 DB에서도 돌아가게 만들기 때문에 DB는 그대로 두면 됩니다 (새 마이그레이션도 이 원칙을 지킵니다).
-> 반대로 DB를 되돌리면 새 기능으로 들어온 데이터(예: 출입구 없이 시설만 있는 제보) 때문에
-> 이전 제약조건을 다시 걸지 못해 실패합니다. 데이터 자체가 꼬였다면 아래 **DB 복원**으로 백업 시점으로 돌아갑니다.
+**⑤ 롤백 중 자동 배포와의 관계**
 
-**DB 복원**
+- 롤백 중에 develop에 머지하면 자동 배포가 돌지만 `IMAGE_TAG`가 SHA로 고정돼 있어 **web 이미지는 그대로**입니다.
+  그런데 `git pull`은 되므로 compose·nginx 설정만 새 버전이 되고, `migrate`는 이전 이미지로 실행돼 새 마이그레이션이 적용되지 않습니다.
+  → 코드와 설정이 어긋나므로 **롤백 중에는 develop 머지를 멈춥니다.**
+- 고치는 PR이 준비되면: `.env`를 `IMAGE_TAG=latest`로 되돌린 **뒤** 머지합니다. 그러면 자동 배포가 새 이미지 pull → migrate → collectstatic까지 정상적으로 합니다.
+  이미 머지했다면 `IMAGE_TAG=latest`로 바꾸고 Actions에서 "Deploy to EC2"를 수동 실행합니다.
+
+> ⚠️ `IMAGE_TAG`를 `latest`로 되돌리는 걸 잊으면 이후 모든 배포가 반영되지 않습니다. 롤백이 끝나면 꼭 확인하세요: `grep IMAGE_TAG .env`
+
+### 7-3. DB 복원 (백업 시점으로)
+
+백업은 `scripts/backup_db.sh`가 만든 `backups/<날짜_시간>.sql.gz`입니다 (6-1). `pg_dump --clean --if-exists` 형식이라 **복원하면 지금 테이블을 지우고 백업 내용으로 다시 만듭니다.**
+
+**잃는 것**: 백업 시각 이후의 모든 DB 기록 (제보·확인·알림·사장님 요청·가입). 이 기간의 제보 사진 파일은 media 볼륨에 남지만 연결된 기록이 없어져 화면에 나오지 않습니다.
+→ 복원 전에 단톡방에 "몇 시 기준으로 되돌림, 그 뒤 제보는 사라짐"을 알립니다.
 
 ```bash
-gunzip -c backups/<파일>.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -U teokeopne -d teokeopne
+cd ~/teokeopne
+COMPOSE="docker compose -f docker-compose.prod.yml"
+
+# ① 쓸 백업 고르기 + 파일이 온전한지 확인 (gzip 검사, PostgreSQL 덤프 머리말)
+ls -lh backups/
+gunzip -t backups/<파일>.sql.gz && zcat backups/<파일>.sql.gz | head -5
+
+# ② 지금 상태도 백업 (복원이 잘못되면 여기로 되돌아옴)
+./scripts/backup_db.sh
+
+# ③ 쓰기 멈추기: web을 내림 (그동안 사이트는 502. nginx·db는 그대로)
+$COMPOSE stop web
+
+# ④ 비우고 복원. 백업 뒤에 새로 생긴 테이블까지 지워야 ⑤의 migrate가 "이미 있는 테이블" 오류 없이 다시 만든다
+#    (오류가 나면 바로 멈춤: ON_ERROR_STOP)
+$COMPOSE exec -T db psql -v ON_ERROR_STOP=1 -U teokeopne -d teokeopne -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+gunzip -c backups/<파일>.sql.gz | $COMPOSE exec -T db psql -v ON_ERROR_STOP=1 -U teokeopne -d teokeopne
+
+# ⑤ web 다시 올리고, 백업이 지금 코드보다 오래됐으면 마이그레이션을 앞으로 맞춤
+$COMPOSE up -d web
+$COMPOSE exec -T web python manage.py migrate --noinput
+$COMPOSE exec -T web python manage.py showmigrations | grep "\[ \]" || echo "마이그레이션 모두 적용됨"
+
+# ⑥ 확인
+curl -fsS https://<도메인>/health/
+$COMPOSE exec -T web python manage.py shell -c "from places.models import Place; from reports.models import Report; print('장소', Place.objects.count(), '제보', Report.objects.count())"
 ```
+
+- `POSTGRES_USER`·`POSTGRES_DB`를 바꿨다면 `teokeopne` 대신 그 값을 씁니다.
+- 마이그레이션은 앞으로만 갑니다: 오래된 백업 + 지금 코드 → ⑤의 `migrate`가 빠진 마이그레이션을 적용합니다. 그 반대(새 백업 + 옛 코드)는 7-2의 호환성 확인을 따릅니다.
+- ④에서 오류가 나면: ②에서 만든 백업으로 같은 ④(비우기 + 복원)를 다시 실행해 원래 상태로 돌아간 뒤 원인을 봅니다.
+- 판정은 DB에 같이 저장돼 있어 복원과 함께 돌아옵니다. 규칙(`load_rules`)을 백업 이후에 바꿨다면 `manage.py recompute_judgments`로 다시 계산합니다.

@@ -39,7 +39,10 @@ class StaticStorageTests(TestCase):
 
 class NotFoundTests(TestCase):
     def test_api_paths_answer_json_404(self):
-        for path in ("/api/v1/places/abc/", "/api/v1/nope/", "/api/v1/places/999999/"):
+        # 없는 숫자 ID, 글자·음수·위첨자 숫자·공백·빈 ID, 아주 큰 숫자, 없는 API 경로 (#44)
+        for path in ("/api/v1/places/abc/", "/api/v1/nope/", "/api/v1/places/999999/", "/api/v1/places/-1/",
+                     "/api/v1/places/%C2%B2/", "/api/v1/places/%20/", "/api/v1/places//",
+                     "/api/v1/places/" + "9" * 30 + "/", "/api/v2/places/"):
             with self.subTest(path=path):
                 res = self.client.get(path)
                 self.assertEqual(res.status_code, 404)
@@ -50,6 +53,13 @@ class NotFoundTests(TestCase):
         res = self.client.get("/api/v1/places")
         self.assertEqual(res.status_code, 301)
         self.assertEqual(res["Location"], "/api/v1/places/")
+
+    def test_logged_in_users_and_json_accept_get_same_json_404(self):
+        from accounts.models import User
+
+        self.client.force_login(User.objects.create_user(username="staff404", is_staff=True))
+        res = self.client.get("/api/v1/places/abc/", HTTP_ACCEPT="text/html")
+        self.assertEqual((res.status_code, res["Content-Type"]), (404, "application/json"))
 
     def test_pages_keep_html_404(self):
         res = self.client.get("/places/abc/")
