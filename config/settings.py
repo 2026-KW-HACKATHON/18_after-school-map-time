@@ -231,9 +231,15 @@ AI_ENABLED = os.getenv("AI_ENABLED", "False") == "True"
 # 사진·설명을 보낼 곳: gemini(팀 결정, 결제 연결한 유료 등급만) 또는 openai. 키는 서버 전용, 템플릿·JS로 절대 내보내지 않기
 AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")  # 이미지 입력 + JSON 출력 형식 지원 모델
-# Gemini 3 이후 모델의 생각 단계: minimal / low / medium / high. 입구 항목 뽑기는 깊은 추론이 필요 없어 low
-GEMINI_THINKING_LEVEL = os.getenv("GEMINI_THINKING_LEVEL", "low").strip().lower()
+# 실제 호출 비교(2026-10-05): 3.5 Flash-Lite가 3 Flash와 같은 결과·1회 약 3원·안정판 → 기본값. 2.5는 새 프로젝트에서 404
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+# Gemini 3 이후 모델의 생각 단계: low / medium / high. minimal은 실제 호출에서 형식이 깨져 쓰지 않음 → low로 바꿈
+def _thinking_level(raw):
+    value = (raw or "").strip().lower()
+    return value if value in ("low", "medium", "high") else "low"
+
+
+GEMINI_THINKING_LEVEL = _thinking_level(os.getenv("GEMINI_THINKING_LEVEL", "low"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
 

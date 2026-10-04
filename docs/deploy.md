@@ -304,9 +304,9 @@ cd ~/teokeopne
 nano .env
 # AI_PROVIDER=gemini
 # GEMINI_API_KEY=<서버 전용 키>
-# GEMINI_MODEL=gemini-3-flash-preview
+# GEMINI_MODEL=gemini-3.5-flash-lite
 # GEMINI_THINKING_LEVEL=low
-# AI_DAILY_LIMIT=100
+# AI_DAILY_LIMIT=50                             ← 1회 약 3원 → 하루 최대 약 150원
 # AI_NOTICE_SINCE=2026-10-07T09:00:00+09:00   ← 켜는 시각, 시간대(+09:00) 꼭 포함
 # AI_NOTICE_VERSION=ai-notice-v1                ← 안내 문구 버전. 문구를 바꾸면 SINCE와 함께 올림
 # AI_ENABLED=True
