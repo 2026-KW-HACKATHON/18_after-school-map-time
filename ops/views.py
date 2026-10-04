@@ -5,7 +5,7 @@ Django 관리자(/admin/)는 데이터 전체를 다루는 도구로 남겨 두�
 
 import csv
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
@@ -241,7 +241,8 @@ def _ai_panel(report, selection_form=None):
         "attempts": ai.attempts_today(), "limit": settings.AI_DAILY_LIMIT,
         "staff_only": staff_only, "excluded_confirmations": report.confirmations.count() if staff_only else 0,
         "history": [
-            {**entry, "changes": [{"label": labels.get(c["key"], c["key"]), "before": _shown(c["before"]),
+            {**entry, "at": datetime.fromisoformat(entry["at"]),
+             "changes": [{"label": labels.get(c["key"], c["key"]), "before": _shown(c["before"]),
                                    "after": _shown(c["after"])} for c in entry["changes"]]}
             for a in analyses for entry in a.selection_history
         ],

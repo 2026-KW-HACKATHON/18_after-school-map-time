@@ -88,7 +88,7 @@
             {% if f.non_field_errors %}<div class="alert">{{ f.non_field_errors }}</div>{% endif %}
             {% for e in f.selected_keys.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
             <div class="table-scroll">
-            <table class="diff-table">
+            <table class="diff-table ai-table">
               <thead><tr><th>저장</th><th>항목</th><th>제보 값</th><th>AI 후보 (근거)</th><th>저장할 값</th></tr></thead>
               <tbody>
                 {% for row in f.rows %}
@@ -97,7 +97,7 @@
                     <th scope="row"><label for="ai-pick-{{ row.key }}">{{ row.label }}</label></th>
                     <td>{% if row.current %}{{ row.current }}{{ row.unit }}{% else %}<span class="muted">-</span>{% endif %}</td>
                     <td>{% if row.candidate != "" %}<strong>{{ row.candidate }}{{ row.unit }}</strong>{% else %}<span class="muted">모름</span>{% endif %}
-                      <br><span class="muted small">{{ row.certainty }} · {{ row.source }}{% if row.evidence %} — {{ row.evidence }}{% endif %}</span></td>
+                      {% if row.evidence %}<br><span class="muted small">{{ row.certainty }} · {{ row.source }} — {{ row.evidence }}</span>{% endif %}</td>
                     <td>{{ row.field }}{% for e in row.field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</td>
                   </tr>
                 {% endfor %}
@@ -118,7 +118,7 @@
       <p class="small"><strong>AI 후보 저장 기록</strong></p>
       <ul class="small">
         {% for h in ai.history %}
-          <li>{{ h.by_name }} · {{ h.at|slice:":16"|cut:"T" }} — {% for c in h.changes %}{{ c.label }} {{ c.before }} → {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+          <li>{{ h.by_name }} · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.before }} → {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
         {% endfor %}
       </ul>
     {% endif %}
