@@ -71,9 +71,11 @@
 
     {% if ai.latest %}
       {% if ai.status == "FAILED" %}
-        <p class="alert small">AI 분석을 완료하지 못했어요. 사진과 설명을 직접 검토해 주세요.{% if ai.latest.error_message %} ({{ ai.latest.error_message }}){% endif %}</p>
+        <p class="alert small">AI 분석을 완료하지 못했어요. 사진과 설명을 직접 검토해 주세요.{% if ai.error_message %} ({{ ai.error_message }}){% endif %}</p>
       {% elif ai.status == "PROCESSING" %}
         <p class="small">분석 중이에요. 잠시 뒤 새로고침해 주세요.</p>
+      {% elif ai.old_schema %}
+        <p class="alert small">이전 버전으로 분석한 결과라 후보를 쓸 수 없어요. 재분석이 필요합니다.</p>
       {% else %}
         <p><strong>요약</strong> {{ ai.summary|default:"없음" }}</p>
         {% if ai.warnings %}<ul class="plain-list small">{% for w in ai.warnings %}<li><span class="badge-warn">확인</span> {{ w }}</li>{% endfor %}</ul>{% endif %}
@@ -92,6 +94,9 @@
               <thead><tr><th>저장</th><th>항목</th><th>제보 값</th><th>AI 후보 (근거)</th><th>저장할 값</th></tr></thead>
               <tbody>
                 {% for row in f.rows %}
+                  {% if row.excluded %}
+                  <tr class="muted"><td></td><th scope="row">{{ row.label }}</th><td colspan="3" class="small">분석 제외 (꺼진 항목)</td></tr>
+                  {% else %}
                   <tr>
                     <td><input type="checkbox" name="selected_keys" value="{{ row.key }}" id="ai-pick-{{ row.key }}" aria-label="{{ row.label }} 저장"{% if row.key in f.selected_keys.value %} checked{% endif %}></td>
                     <th scope="row"><label for="ai-pick-{{ row.key }}">{{ row.label }}</label></th>
@@ -100,6 +105,7 @@
                       {% if row.evidence %}<br><span class="muted small">{{ row.certainty }} · {{ row.source }} — {{ row.evidence }}</span>{% endif %}</td>
                     <td>{{ row.field }}{% for e in row.field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</td>
                   </tr>
+                  {% endif %}
                 {% endfor %}
               </tbody>
             </table>

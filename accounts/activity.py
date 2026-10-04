@@ -7,6 +7,7 @@
 """
 
 from judgments.services import required_confirmations
+from reports.ai import staff_review_report_ids
 from reports.models import Reconfirmation, Report, ReportConfirmation
 
 # (키, 이름, 무엇을 세는지, 기준 수, 설명)
@@ -24,7 +25,9 @@ def counts(user):
         "reports": reports.count(),
         "verified_reports": reports.filter(status=Report.Status.VERIFIED).count(),
         "pending_reports": reports.filter(status=Report.Status.PENDING).count(),
-        "confirmations": ReportConfirmation.objects.filter(user=user).count(),
+        # AI 후보로 값을 고친 제보에 한 확인은 고치기 전 값에 대한 것이라 세지 않음 (AI 명세 v1.3 6장)
+        "confirmations": ReportConfirmation.objects.filter(user=user).exclude(
+            report_id__in=staff_review_report_ids()).count(),
         "reconfirmations": Reconfirmation.objects.filter(user=user).count(),
     }
 
