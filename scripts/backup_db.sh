@@ -9,7 +9,7 @@
 #   KEEP_DAYS=14 ./scripts/backup_db.sh
 #
 # cron 등록(매일 새벽 4시)은 docs/deploy.md 6단계 참고
-# 복원: gunzip -c backups/<파일>.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -U <유저> -d <DB이름>
+# 복원 절차(쓰기 멈추기·검증 포함)는 docs/deploy.md 7-3 참고
 # ─────────────────────────────────────────────────────────
 
 # 명령 하나라도 실패하면 즉시 중단 (pipefail: pg_dump가 실패하면 gzip 성공이어도 실패로 처리)
