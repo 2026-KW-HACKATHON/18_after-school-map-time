@@ -50,6 +50,7 @@ OPENAI_URL = "https://api.openai.com/v1/responses"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 OPENAI_TIMEOUT = 20          # 초. gunicorn(60초)·nginx(60초) 제한보다 짧게 (두 제공자 공통)
 MAX_OUTPUT_TOKENS = 2500
+GEMINI3_MAX_OUTPUT_TOKENS = 4000  # 생각 토큰 포함 (출력 JSON은 약 500토큰)
 ACCEPT_DEADLINE = timedelta(seconds=25)   # 요청한 지 이보다 늦게 온 응답은 후보로 쓰지 않음 (시간 초과)
 PROCESSING_STALE = timedelta(seconds=60)  # 이만큼 '분석 중'이면 작업자가 죽은 것 → 실패(시간 초과)로 계산
 NOTICE_SALT = "teokeopne.ai-notice"
@@ -439,13 +440,20 @@ class GeminiClient:
         return {
             "system_instruction": {"parts": [{"text": request["instructions"]}]},
             "contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseJsonSchema": gemini_schema(request["schema"]),
-                "maxOutputTokens": request["max_output_tokens"],
-                "temperature": 0,  # 같은 입력이면 최대한 같은 후보 (추출 작업)
-            },
+            "generationConfig": self.generation_config(request),
         }
+
+    def generation_config(self, request):
+        config = {"responseMimeType": "application/json", "responseJsonSchema": gemini_schema(request["schema"])}
+        if settings.GEMINI_MODEL.startswith("gemini-2"):
+            config.update(maxOutputTokens=request["max_output_tokens"],
+                          temperature=0)  # 같은 입력이면 최대한 같은 후보 (추출 작업)
+        else:
+            # Gemini 3 이후: 생각(thinking)이 기본으로 켜져 있고 생각 토큰도 출력 한도에 들어감 → 단계를 낮추고 한도를 늘림.
+            # temperature는 구글 권장대로 기본값(1.0) 그대로 (낮추면 반복 출력 등 이상 동작 가능)
+            config.update(maxOutputTokens=GEMINI3_MAX_OUTPUT_TOKENS,
+                          thinkingConfig={"thinkingLevel": settings.GEMINI_THINKING_LEVEL})
+        return config
 
     def create(self, request):
         """→ (출력 JSON, 응답 번호, 토큰 사용량)"""
