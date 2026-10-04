@@ -76,7 +76,7 @@
 - 건물 공용 입구 → 층 이동 시설 → 가게 입구를 나눠 기록할 수 있지만, 시설 간 경로 그래프·자동 경로 탐색·시설을 조합한 새로운 판정은 후속 범위입니다.
 - 이 확장에는 `places` 0002·0003, `reports` 0006 Migration이 필요합니다. 실제 DB 적용은 별도 승인 후 진행합니다. 테스트는 임시 DB에서 시설 등록·조회·검증·검토·기존 데이터 보존을 확인합니다.
 
-**정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 올린 사진의 촬영 위치(EXIF) 자동 삭제와 **얼굴 자동 가림**(서버 안 OpenCV, 외부 전송 없음), 확인 전 제보 사진은 로그인한 주민에게만
+**정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 아이폰 HEIC 사진 업로드(JPEG로 바꿔 저장), 올린 사진의 촬영 위치(EXIF) 자동 삭제와 **얼굴 자동 가림**(서버 안 OpenCV, 외부 전송 없음), 확인 전 제보 사진은 로그인한 주민에게만
 
 **개선 연결·분쟁 방지 (✅):** "가고 싶어요" 누른 가게가 좋아지면 알림, 사장님 정보와 주민 제보가 다르면 "방문 전 전화 확인" 안내, 운영자용 **지역 집계**(판정 분포·경사로 지원사업 검토 목록 CSV — 구청 협력용, 비공개)
 
@@ -326,6 +326,7 @@ python manage.py runserver
 | [Pillow](https://python-pillow.org/) | 이미지 처리 | MIT-CMU |
 | [OpenCV](https://opencv.org/) (opencv-python-headless) | 제보 사진 얼굴 자동 가림 (정면 얼굴 검출기 포함) | Apache-2.0 |
 | [NumPy](https://numpy.org/) | OpenCV 이미지 배열 | BSD-3-Clause |
+| [pi-heif](https://github.com/bigcat88/pillow_heif) | 아이폰 HEIC/HEIF 사진 읽기 (JPEG로 바꿔 저장) | BSD-3-Clause (포함된 libheif·libde265는 LGPL-3.0) |
 | [Requests](https://requests.readthedocs.io/) | 외부 API 호출 | Apache-2.0 |
 | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (cdnjs) | 사장님 인증 안내 쪽지·전시 포스터의 QR 코드 | MIT |
 | [PostgreSQL](https://www.postgresql.org/) | 데이터베이스 | PostgreSQL License |

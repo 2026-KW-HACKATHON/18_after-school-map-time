@@ -1,11 +1,13 @@
 """주민 제보 화면 테스트 (와이어프레임 8·9번, 기획 v2 7장)"""
 
+import pathlib
 import shutil
 import tempfile
 from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -72,6 +74,14 @@ class ReportFormTests(TempMediaMixin, TestCase):
         self.assertEqual(set(values), {"step_height_cm", "has_ramp", "door_type"})  # '모름'은 저장 안 함
         self.assertIs(values["has_ramp"], False)
         self.assertTrue(report.photo.name)
+
+    def test_iphone_heic_photo_is_saved_as_jpeg(self):
+        heic = (pathlib.Path(settings.BASE_DIR) / "core" / "testdata" / "sample.heic").read_bytes()
+        upload = SimpleUploadedFile("IMG_0001.HEIC", heic, content_type="image/heic")
+        res = self.client.post(self.url, {"photo": upload, "place": self.place.pk, "step_height_cm": "0"})
+        self.assertRedirects(res, reverse("reports:done"))
+        name = Report.objects.get().photo.name
+        self.assertTrue(name.endswith(".jpg"), name)  # 어느 브라우저에서나 보이게 JPEG로 저장
 
     def test_photo_required(self):
         res = self.client.post(self.url, {"place": self.place.pk, "step_height_cm": "3"})
