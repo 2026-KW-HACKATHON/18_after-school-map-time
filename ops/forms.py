@@ -134,3 +134,84 @@ class ReviewForm(forms.Form):
                 if data.get(key) in (None, ""):
                     self.add_error(key, msg)
         return data
+
+
+# ── 운영자 AI 검토 보조 (reports/ai.py, AI 명세 v1.2 A안) ──
+PRIVACY_CHECK_LABEL = "사진과 설명에 얼굴·차량 번호판·이름 등 개인정보가 남아 있지 않음을 확인했어요"
+
+
+class AIAnalyzeForm(forms.Form):
+    """'AI 후보 불러오기' — 보내기 전 운영자의 개인정보 점검 기록 (주민 동의를 대신하지 않음)"""
+
+    privacy_checked = forms.BooleanField(label=PRIVACY_CHECK_LABEL,
+                                         error_messages={"required": "보내기 전에 개인정보 확인에 체크해 주세요."})
+
+
+class AISelectionForm(forms.Form):
+    """
+    AI 후보 중 운영자가 고른 항목만 저장. 모든 후보는 처음엔 선택 해제 (명세 9장).
+    선택 체크박스와 값 칸을 나눈다 → 예/아니오는 있음·없음·모름 중 직접 고르고, 체크 안 한 칸을 false로 보지 않는다.
+    """
+
+    analysis_id = forms.UUIDField(widget=forms.HiddenInput)
+    privacy_checked = forms.BooleanField(label=PRIVACY_CHECK_LABEL,
+                                         error_messages={"required": "저장하기 전에 개인정보 확인에 체크해 주세요."})
+    selected_keys = forms.MultipleChoiceField(label="저장할 항목", widget=forms.CheckboxSelectMultiple,
+                                              error_messages={"required": "저장할 항목을 하나 이상 골라 주세요."})
+
+    def __init__(self, *args, analysis, definitions, report_values=None, **kwargs):
+        from places.models import FieldDefinition
+        from places.validation import INTEGER_KEYS
+        from reports.ai import AUTOMATIC_DOOR, CERTAINTY, EVIDENCE_SOURCES
+
+        super().__init__(*args, **kwargs)
+        self.definitions = definitions
+        self.fields["selected_keys"].choices = [(f.key, f.label) for f in definitions]
+        self.initial["analysis_id"] = analysis.pk
+        candidates = (analysis.result or {}).get("fields", {})
+        report_values = report_values or {}
+        vt = FieldDefinition.ValueType
+        self.rows = []
+        for f in definitions:
+            name = f"value_{f.key}"
+            if f.value_type == vt.NUMBER:
+                if f.key in INTEGER_KEYS:
+                    field = forms.IntegerField(required=False, **numeric_form_options(f.key))
+                else:
+                    field = forms.DecimalField(required=False, decimal_places=1, **numeric_form_options(f.key))
+            elif f.value_type == vt.BOOL:
+                field = forms.ChoiceField(required=False, choices=BOOL_CHOICES)
+            else:
+                field = forms.ChoiceField(required=False, choices=[(UNKNOWN, "모름")] + [
+                    (c, c) for c in f.choices if c != AUTOMATIC_DOOR])
+            field.label = f"{f.label} 저장할 값"
+            self.fields[name] = field
+            candidate = candidates.get(f.key, {})
+            value = candidate.get("value")
+            if value is not None:
+                self.initial[name] = ("true" if value else "false") if isinstance(value, bool) else value
+            current = report_values.get(f.key)
+            self.rows.append({
+                "key": f.key, "label": f.label, "unit": f.unit,
+                "current": current.display_value if current else "",
+                "candidate": "" if value is None else (("있음" if value else "없음") if isinstance(value, bool) else value),
+                "certainty": CERTAINTY.get(candidate.get("certainty"), ""),
+                "source": EVIDENCE_SOURCES.get(candidate.get("evidence_source"), ""),
+                "evidence": candidate.get("evidence", ""),
+                "field": self[name],
+            })
+
+    def clean(self):
+        data = super().clean()
+        for key in data.get("selected_keys", []):
+            if data.get(f"value_{key}") in (None, UNKNOWN):
+                self.add_error(f"value_{key}", "값을 고르거나 이 항목 선택을 풀어 주세요.")
+        return data
+
+    def selections(self):
+        """{필드 키: 저장할 값} — 예/아니오는 bool로"""
+        out = {}
+        for key in self.cleaned_data["selected_keys"]:
+            value = self.cleaned_data[f"value_{key}"]
+            out[key] = {"true": True, "false": False}.get(value, value) if isinstance(value, str) else value
+        return out
