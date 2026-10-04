@@ -185,7 +185,8 @@ class AnalyzeTests(AIBase):
             "UNSUPPORTED_REPORT_TYPE": [self.make_report(source=Report.Source.OWNER),
                                         self.make_report(note="[사진 수정 요청] 예전 모습이에요")],
             "REPORT_NOT_PENDING": [self.make_report(status=Report.Status.VERIFIED)],
-            "UNSUPPORTED_SCOPE": [self.make_report(entrance=None, place=self.place, facility_kind="ELEVATOR")],
+            # 가게 전체 항목(사장님 영역)은 대상 아님. 시설 제보는 이제 대상 (FacilityAnalysisTests)
+            "UNSUPPORTED_SCOPE": [self.make_report(entrance=None, place=self.place)],
         }
         for code, reports in cases.items():
             for report in reports:
@@ -817,3 +818,140 @@ class GeminiTests(AIBase):
 
         self.assertEqual([_thinking_level(v) for v in ("minimal", "", None, "HIGH", "medium")],
                          ["low", "low", "low", "high", "medium"])
+
+
+class ConfigWarningTests(AIBase):
+    """AI를 켰는데 설정이 틀리면 운영자 화면에 원인을 알려 준다"""
+
+    def test_no_warnings_when_ok_or_ai_off(self):
+        self.assertEqual(ai.config_warnings(), [])
+        with override_settings(AI_ENABLED=False, AI_NOTICE_VERSION=""):
+            self.assertEqual(ai.config_warnings(), [])
+
+    def test_each_misconfiguration_is_explained(self):
+        future = timezone.now() + timedelta(hours=12)
+        cases = [
+            (dict(AI_NOTICE_SINCE=future), "아직 오지 않았어요"),
+            (dict(AI_NOTICE_SINCE=None, AI_NOTICE_SINCE_RAW="2026-10-05T14:30:00"), "형식이 잘못됐어요"),
+            (dict(AI_NOTICE_SINCE=None, AI_NOTICE_SINCE_RAW=""), "AI_NOTICE_SINCE가 비어 있어요"),
+            (dict(AI_NOTICE_VERSION=""), "AI_NOTICE_VERSION이 비어 있어요"),
+            (dict(OPENAI_API_KEY=""), "OPENAI_API_KEY가 비어 있어요"),
+            (dict(AI_PROVIDER="gemini", GEMINI_MODEL=""), "GEMINI_MODEL가 비어 있어요"),
+            (dict(AI_PROVIDER="claude"), "지원하지 않아요"),
+            (dict(AI_DAILY_LIMIT=0), "AI_DAILY_LIMIT이 0"),
+        ]
+        for overrides, text in cases:
+            with self.subTest(text=text), override_settings(**overrides):
+                self.assertTrue(any(text in w for w in ai.config_warnings()), ai.config_warnings())
+        with override_settings(AI_NOTICE_SINCE=future):
+            self.assertNotIn("test-key", " ".join(ai.config_warnings()))  # 키 값은 보여 주지 않음
+
+    def test_daily_limit_reached_is_shown(self):
+        with override_settings(AI_DAILY_LIMIT=1):
+            ai.analyze(self.report, self.staff, client=good())
+            self.assertTrue(any("한도(1회)를 다 썼어요" in w for w in ai.config_warnings()))
+
+    def test_review_and_dashboard_show_warning_and_specific_reason(self):
+        self.client.force_login(self.staff)
+        future = timezone.now() + timedelta(hours=12)
+        with override_settings(AI_NOTICE_SINCE=future):
+            page = self.client.get(reverse("ops:report-review", args=[self.report.pk]))
+            self.assertContains(page, "AI 설정 확인")
+            self.assertContains(page, "AI 안내를 붙인 시각")  # 이 제보가 왜 안 되는지
+            dashboard = self.client.get(reverse("ops:dashboard"))
+            self.assertContains(dashboard, "아직 오지 않았어요")
+        self.assertContains(self.client.get(reverse("ops:dashboard")), "AI 검토 보조 오늘 0/100회 사용")
+
+    def test_notice_reason_for_version_mismatch(self):
+        report = self.make_report(ai_notice_version="")
+        self.assertIn("제출 당시: 없음", ai.notice_reason(report))
+        report = self.make_report(ai_notice_version="notice-old")
+        self.assertIn("'notice-old'", ai.notice_reason(report))
+
+
+ELEVATOR_KEYS = ["facility_available", "facility_connected_floors", "facility_wheelchair", "facility_door_width_cm",
+                 "facility_interior_space", "facility_accessible_buttons", "facility_braille"]
+
+
+class FacilityAnalysisTests(AIBase):
+    """엘리베이터·계단·경사로·화장실 같은 접근 시설 제보도 같은 흐름으로 (운영자 검토, 시설은 원래 운영자만 승인)"""
+
+    def setUp(self):
+        super().setUp()
+        self.facility_report = self.make_report(entrance=None, place=self.place, facility_kind="ELEVATOR",
+                                                facility_name="동쪽 엘리베이터",
+                                                note="엘리베이터 1층에서 3층까지 가요. 문 폭 재보니 90cm, 지금 잘 작동해요.")
+
+    def facility_client(self):
+        data = output(keys=ELEVATOR_KEYS,
+                      facility_available=clear(True, "지금 잘 작동해요"),
+                      facility_connected_floors=clear("1층 → 3층", "1층에서 3층까지"),
+                      facility_door_width_cm=clear(90, "문 폭 재보니 90cm"))
+        return FakeClient(body(data))
+
+    def test_facility_report_is_analysed_with_its_own_fields(self):
+        self.assertEqual(ai.analysis_kind(self.facility_report), "ELEVATOR")
+        self.assertIsNone(ai.unsupported_reason(self.facility_report))
+        client = self.facility_client()
+        analysis, _ = ai.analyze(self.facility_report, self.staff, client=client)
+        request = client.calls[0]
+        self.assertEqual(request["schema"]["properties"]["fields"]["required"], ELEVATOR_KEYS)
+        self.assertIn("엘리베이터", request["instructions"])
+        self.assertIn("facility_wheelchair는", request["instructions"])  # 시설 항목 규칙
+        self.assertNotIn("door_type은", request["instructions"])  # 출입구 규칙은 빠짐
+        self.assertEqual(analysis.schema_version, ai.FACILITY_SCHEMA_VERSION)
+        fields = analysis.result["fields"]
+        self.assertEqual((fields["facility_connected_floors"]["value"], fields["facility_door_width_cm"]["value"]),
+                         ("1층 → 3층", 90))
+
+    def test_entrance_instructions_keep_entrance_rules_only(self):
+        client = good()
+        ai.analyze(self.report, self.staff, client=client)
+        text = client.calls[0]["instructions"]
+        self.assertIn("가게 입구", text)
+        self.assertIn("entrance_available은", text)
+        self.assertNotIn("facility_wheelchair는", text)
+
+    def test_long_text_candidate_is_clipped(self):
+        data = output(keys=ELEVATOR_KEYS, facility_interior_space=clear("가" * 500))
+        analysis, _ = ai.analyze(self.facility_report, self.staff, client=FakeClient(body(data)))
+        self.assertEqual(len(analysis.result["fields"]["facility_interior_space"]["value"]), 200)
+
+    def test_select_and_save_facility_values_then_staff_approves(self):
+        analysis, _ = ai.analyze(self.facility_report, self.staff, client=self.facility_client())
+        ai.save_selection(analysis, self.staff, {"facility_connected_floors": "1층 → 3층", "facility_available": True})
+        self.assertEqual(self.values(self.facility_report),
+                         {"facility_connected_floors": "1층 → 3층", "facility_available": True})
+        with self.assertRaises(ai.AIError):  # 엘리베이터에 없는 항목
+            other, _ = ai.analyze(self.make_report(entrance=None, place=self.place, facility_kind="ELEVATOR",
+                                                   note="다른 엘리베이터"), self.staff, client=self.facility_client())
+            ai.save_selection(other, self.staff, {"facility_slope_deg": 5})
+        self.assertIsNone(required_confirmations(self.facility_report))
+
+    def test_ops_screen_shows_facility_rows_with_text_input(self):
+        ai.analyze(self.facility_report, self.staff, client=self.facility_client())
+        self.client.force_login(self.staff)
+        url = reverse("ops:report-review", args=[self.facility_report.pk])
+        page = self.client.get(url)
+        self.assertContains(page, 'name="value_facility_connected_floors"')
+        self.assertContains(page, 'value="1층 → 3층"')
+        self.assertNotContains(page, 'name="value_step_height_cm"')
+        analysis = AIAnalysis.objects.get(report=self.facility_report)
+        res = self.client.post(url, {"action": "ai_save", "analysis_id": analysis.pk, "privacy_checked": "on",
+                                     "selected_keys": ["facility_connected_floors", "facility_door_width_cm"],
+                                     "value_facility_connected_floors": "1층 → 3층", "value_facility_door_width_cm": "90"})
+        self.assertRedirects(res, url + "#ai", fetch_redirect_response=False)
+        self.assertEqual(self.values(self.facility_report),
+                         {"facility_connected_floors": "1층 → 3층", "facility_door_width_cm": Decimal("90.00")})
+
+
+class ReportListBadgeTests(AIBase):
+    def test_list_shows_ai_state(self):
+        other = self.make_report()
+        ai.analyze(other, self.staff, client=good())
+        analysis, _ = ai.analyze(self.report, self.staff, client=good())
+        ai.save_selection(analysis, self.staff, {"has_ramp": False})
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:reports"))
+        self.assertContains(page, "AI 후보 저장", count=1)
+        self.assertContains(page, "AI 분석함", count=1)

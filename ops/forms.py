@@ -159,7 +159,7 @@ class AISelectionForm(forms.Form):
     selected_keys = forms.MultipleChoiceField(label="저장할 항목", widget=forms.CheckboxSelectMultiple,
                                               error_messages={"required": "저장할 항목을 하나 이상 골라 주세요."})
 
-    def __init__(self, *args, analysis, definitions, report_values=None, labels=None, **kwargs):
+    def __init__(self, *args, analysis, definitions, report_values=None, labels=None, all_keys=None, **kwargs):
         from places.models import FieldDefinition
         from places.validation import INTEGER_KEYS
         from reports.ai import AUTOMATIC_DOOR, CERTAINTY, ENTRANCE_KEYS, EVIDENCE_SOURCES
@@ -184,6 +184,8 @@ class AISelectionForm(forms.Form):
                     field = forms.DecimalField(required=False, decimal_places=1, **numeric_form_options(f.key))
             elif f.value_type == vt.BOOL:
                 field = forms.ChoiceField(required=False, choices=BOOL_CHOICES)
+            elif f.value_type == vt.TEXT:
+                field = forms.CharField(required=False, max_length=200)
             else:
                 field = forms.ChoiceField(required=False, choices=[(UNKNOWN, "모름")] + [
                     (c, c) for c in f.choices if c != AUTOMATIC_DOOR])
@@ -205,7 +207,7 @@ class AISelectionForm(forms.Form):
             })
         labels = labels or {}
         self.rows = [rows.get(key) or {"key": key, "label": labels.get(key, key), "excluded": True}
-                     for key in ENTRANCE_KEYS]
+                     for key in (all_keys or ENTRANCE_KEYS)]  # 제보 종류의 항목 전체 고정 (꺼진 항목은 '분석 제외')
 
     def clean(self):
         data = super().clean()
