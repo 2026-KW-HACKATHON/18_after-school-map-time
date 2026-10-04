@@ -306,11 +306,12 @@ nano .env
 # OPENAI_MODEL=<팀이 정한 모델 ID>
 # AI_DAILY_LIMIT=100
 # AI_NOTICE_SINCE=2026-10-07T09:00:00+09:00   ← 켜는 시각, 시간대(+09:00) 꼭 포함
+# AI_NOTICE_VERSION=ai-notice-v1                ← 안내 문구 버전. 문구를 바꾸면 SINCE와 함께 올림
 # AI_ENABLED=True
 docker compose -f docker-compose.prod.yml up -d web   # .env 다시 읽기
 ```
 
-3. 확인: 제보 화면 맨 아래에 "OpenAI(미국)로 전송될 수 있습니다" 안내가 보이는지, 운영자 검토 화면에 "AI 검토 보조"가 보이는지.
+3. 확인: 켠 뒤에 들어온 제보만 분석됩니다(안내 버전이 기록된 제보). 이미 열려 있던 제보 화면에서 제출하면 "안내가 바뀌었어요"가 한 번 뜨는 게 정상입니다. 제보 화면 맨 아래에 "OpenAI(미국)로 전송될 수 있습니다" 안내가 보이는지, 운영자 검토 화면에 "AI 검토 보조"가 보이는지.
 4. 끄기: `AI_ENABLED=False`로 바꾸고 `up -d web`. 이미 저장된 분석 기록·선택 값은 그대로 남습니다.
 
 ---

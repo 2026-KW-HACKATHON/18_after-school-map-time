@@ -68,6 +68,9 @@ class Report(models.Model):
     # 실제로 현장을 확인한 시각. 운영자가 예전 답사 기록을 나중에 입력할 수 있어서 작성 시각과 따로 둔다.
     # "지금 쓸 값"은 이 시각이 가장 최근인 제보로 정한다 (reports/selectors.py)
     observed_at = models.DateTimeField("확인 시각", default=timezone.now)
+    # 제출한 폼에 붙어 있던 AI 활용 안내 버전 (AI 명세 v1.3 7.1). 안내를 '봤다'·'동의했다'는 뜻은 아님.
+    # 빈 값 = 안내 없이 제출 → AI로 보내지 않음. db_default: 이전 버전 코드로 롤백해도 제보 저장이 깨지지 않게
+    ai_notice_version = models.CharField("AI 안내 버전", max_length=40, blank=True, default="", db_default="")
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="작성자", on_delete=models.SET_NULL, null=True, blank=True,
@@ -315,7 +318,9 @@ class AIAnalysis(models.Model):
         FAILED = "FAILED", "실패"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)  # 폼·주소에 넣어도 순서 추측 불가
-    report = models.ForeignKey(Report, verbose_name="제보", on_delete=models.CASCADE, related_name="ai_analyses")
+    # 제보를 지워도 행은 남겨 오늘 호출 횟수에 계속 센다. 내용은 지울 때 비운다 (reports.ai.clear_on_report_delete)
+    report = models.ForeignKey(Report, verbose_name="제보", on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name="ai_analyses")
     requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="요청한 운영자", on_delete=models.SET_NULL,
                                      null=True, blank=True, related_name="+")
     status = models.CharField("상태", max_length=12, choices=Status.choices, default=Status.PROCESSING)
@@ -343,4 +348,5 @@ class AIAnalysis(models.Model):
         indexes = [models.Index(fields=["created_at"], name="ai_analysis_created")]
 
     def __str__(self):
-        return f"{self.report_id}번 제보 · {self.get_status_display()} ({self.created_at:%Y-%m-%d %H:%M})"
+        target = f"{self.report_id}번 제보" if self.report_id else "삭제된 제보"
+        return f"{target} · {self.get_status_display()} ({self.created_at:%Y-%m-%d %H:%M})"

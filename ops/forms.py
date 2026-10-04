@@ -159,19 +159,22 @@ class AISelectionForm(forms.Form):
     selected_keys = forms.MultipleChoiceField(label="저장할 항목", widget=forms.CheckboxSelectMultiple,
                                               error_messages={"required": "저장할 항목을 하나 이상 골라 주세요."})
 
-    def __init__(self, *args, analysis, definitions, report_values=None, **kwargs):
+    def __init__(self, *args, analysis, definitions, report_values=None, labels=None, **kwargs):
         from places.models import FieldDefinition
         from places.validation import INTEGER_KEYS
-        from reports.ai import AUTOMATIC_DOOR, CERTAINTY, EVIDENCE_SOURCES
+        from reports.ai import AUTOMATIC_DOOR, CERTAINTY, ENTRANCE_KEYS, EVIDENCE_SOURCES
 
         super().__init__(*args, **kwargs)
+        # 분석할 때와 지금 모두 켜져 있는 항목만 고를 수 있음. 나머지는 표에 '분석 제외'로 (출입구 7개 고정)
+        analysed = set(analysis.field_definition_snapshot or {})
+        definitions = [f for f in definitions if f.key in analysed]
         self.definitions = definitions
         self.fields["selected_keys"].choices = [(f.key, f.label) for f in definitions]
         self.initial["analysis_id"] = analysis.pk
         candidates = (analysis.result or {}).get("fields", {})
         report_values = report_values or {}
         vt = FieldDefinition.ValueType
-        self.rows = []
+        rows = {}
         for f in definitions:
             name = f"value_{f.key}"
             if f.value_type == vt.NUMBER:
@@ -191,7 +194,7 @@ class AISelectionForm(forms.Form):
             if value is not None:
                 self.initial[name] = ("true" if value else "false") if isinstance(value, bool) else value
             current = report_values.get(f.key)
-            self.rows.append({
+            rows[f.key] = ({
                 "key": f.key, "label": f.label, "unit": f.unit,
                 "current": current.display_value if current else "",
                 "candidate": "" if value is None else (("있음" if value else "없음") if isinstance(value, bool) else value),
@@ -200,6 +203,9 @@ class AISelectionForm(forms.Form):
                 "evidence": candidate.get("evidence", ""),
                 "field": self[name],
             })
+        labels = labels or {}
+        self.rows = [rows.get(key) or {"key": key, "label": labels.get(key, key), "excluded": True}
+                     for key in ENTRANCE_KEYS]
 
     def clean(self):
         data = super().clean()

@@ -172,7 +172,7 @@ def report_review(request, pk):
         "direction": report_direction(report, effect) if effect else None,
         "downgrade_places": services.recent_downgrade_places(report.created_by),
         "abuse_threshold": services.ABUSE_PLACE_COUNT,
-        "confirmations": report.confirmations.select_related("user"),
+        "confirmations": ai.effective_confirmations(report),  # AI 후보를 저장한 제보는 0건
         "required": required_confirmations(report),
         "owner_kind": _owner_kind(report),
         # 사진 교체·수정 요청이면 지금 공개된 사진과 나란히 보여 줌
@@ -209,7 +209,7 @@ def _ai_save(request, report):
     except (ValueError, AIAnalysis.DoesNotExist):
         raise Http404("분석 기록을 찾을 수 없어요.")
     form = AISelectionForm(request.POST, analysis=analysis, definitions=ai.active_definitions(),
-                           report_values=_report_values(report))
+                           report_values=_report_values(report), labels=_entrance_labels())
     if not form.is_valid():
         return form, None
     try:
@@ -219,6 +219,10 @@ def _ai_save(request, report):
     else:
         messages.success(request, f"{len(changes)}개 항목을 제보에 저장했어요. 이 제보는 이제 운영자만 승인할 수 있어요.")
     return None, redirect(_ai_back(report))
+
+
+def _entrance_labels():
+    return dict(FieldDefinition.objects.filter(key__in=ai.ENTRANCE_KEYS).values_list("key", "label"))
 
 
 def _report_values(report):
@@ -234,7 +238,7 @@ def _ai_panel(report, selection_form=None):
     analyses = list(report.ai_analyses.select_related("requested_by"))
     staff_only = any(a.selection_history for a in analyses)
     blocked = ai.config_error() or ai.unsupported_reason(report)
-    labels = dict(FieldDefinition.objects.filter(key__in=ai.ENTRANCE_KEYS).values_list("key", "label"))
+    labels = _entrance_labels()
     panel = {
         "enabled": settings.AI_ENABLED, "blocked": ai.MESSAGES[blocked] if blocked else "",
         "masked_note": ai.mask_phone(report.note), "analyze_form": AIAnalyzeForm(),
@@ -252,7 +256,11 @@ def _ai_panel(report, selection_form=None):
     if latest is None:
         return panel
     panel["status"] = ai.effective_status(latest)
+    panel["error_code"], panel["error_message"] = ai.effective_error(latest)
     if panel["status"] != AIAnalysis.Status.SUCCEEDED:
+        return panel
+    if latest.schema_version != ai.SCHEMA_VERSION:  # 이전 버전 결과는 바꿔 쓰지 않음
+        panel["old_schema"] = True
         return panel
     result = latest.result
     panel["summary"] = result["summary"]
@@ -264,7 +272,7 @@ def _ai_panel(report, selection_form=None):
         panel["input_changed"] = True
         return panel
     panel["selection_form"] = selection_form or AISelectionForm(
-        analysis=latest, definitions=ai.active_definitions(), report_values=_report_values(report))
+        analysis=latest, definitions=ai.active_definitions(), report_values=_report_values(report), labels=labels)
     return panel
 
 

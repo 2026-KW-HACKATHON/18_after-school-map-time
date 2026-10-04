@@ -32,7 +32,7 @@ from .test_views import TempMediaMixin, photo
 KEYS = list(ai.ENTRANCE_KEYS)
 PAST = datetime(2026, 1, 1, tzinfo=dt_timezone.utc)
 AI_ON = dict(AI_ENABLED=True, OPENAI_API_KEY="test-key", OPENAI_MODEL="test-model", AI_DAILY_LIMIT=100,
-             AI_NOTICE_SINCE=PAST)
+             AI_NOTICE_SINCE=PAST, AI_NOTICE_VERSION="notice-test-1")
 
 
 def unknown():
@@ -91,7 +91,8 @@ class AIBase(TempMediaMixin, TestCase):
 
     def make_report(self, **kwargs):
         fields = dict(source=Report.Source.USER_REPORT, status=Report.Status.PENDING, entrance=self.entrance,
-                      created_by=self.resident, note="입구 턱 재보니 3cm. 사장님 번호는 010-1234-5678로 연락", photo=photo())
+                      created_by=self.resident, note="입구 턱 재보니 3cm. 사장님 번호는 010-1234-5678로 연락", photo=photo(),
+                      ai_notice_version="notice-test-1")
         fields.update(kwargs)
         report = Report.objects.create(**fields)
         if report.target_scope == FieldDefinition.Scope.ENTRANCE:
@@ -510,3 +511,168 @@ class ResidentNoticeTests(AIBase):
         self.assertContains(self.client.get(url), "OpenAI(미국)")
         with override_settings(AI_ENABLED=False):
             self.assertNotContains(self.client.get(url), "OpenAI(미국)")
+
+
+class SpecV13Tests(AIBase):
+    """AI 명세 v1.3 추가 사항"""
+
+    def test_duplicate_keys_and_non_finite_numbers_are_rejected(self):
+        valid = json.dumps(output(), ensure_ascii=False)
+        cases = {
+            "최상위 중복": valid[:-1] + ', "summary": "두 번째"}',
+            "항목 안 중복": valid.replace('"certainty": "UNKNOWN"', '"certainty": "UNKNOWN", "certainty": "CLEAR"', 1),
+            "NaN": valid.replace('"value": null', '"value": NaN', 1),
+        }
+        for name, text in cases.items():
+            with self.subTest(name=name), self.assertRaises(ai.AIError) as e:
+                ai.strict_json(text)
+            self.assertEqual(e.exception.code, "AI_INVALID_OUTPUT")
+        self.assertEqual(ai.strict_json(valid)["report_type"], "ACCESSIBILITY_OBSERVATION")
+        with mock.patch("reports.ai.logger"), self.assertRaises(ai.AIError):
+            ai.analyze(self.report, self.staff, client=FakeClient(body(None, text=cases["항목 안 중복"])))
+        self.assertEqual(AIAnalysis.objects.get().error_code, "AI_INVALID_OUTPUT")
+
+    def test_notice_version_must_match(self):
+        client = good()
+        for version in ("", "notice-old"):
+            report = self.make_report(ai_notice_version=version)
+            with self.subTest(version=version), self.assertRaises(ai.AIError) as e:
+                ai.analyze(report, self.staff, client=client)
+            self.assertEqual(e.exception.code, "NOTICE_NOT_APPLIED")
+        with override_settings(AI_NOTICE_VERSION=""), self.assertRaises(ai.AIError):
+            ai.analyze(self.report, self.staff, client=client)
+        self.assertEqual(client.calls, [])
+
+    def test_notice_check_runs_before_reuse(self):
+        ai.analyze(self.report, self.staff, client=good())
+        with override_settings(AI_NOTICE_VERSION="notice-test-2"), self.assertRaises(ai.AIError) as e:
+            ai.analyze(self.report, self.staff, client=good())
+        self.assertEqual(e.exception.code, "NOTICE_NOT_APPLIED")
+
+    def test_processing_59_seconds_is_running_60_seconds_is_timeout(self):
+        stuck = AIAnalysis.objects.create(report=self.report, status=AIAnalysis.Status.PROCESSING)
+        for seconds, status in ((59, AIAnalysis.Status.PROCESSING), (60, AIAnalysis.Status.FAILED)):
+            AIAnalysis.objects.filter(pk=stuck.pk).update(created_at=timezone.now() - timedelta(seconds=seconds))
+            stuck.refresh_from_db()
+            with self.subTest(seconds=seconds):
+                self.assertEqual(ai.effective_status(stuck), status)
+        self.assertEqual(ai.effective_error(stuck)[0], "AI_TIMEOUT")
+
+    def test_late_response_is_not_saved(self):
+        def slow():  # 응답이 오기 전에 요청 시각이 26초 지난 것처럼
+            AIAnalysis.objects.update(created_at=timezone.now() - timedelta(seconds=26))
+        with self.assertRaises(ai.AIError) as e:
+            ai.analyze(self.report, self.staff, client=FakeClient(good().response, on_call=slow))
+        self.assertEqual(e.exception.code, "AI_TIMEOUT")
+        analysis = AIAnalysis.objects.get()
+        self.assertEqual((analysis.status, analysis.result), (AIAnalysis.Status.FAILED, None))
+
+    def test_old_schema_result_is_not_reused_or_selectable(self):
+        old, _ = ai.analyze(self.report, self.staff, client=good())
+        AIAnalysis.objects.filter(pk=old.pk).update(schema_version="entrance-analysis-v2",
+                                                    prompt_version="entrance-extract-v2")
+        old.refresh_from_db()
+        with self.assertRaises(ai.AIError) as e:
+            ai.save_selection(old, self.staff, {"has_ramp": False})
+        self.assertEqual(e.exception.code, "UNSUPPORTED_SCHEMA_VERSION")
+        client = good()
+        new, reused = ai.analyze(self.report, self.staff, client=client)
+        self.assertFalse(reused)
+        self.assertEqual((len(client.calls), new.schema_version), (1, ai.SCHEMA_VERSION))
+
+    def test_deleting_report_keeps_daily_count_and_clears_content(self):
+        analysis, _ = ai.analyze(self.report, self.staff, client=good())
+        ai.save_selection(analysis, self.staff, {"has_ramp": False})
+        before = ai.attempts_today()
+        self.report.delete()
+        analysis.refresh_from_db()
+        self.assertIsNone(analysis.report_id)
+        self.assertEqual((analysis.input_snapshot, analysis.result, analysis.selection_history, analysis.usage),
+                         ({}, None, [], None))
+        self.assertIsNone(analysis.requested_by_id)
+        self.assertEqual(ai.attempts_today(), before)  # 지워도 오늘 횟수는 그대로
+
+    def test_report_deleted_during_call_is_not_revived(self):
+        with mock.patch("reports.ai.logger"), self.assertRaises(ai.AIError) as e:
+            ai.analyze(self.report, self.staff, client=FakeClient(good().response, on_call=self.report.delete))
+        self.assertEqual(e.exception.code, "REPORT_NOT_FOUND")
+        analysis = AIAnalysis.objects.get()
+        self.assertEqual((analysis.status, analysis.report_id, analysis.result, analysis.input_snapshot),
+                         (AIAnalysis.Status.FAILED, None, None, {}))
+        self.assertEqual(ai.attempts_today(), 1)
+
+    def test_deleting_place_also_clears_ai_content(self):
+        analysis, _ = ai.analyze(self.report, self.staff, client=good())
+        self.place.delete()
+        analysis.refresh_from_db()
+        self.assertEqual((analysis.report_id, analysis.input_snapshot), (None, {}))
+
+    def test_my_activity_and_badge_skip_confirmations_on_ai_edited_reports(self):
+        from accounts.activity import badges, counts
+
+        ReportConfirmation.objects.create(report=self.report, user=self.neighbor)
+        other = self.make_report()
+        ReportConfirmation.objects.create(report=other, user=self.neighbor)
+        self.assertEqual(counts(self.neighbor)["confirmations"], 2)
+        analysis, _ = ai.analyze(self.report, self.staff, client=good())
+        ai.save_selection(analysis, self.staff, {"has_ramp": False})
+        self.assertEqual(counts(self.neighbor)["confirmations"], 1)
+        badge = next(b for b in badges(counts(self.neighbor)) if b["key"] == "neighbor_check")
+        self.assertEqual(badge["progress"], "1/3")
+        verify_report(self.report, by=self.staff)  # 승인한 뒤에도 되살리지 않음
+        self.assertEqual(counts(self.neighbor)["confirmations"], 1)
+        self.assertEqual(ai.effective_confirmations(self.report), [])
+
+    def test_inactive_field_is_shown_as_excluded_and_cannot_be_saved(self):
+        FieldDefinition.objects.filter(key="entrance_available").update(is_active=False)
+        keys = [k for k in KEYS if k != "entrance_available"]
+        analysis, _ = ai.analyze(self.report, self.staff,
+                                 client=FakeClient(body(output(keys=keys, step_height_cm=clear(3)))))
+        self.assertNotIn("entrance_available", analysis.result["fields"])
+        with self.assertRaises(ai.AIError):
+            ai.save_selection(analysis, self.staff, {"entrance_available": True})
+        self.client.force_login(self.staff)
+        page = self.client.get(reverse("ops:report-review", args=[self.report.pk]))
+        self.assertContains(page, "분석 제외")
+        self.assertNotContains(page, 'value="entrance_available"')
+
+
+class NoticeTokenTests(AIBase):
+    """제보 폼의 안내 버전 표 (명세 v1.3 7.1)"""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.neighbor)  # resident는 setUp에서 이미 제보해 24시간 제한에 걸림
+        self.url = reverse("reports:new")
+
+    def post(self, token, **extra):
+        data = {"place": self.place.pk, "step_height_cm": "0", "photo": photo(), **extra}
+        if token is not None:
+            data["notice_token"] = token
+        return self.client.post(self.url, data)
+
+    def test_valid_token_records_version(self):
+        page = self.client.get(self.url, {"place": self.place.pk})
+        token = page.context["form"].notice_token_value
+        self.assertContains(page, f'name="notice_token" value="{token}"')
+        before = Report.objects.count()
+        self.assertRedirects(self.post(token), reverse("reports:done"))
+        self.assertEqual(Report.objects.count(), before + 1)
+        self.assertEqual(Report.objects.latest("pk").ai_notice_version, "notice-test-1")
+
+    def test_missing_tampered_or_old_tokens_are_rejected(self):
+        with override_settings(AI_NOTICE_VERSION="notice-old"):
+            old = ai.notice_token()
+        before = Report.objects.count()
+        for token in (None, "tampered", old):
+            with self.subTest(token=token):
+                res = self.post(token)
+                self.assertEqual(res.status_code, 200)
+                self.assertContains(res, "AI 활용 안내가 바뀌었거나 확인되지 않았어요")
+                self.assertContains(res, f'value="{res.context["form"].notice_token_value}"')  # 새 표로 다시
+        self.assertEqual(Report.objects.count(), before)
+
+    @override_settings(AI_ENABLED=False)
+    def test_no_token_needed_when_ai_off(self):
+        self.assertRedirects(self.post(None), reverse("reports:done"))
+        self.assertEqual(Report.objects.latest("pk").ai_notice_version, "")
