@@ -174,10 +174,10 @@ docker compose exec web python manage.py createsuperuser
 docker compose exec web python manage.py test
 ```
 
-장소 선택 UI의 검색·핀·좌표 동기화 테스트는 Node.js 18 이상에서 추가 패키지 없이 실행합니다.
+화면 JS 테스트(장소 선택의 검색·핀·좌표 동기화, 제보 시설 종류 전환)는 Node.js 18 이상에서 추가 패키지 없이 실행합니다. CI에서도 같이 돌아갑니다.
 
 ```bash
-node --test tests/js/location-picker.test.cjs
+node --test tests/js/*.test.cjs
 ```
 
 새 장소 제보(`/report/new/`)는 장소 이름과 위치 설명 사이에서 카카오맵 장소 검색 및 지도 클릭으로 핀을 선택할 수 있습니다.
