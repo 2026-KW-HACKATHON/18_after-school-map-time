@@ -55,6 +55,8 @@ GEMINI3_MAX_OUTPUT_TOKENS = 4000  # 생각 토큰 포함 (출력 JSON은 약 500
 ACCEPT_DEADLINE = timedelta(seconds=25)   # 요청한 지 이보다 늦게 온 응답은 후보로 쓰지 않음 (시간 초과)
 PROCESSING_STALE = timedelta(seconds=60)  # 이만큼 '분석 중'이면 작업자가 죽은 것 → 실패(시간 초과)로 계산
 NOTICE_SALT = "teokeopne.ai-notice"
+PREFILL_SALT = "teokeopne.ai-prefill"
+PREFILL_MAX_AGE = 60 * 60 * 24  # 'AI로 채우기' 결과 표는 하루 안에 제출해야 제보에 연결됨
 ADVISORY_LOCK_ID = 7_310_001  # PostgreSQL에서 일일 한도 검사를 한 번에 하나씩 하기 위한 잠금 번호
 AUTOMATIC_DOOR = "자동문"     # 자동문 여부는 entrance_automatic_door에 기록. 새 AI 후보의 문 형태로는 쓰지 않음
 TEXT_LIMIT = 200
@@ -76,7 +78,8 @@ WARNINGS = {
 RECIPIENTS = {"gemini": "Google(미국)", "openai": "OpenAI(미국)"}
 
 # 제보 화면 안내 (명세 7.1 초안 — 신지현 법적 검토 후 확정. 받는 곳이 바뀌면 AI_NOTICE_VERSION도 올린다)
-NOTICE_TEMPLATE = ("제보한 사진과 설명은 운영자 검토 시 접근성 항목을 추출하기 위한 AI 분석에 활용될 수 있습니다. "
+NOTICE_TEMPLATE = ("제보한 사진과 설명은 접근성 항목을 추출하기 위한 AI 분석에 활용될 수 있습니다 "
+                   "(운영자 검토 때, 또는 'AI로 항목 채우기'를 누를 때). "
                    "AI 분석 시 사진과 설명이 {recipient}로 전송될 수 있습니다. "
                    "이름·전화번호 등 개인정보와 얼굴·차량 번호판이 나오지 않도록 해 주세요. "
                    "AI 결과는 운영자가 확인하며 자동으로 승인되지 않습니다.")
@@ -113,7 +116,20 @@ MESSAGES = {
     "INVALID_REQUEST": "저장할 값을 확인해 주세요.",
     "UNSUPPORTED_SCHEMA_VERSION": "이전 버전으로 분석한 결과라 다시 분석해야 해요.",
     "REPORT_NOT_FOUND": "제보를 찾을 수 없어요. 그사이 삭제됐을 수 있어요.",
+    "PREFILL_LIMIT_REACHED": "오늘 AI 채우기를 다 썼어요.",
 }
+
+# 주민 화면('AI로 항목 채우기')에서 보여 줄 말 — 운영자용 안내("직접 검토해 주세요") 대신
+PREFILL_MESSAGES = {
+    "PREFILL_LIMIT_REACHED": "오늘 AI 채우기를 다 썼어요. 직접 입력해 주세요.",
+    "DAILY_LIMIT_REACHED": "오늘은 AI 채우기 사용량이 다 찼어요. 직접 입력해 주세요.",
+    "AI_TIMEOUT": "AI 응답이 늦어요. 잠시 뒤 다시 누르거나 직접 입력해 주세요.",
+    "EMPTY_INPUT": "사진을 고르거나 설명을 적은 뒤 눌러 주세요.",
+    "IMAGE_UNREADABLE": "사진을 읽지 못했어요. 다른 사진을 골라 주세요.",
+    "AI_DISABLED": "지금은 AI 채우기를 쓸 수 없어요. 직접 입력해 주세요.",
+    "NOTICE_NOT_APPLIED": "지금은 AI 채우기를 쓸 수 없어요. 직접 입력해 주세요.",
+}
+PREFILL_DEFAULT_MESSAGE = "AI가 값을 채우지 못했어요. 직접 입력해 주세요."
 
 
 class AIError(Exception):
@@ -473,11 +489,15 @@ def _photo_base64(report):
 
 def build_request(report, defs):
     """제공자와 상관없는 요청 내용. 보내는 것은 이것뿐: 지시문, 가린 설명, 사진 1장, 출력 형식"""
-    note = mask_phone(report.note).strip()
+    return request_from(defs, analysis_kind(report), report.note, _photo_base64(report) if report.photo else None)
+
+
+def request_from(defs, kind, note, image):
+    note = mask_phone(note).strip()
     return {
-        "instructions": instructions(defs, analysis_kind(report)),
+        "instructions": instructions(defs, kind),
         "text": f"주민 설명: {note}" if note else "주민 설명 없음. 사진만 보고 판단한다.",
-        "image": _photo_base64(report) if report.photo else None,  # JPEG
+        "image": image,  # JPEG base64 (core/images.py로 EXIF 지우고 얼굴 가린 것)
         "schema": output_schema(defs),
         "max_output_tokens": MAX_OUTPUT_TOKENS,
     }
@@ -754,9 +774,12 @@ def _lock_daily_counter():
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", [ADVISORY_LOCK_ID])
 
 
-def _fail(analysis, code):
+def _fail(analysis, code, require_report=True):
     """아직 '분석 중'이고 제보가 남아 있을 때만 실패로 닫는다 (삭제로 비운 내용이 되살아나지 않게 필요한 칸만 갱신)"""
-    AIAnalysis.objects.filter(pk=analysis.pk, status=AIAnalysis.Status.PROCESSING, report__isnull=False).update(
+    rows = AIAnalysis.objects.filter(pk=analysis.pk, status=AIAnalysis.Status.PROCESSING)
+    if require_report:
+        rows = rows.filter(report__isnull=False)
+    rows.update(
         status=AIAnalysis.Status.FAILED, error_code=code,
         error_message=MESSAGES.get(code, MESSAGES["INTERNAL_ERROR"])[:200], completed_at=timezone.now(),
         provider_response_id=analysis.provider_response_id, usage=analysis.usage,
@@ -909,3 +932,123 @@ def clear_on_report_delete(sender, instance, **kwargs):
     rows.filter(status=AIAnalysis.Status.PROCESSING).update(status=AIAnalysis.Status.FAILED, completed_at=timezone.now())
     rows.update(input_snapshot={}, field_definition_snapshot={}, result=None, selection_history=[],
                 requested_by=None, provider_response_id="", usage=None, error_message="")
+
+
+# ── 주민 'AI로 항목 채우기' (제보 작성 중, 주민이 버튼을 눌렀을 때만) ──
+def prefill_available():
+    """제보 화면에 버튼을 보여 줄지: 설정이 맞고 안내가 붙어 있고 적용 시각이 지났을 때"""
+    since = settings.AI_NOTICE_SINCE
+    return (config_error() is None and notice_active() and since is not None and since <= timezone.now()
+            and settings.AI_PREFILL_USER_DAILY_LIMIT > 0)
+
+
+def prefill_attempts_today(user):
+    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    return AIAnalysis.objects.filter(created_at__gte=start, requested_by=user, input_snapshot__prefill=True).count()
+
+
+def prefill(user, kind, note, photo=None, client=None):
+    """
+    제보를 내기 전에 사진·설명으로 빈 칸 후보를 받는다 → {"result", "token", "remaining"}.
+    - 사진은 서버에서 EXIF를 지우고 얼굴을 가린 뒤 보내고, 설명의 전화번호는 가린다
+    - 기록 행은 횟수 세기용으로만 (내용은 저장하지 않음). 결과는 서명된 표에 담아 돌려주고,
+      제출할 때 표가 오면 그 제보에 연결한다 (attach_prefill)
+    - 하루 한도: 주민 1명 AI_PREFILL_USER_DAILY_LIMIT회 + 전체 AI_DAILY_LIMIT회 (운영자 분석과 같이 씀)
+    """
+    from core.images import normalize_photo
+
+    code = config_error()
+    if code:
+        raise AIError(code)
+    if not prefill_available():
+        raise AIError("NOTICE_NOT_APPLIED")
+    if kind not in KIND_FIELDS:
+        raise AIError("UNSUPPORTED_SCOPE")
+    keys = active_keys(list(KIND_FIELDS[kind]))
+    found = {f.key: f for f in FieldDefinition.objects.filter(key__in=keys)}
+    defs = [found[k] for k in keys]
+    if not defs:
+        raise AIError("NO_ACTIVE_FIELDS")
+    if photo is None and not (note or "").strip():
+        raise AIError("EMPTY_INPUT")
+    image = None
+    if photo is not None:
+        try:
+            image = base64.b64encode(normalize_photo(photo).read()).decode("ascii")
+        except Exception as e:  # 사진이 아니거나 깨진 파일
+            raise AIError("IMAGE_UNREADABLE") from e
+    request = request_from(defs, kind, note or "", image)
+
+    with transaction.atomic():
+        _lock_daily_counter()
+        used = prefill_attempts_today(user)
+        if used >= settings.AI_PREFILL_USER_DAILY_LIMIT:
+            raise AIError("PREFILL_LIMIT_REACHED")
+        if attempts_today() >= settings.AI_DAILY_LIMIT:
+            raise AIError("DAILY_LIMIT_REACHED")
+        analysis = AIAnalysis.objects.create(
+            report=None, requested_by=user, input_snapshot={"prefill": True, "kind": kind},
+            field_definition_snapshot=definition_snapshot(defs), model_id=current_model(),
+            prompt_version=PROMPT_VERSION, schema_version=SCHEMA_VERSION if kind == ENTRANCE else FACILITY_SCHEMA_VERSION,
+        )
+    try:
+        data, analysis.provider_response_id, analysis.usage = (client or get_client()).create(request)
+        result = validate_output(data, defs)
+        if timezone.now() > analysis.created_at + ACCEPT_DEADLINE:
+            raise AIError("AI_TIMEOUT")
+    except AIError as e:
+        _fail(analysis, e.code, require_report=False)
+        raise
+    except Exception as e:
+        logger.exception("AI 채우기 중 예상하지 못한 오류")
+        _fail(analysis, "INTERNAL_ERROR", require_report=False)
+        raise AIError("INTERNAL_ERROR") from e
+    AIAnalysis.objects.filter(pk=analysis.pk, status=AIAnalysis.Status.PROCESSING).update(
+        status=AIAnalysis.Status.SUCCEEDED, completed_at=timezone.now(),
+        provider_response_id=analysis.provider_response_id, usage=analysis.usage)
+    token = signing.dumps({"id": str(analysis.pk), "user": user.pk, "kind": kind, "result": result},
+                          salt=PREFILL_SALT, compress=True)
+    return {"result": result, "token": token, "remaining": max(settings.AI_PREFILL_USER_DAILY_LIMIT - used - 1, 0)}
+
+
+def _same_value(submitted, candidate):
+    if isinstance(candidate, bool) or isinstance(submitted, bool):
+        return submitted is candidate
+    if isinstance(candidate, (int, float)):
+        try:
+            return submitted == _plain(Decimal(str(candidate)))
+        except InvalidOperation:
+            return False
+    return submitted == candidate
+
+
+def attach_prefill(report, token, user):
+    """
+    제출한 제보에 'AI로 채우기' 결과를 연결한다. 표가 없거나·고쳐졌거나·다른 사람·다른 시설 종류면 무시.
+    AI 후보와 같은 값을 그대로 냈으면 선택 기록을 남겨 운영자만 승인 (AI 추측이 주민 확인 1명만으로 공개되지 않게).
+    다 고쳐서 냈으면 기록 없이 연결만 → 운영자 화면에서 그 후보를 다시 쓸 수 있음 (다시 부르지 않음)
+    """
+    if not token:
+        return None
+    try:
+        data = signing.loads(token, salt=PREFILL_SALT, max_age=PREFILL_MAX_AGE)
+    except signing.BadSignature:
+        return None
+    if not isinstance(data, dict) or data.get("user") != user.pk or data.get("kind") != analysis_kind(report):
+        return None
+    analysis = AIAnalysis.objects.filter(pk=data.get("id"), report__isnull=True, requested_by=user,
+                                         status=AIAnalysis.Status.SUCCEEDED, input_snapshot__prefill=True).first()
+    if analysis is None:
+        return None
+    result = data.get("result") or {}
+    submitted = {v.field_id: _plain(v.value) for v in report.values.select_related("field")}
+    kept = [{"key": key, "before": None, "after": submitted[key]}
+            for key, item in (result.get("fields") or {}).items()
+            if item.get("value") is not None and key in submitted and _same_value(submitted[key], item["value"])]
+    analysis.report = report
+    analysis.result = result
+    analysis.input_snapshot = input_snapshot(report)
+    analysis.selection_history = [{"source": "resident_prefill", "by": user.pk, "by_name": user.get_username(),
+                                   "at": timezone.now().isoformat(), "changes": kept}] if kept else []
+    analysis.save(update_fields=["report", "result", "input_snapshot", "selection_history"])
+    return analysis

@@ -1,5 +1,6 @@
 from datetime import datetime, time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -11,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from core import uploads
 from core.validation import parse_pk
 from judgments.services import required_confirmations
 from places.facilities import ENTRANCE, KIND_FIELDS
@@ -121,6 +123,8 @@ def report_new(request):
                 value.set_value(raw)
                 value.full_clean()
                 value.save()
+            # 'AI로 항목 채우기'를 썼으면 그 결과를 이 제보에 연결 (AI 값을 그대로 냈으면 운영자만 승인)
+            ai.attach_prefill(report, request.POST.get("ai_prefill_token"), request.user)
         return redirect("reports:done")
 
     if request.method == "POST":
@@ -131,6 +135,51 @@ def report_new(request):
         "show_picker": show_picker, "kind_label": kind_label,
         # AI 검토 보조를 켜면 사진·설명이 OpenAI로 갈 수 있음을 안내 (AI_NOTICE_SINCE를 이 문구를 붙인 시각으로)
         "ai_notice": ai.notice_text() if ai.notice_active() else "",
+        "ai_prefill": ai.prefill_available(), "ai_recipient": ai.recipient(),
+        "ai_prefill_limit": settings.AI_PREFILL_USER_DAILY_LIMIT,
+        "ai_prefill_token": request.POST.get("ai_prefill_token", "") if request.method == "POST" else "",
+    })
+
+
+# 'AI로 항목 채우기' 오류 → HTTP 상태
+PREFILL_STATUS = {
+    "AI_DISABLED": 503, "AI_UNAVAILABLE": 503, "AI_BUDGET_EXCEEDED": 503, "NOTICE_NOT_APPLIED": 503,
+    "PREFILL_LIMIT_REACHED": 429, "DAILY_LIMIT_REACHED": 429, "AI_TIMEOUT": 504,
+    "AI_INVALID_OUTPUT": 502, "AI_INCOMPLETE": 502, "AI_REFUSAL": 422,
+    "EMPTY_INPUT": 400, "IMAGE_UNREADABLE": 400, "UNSUPPORTED_SCOPE": 400, "NO_ACTIVE_FIELDS": 400,
+}
+PREFILL_MAX_BYTES = 10 * 1024 * 1024
+
+
+@login_required
+@require_POST
+def ai_prefill(request):
+    """
+    제보 작성 중 'AI로 항목 채우기' (주민이 버튼을 눌렀을 때만). JSON으로 빈 칸 후보를 돌려준다.
+    제보를 만들지 않는다. 결과 표는 폼에 숨겨 두었다가 제출할 때 제보에 연결된다 (ai.attach_prefill)
+    """
+    kind = request.POST.get("facility_kind") or ENTRANCE
+    note = (request.POST.get("note") or "")[:500]
+    photo = request.FILES.get("photo")
+    if photo is None and request.POST.get("photo_token"):
+        photo = uploads.restore(request.POST["photo_token"])  # 폼 오류로 보관 중인 사진
+    try:
+        if photo is not None and photo.size > PREFILL_MAX_BYTES:
+            raise ai.AIError("IMAGE_UNREADABLE")
+        out = ai.prefill(request.user, kind, note, photo)
+    except ai.AIError as e:
+        message = ai.PREFILL_MESSAGES.get(e.code, ai.PREFILL_DEFAULT_MESSAGE)
+        return JsonResponse({"ok": False, "code": e.code, "message": message},
+                            status=PREFILL_STATUS.get(e.code, 500))
+    result = out["result"]
+    return JsonResponse({
+        "ok": True,
+        "fields": {key: {"value": item["value"], "certainty": ai.CERTAINTY[item["certainty"]],
+                         "evidence": item["evidence"]} for key, item in result["fields"].items()},
+        "summary": result["summary"],
+        "warnings": [ai.WARNINGS[w] for w in result["warnings"]],
+        "token": out["token"],
+        "remaining": out["remaining"],
     })
 
 
