@@ -31,3 +31,5 @@ pillow==12.3.0
 # 사진 속 얼굴 자동 가림 (core/images.py). 화면 없는 서버용 headless 판, 5.x 대신 안정된 4.x 고정
 opencv-python-headless==4.14.0.94
 numpy==2.3.5               # OpenCV 의존성 (이미지 배열)
+# 아이폰 HEIC/HEIF 사진 읽기 (core/apps.py에서 Pillow에 등록). 읽기 전용 판이라 인코더(x265)가 없어 가볍다
+pi-heif==1.4.0
