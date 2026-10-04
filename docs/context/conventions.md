@@ -117,4 +117,4 @@ main        ← 최종 제출/릴리스용. 직접 push 금지.
 | 12 | `.gitattributes` 없음 | `*.sh text eol=lf` — Windows에서 체크아웃한 셸 스크립트가 컨테이너에서 깨지는 문제 예방 |
 | 13 | HTTPS 관련 Django 설정 일부만 | `SECURE_PROXY_SSL_HEADER`, `CSRF_TRUSTED_ORIGINS`, `SESSION/CSRF_COOKIE_SECURE`(DEBUG=False일 때) |
 | 14 | README에 오픈소스 출처 섹션 없음 | 대회 규정대로 추가 |
-| 15 | PR 승인 2명 | 기본은 동일. 본선 무박 2일에는 1명으로 완화할지 사용자에게 확인 |
+| 15 | PR 승인 2명 | **1명 + CI 통과** (2026-09-26 결정, CLAUDE.md "결정된 사항") |
