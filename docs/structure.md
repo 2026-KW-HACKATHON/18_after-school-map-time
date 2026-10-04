@@ -151,7 +151,7 @@
 | 배포 보안 | `DEBUG=False`일 때만: HTTPS 판단 헤더, 쿠키 Secure. HSTS는 의도적으로 보류(주석에 이유) |
 | 로깅 | 콘솔 출력 → `docker compose logs web`으로 확인 |
 | DRF | 세션 인증 (같은 도메인의 템플릿 페이지에서 fetch로 호출) |
-| 외부 API 키 | `KAKAO_JAVASCRIPT_KEY`(브라우저용), `KAKAO_REST_API_KEY`(서버 전용), `OPENAI_API_KEY`·`AI_ENABLED`·`OPENAI_MODEL`·`AI_DAILY_LIMIT`·`AI_NOTICE_SINCE` (운영자 AI 검토 보조) |
+| 외부 API 키 | `KAKAO_JAVASCRIPT_KEY`(브라우저용), `KAKAO_REST_API_KEY`(서버 전용), `AI_ENABLED`·`AI_PROVIDER`·`GEMINI_API_KEY`·`GEMINI_MODEL`(또는 `OPENAI_*`)·`AI_DAILY_LIMIT`·`AI_NOTICE_SINCE`·`AI_NOTICE_VERSION` (운영자 AI 검토 보조) |
 
 ### `config/urls.py`
 
@@ -306,7 +306,7 @@ ASCII 양의 정수 및 BigAutoField 범위를 검사한 뒤 DB에 전달한다.
 | --- | --- |
 | 대상 확인 | 확인 중인 **주민** 제보 + 출입구 범위(기존 출입구·새 장소·새 출입구 제안)만. 사장님 요청·팀 답사·공공데이터·사진 수정 요청·시설 제보·처리 끝난 제보는 보내지 않음. 안내 적용 전 제보도 보내지 않음: `AI_NOTICE_SINCE`(안내를 붙인 시각) 이후이고, 제출한 폼의 안내 버전(`Report.ai_notice_version`, 서명된 표로 기록)이 `AI_NOTICE_VERSION`과 같아야 함. 안내가 바뀌기 전에 연 제보 화면은 제출할 때 다시 확인하게 함 |
 | 보내기 전 | 운영자가 "개인정보 없음 확인" 체크. 설명의 전화번호는 `[전화번호]`로 가림(한글 조사가 붙어도). 보내는 것: 정리된 사진 1장·가린 설명·항목 목록. 이름·계정·좌표·이동 조건은 안 보냄 |
-| 호출 | OpenAI Responses API + 구조화 출력(strict). `requests`로 직접, 20초 제한·재시도 0회. 같은 입력·설정이면 다시 부르지 않고 이전 결과를 씀. 하루 `AI_DAILY_LIMIT`회(실패 포함, 서울 시간) |
+| 호출 | 기본 **Google Gemini**(`generateContent` + JSON 출력 형식, 결제 연결한 유료 등급 키만), 설정으로 OpenAI(Responses API + strict)도 가능. 요청 내용(`build_request`)은 공통이고 제공자별 클라이언트가 형식만 바꿈. 받는 곳(Google/OpenAI)은 안내 문구·운영자 화면에 자동으로 표시. `requests`로 직접, 20초 제한·재시도 0회. 같은 입력·설정이면 다시 부르지 않고 이전 결과를 씀. 하루 `AI_DAILY_LIMIT`회(실패 포함, 서울 시간) |
 | 검증 | 같은 키가 두 번 나온 JSON·NaN은 파싱 단계에서 거부. 요청한 지 25초 넘게 걸린 응답은 쓰지 않음(시간 초과). 형식이 맞아도 서버가 다시 검사: 항목·타입·범위(`places/validation.py`)·소수점·자동문 선택지. 범위 밖·불확실 값은 "모름"으로 바꾸고 확인할 내용에 남김 |
 | 선택 저장 | 고른 항목만 그 제보 값으로 저장(분석 하나에 한 번). 제보는 계속 '확인 중', 출처·작성자·확인일은 그대로. 분석 뒤 제보 값이 바뀌었으면 거부 |
 | 승인 | **운영자만**: 후보를 저장한 제보는 `required_confirmations()`가 None → 이전 주민 "맞아요"는 반영 조건에서 빠지고 새 확인도 받지 않음. `verify_report()`도 운영자가 아니면 거부 |
@@ -316,7 +316,7 @@ ASCII 양의 정수 및 BigAutoField 범위를 검사한 뒤 DB에 전달한다.
 - 화면은 출입구 7개 항목을 고정으로 보여 주고, 분석할 때 꺼져 있던 항목은 '분석 제외'(선택 불가). 이전 버전(v2) 결과는 '재분석 필요'
 - 저장하지 않고 계산: 운영자 승인 전용 여부, 입력 변경 여부, 60초 이상 '분석 중'인 기록 = 실패(시간 초과)
 - 판정과의 관계: 판정 규칙이 쓰는 항목은 단차·계단·고정 경사로·문 폭·문 형태(회전문). 입구 이용 가능 여부·자동문은 화면 표시용
-- 테스트(`reports/test_ai.py`)는 가짜 OpenAI 클라이언트를 써서 CI에 키·네트워크가 필요 없음
+- 테스트(`reports/test_ai.py`)는 가짜 클라이언트·가짜 HTTP 응답(Gemini·OpenAI 모두)을 써서 CI에 키·네트워크가 필요 없음
 
 ## 2-4. 판정 — `judgments/`
 
