@@ -125,7 +125,11 @@
       <p class="small"><strong>AI 후보 저장 기록</strong></p>
       <ul class="small">
         {% for h in ai.history %}
+          {% if h.source == "resident_prefill" %}
+          <li>제보자 {{ h.by_name }}이(가) 'AI로 항목 채우기' 값을 그대로 제출 · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+          {% else %}
           <li>{{ h.by_name }} · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.before }} → {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+          {% endif %}
         {% endfor %}
       </ul>
     {% endif %}
@@ -162,7 +166,7 @@
       <p class="muted small">주민 확인 {{ confirmations|length }}/{{ required }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     {% else %}
       {% if ai.staff_only %}
-        <p class="muted small">운영자가 AI 후보로 값을 고친 제보라 운영자만 승인해요.{% if ai.excluded_confirmations %} 고치기 전에 받은 주민 확인 {{ ai.excluded_confirmations }}건은 바뀐 값에 대한 확인이 아니라서 반영 조건에서 뺐어요.{% endif %}</p>
+        <p class="muted small">AI 후보 값이 들어간 제보라(운영자 저장 또는 제보자의 'AI로 항목 채우기') 운영자만 승인해요.{% if ai.excluded_confirmations %} 고치기 전에 받은 주민 확인 {{ ai.excluded_confirmations }}건은 바뀐 값에 대한 확인이 아니라서 반영 조건에서 뺐어요.{% endif %}</p>
       {% else %}
         <p class="muted small">이 제보는 주민 확인 없이 운영자가 검토해요 (시설 제보, 사진 교체 요청, 또는 새 계정의 하향 제보).</p>
       {% endif %}
