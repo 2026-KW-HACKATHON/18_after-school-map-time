@@ -1,6 +1,7 @@
 """사진 정리 — EXIF 삭제·크기 줄이기·얼굴 자동 가림 (실제 OpenCV 검출기로 그린 얼굴을 찾게 함)"""
 
 import io
+from pathlib import Path
 from unittest import mock
 
 from django.test import SimpleTestCase
@@ -52,3 +53,26 @@ class FaceBlurTests(SimpleTestCase):
             result = images.normalize_photo(as_upload(drawn_face()))
         self.assertEqual(result.blurred_faces, 0)
         self.assertTrue(result.name.endswith(".jpg"))
+
+
+class HeicTests(SimpleTestCase):
+    """아이폰 HEIC 사진: 열리고, 방향을 바로잡고, EXIF 없는 JPEG로 바뀐다 (core/apps.py 등록)"""
+
+    SAMPLE = Path(__file__).parent / "testdata" / "sample.heic"  # 120×80, EXIF 방향=6(세로), 제조사 정보 포함
+
+    def test_heic_becomes_upright_jpeg_without_exif(self):
+        with self.SAMPLE.open("rb") as f:
+            out = images.normalize_photo(f, name="IMG_0001.HEIC")
+        self.assertEqual(out.name, "IMG_0001.jpg")
+        im = Image.open(io.BytesIO(out.read()))
+        self.assertEqual(im.format, "JPEG")
+        self.assertEqual(im.size, (80, 120))  # EXIF 방향값대로 세워짐
+        self.assertFalse(im.getexif())
+
+    def test_django_image_field_accepts_heic(self):
+        from django import forms
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        upload = SimpleUploadedFile("IMG_0001.HEIC", self.SAMPLE.read_bytes(), content_type="image/heic")
+        field = forms.ImageField()
+        self.assertEqual(field.clean(upload).image.format, "HEIF")
