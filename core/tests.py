@@ -26,6 +26,65 @@ class HomeTests(TestCase):
 
 
 class StaticStorageTests(TestCase):
+    def test_static_collection_publishes_valid_manifest_and_hashed_css(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from config.storage import CacheBustingStaticStorage
+
+        with tempfile.TemporaryDirectory() as root, self.settings(DEBUG=False):
+            Path(root, "common.css").write_text("body { color: black; }", encoding="utf8")
+            storage = CacheBustingStaticStorage(location=root, base_url="/static/")
+            processed = list(storage.post_process({"common.css": (storage, "common.css")}))
+            self.assertFalse(any(isinstance(result[2], Exception) for result in processed))
+            manifest = json.loads(Path(root, "staticfiles.json").read_text(encoding="utf8"))
+            self.assertEqual(manifest["version"], "1.1")
+            hashed = manifest["paths"]["common.css"]
+            self.assertNotEqual(hashed, "common.css")
+            self.assertTrue(Path(root, hashed).exists())
+            worker = CacheBustingStaticStorage(location=root, base_url="/static/")
+            self.assertEqual(worker.url("common.css"), "/static/" + hashed)
+
+    def test_existing_workers_refresh_manifest_after_static_collection(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from config.storage import CacheBustingStaticStorage
+
+        with tempfile.TemporaryDirectory() as root, self.settings(DEBUG=False):
+            manifest = Path(root) / "staticfiles.json"
+            def publish(name):
+                # 실제 collectstatic의 manifest 형식, 새 해시 파일은 이전 파일을 지우지 않는다.
+                Path(root, name).write_text("body {}", encoding="utf8")
+                manifest.write_text(json.dumps({"version": "1.1", "hash": name,
+                                               "paths": {"common.css": name}}), encoding="utf8")
+            publish("common.old.css")
+            workers = [CacheBustingStaticStorage(location=root, base_url="/static/") for _ in range(3)]
+            self.assertTrue(all(w.url("common.css") == "/static/common.old.css" for w in workers))
+            publish("common.updated.css")
+            self.assertTrue(all(w.url("common.css") == "/static/common.updated.css" for w in workers))
+            self.assertTrue(Path(root, "common.old.css").exists())  # 뒤로가기한 이전 HTML도 유효
+            cold_worker = CacheBustingStaticStorage(location=root, base_url="/static/")
+            self.assertEqual(cold_worker.url("common.css"), "/static/common.updated.css")
+
+    def test_worker_started_before_manifest_exists_recovers_and_rollback_refreshes(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from config.storage import CacheBustingStaticStorage
+
+        with tempfile.TemporaryDirectory() as root, self.settings(DEBUG=False):
+            storage = CacheBustingStaticStorage(location=root, base_url="/static/")
+            self.assertEqual(storage.url("js/app.js"), "/static/js/app.js")
+            manifest = Path(root) / "staticfiles.json"
+            for hashed in ("js/app.current.js", "js/app.previous-release.js"):
+                manifest.write_text(json.dumps({"version": "1.1", "hash": hashed,
+                                               "paths": {"js/app.js": hashed}}), encoding="utf8")
+                self.assertEqual(storage.url("js/app.js"), "/static/" + hashed)
+
     def test_uncollected_file_falls_back_to_original_name(self):
         # 배포 중 collectstatic 전에 새 파일을 요청해도 500 대신 원래 이름 (config/storage.py)
         import tempfile

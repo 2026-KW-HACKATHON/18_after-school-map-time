@@ -332,6 +332,8 @@ https://<도메인>/accounts/kakao/login/callback/
 
 `.github/workflows/deploy.yml`은 `push`(develop) 트리거가 켜져 있어서 **`develop`에 머지 = 자동 배포**입니다. 진행 상황은 Actions 탭에서 확인합니다.
 
+새 이미지 pull → `run --rm --no-deps web python manage.py collectstatic --noinput` → `up -d` → `migrate` 순서입니다. 정적 파일을 먼저 준비해야 새 worker가 이전 manifest를 기억한 채 새 HTML에 옛 CSS를 연결하지 않습니다. `collectstatic --clear`는 쓰지 않아 이전 페이지/뒤로가기가 참조하는 해시 파일을 보존합니다. 수동 정적 파일 재수집 시에는 `CacheBustingStaticStorage`도 변경된 manifest를 다시 읽습니다.
+
 > 서버를 처음부터 새로 구축하는 중이라면(1~5-3단계 진행 중) `develop` 머지 때 배포가 실패합니다.
 > 그동안은 `deploy.yml`의 `push:` 트리거 3줄을 잠시 주석 처리하고, 5-3 수동 배포가 성공한 뒤 다시 켜세요.
 
@@ -493,7 +495,7 @@ docker compose -f docker-compose.prod.yml up -d web
 - 롤백 중에 develop에 머지하면 자동 배포가 돌지만 `IMAGE_TAG`가 SHA로 고정돼 있어 **web 이미지는 그대로**입니다.
   그런데 `git pull`은 되므로 compose·nginx 설정만 새 버전이 되고, `migrate`는 이전 이미지로 실행돼 새 마이그레이션이 적용되지 않습니다.
   → 코드와 설정이 어긋나므로 **롤백 중에는 develop 머지를 멈춥니다.**
-- 고치는 PR이 준비되면: `.env`를 `IMAGE_TAG=latest`로 되돌린 **뒤** 머지합니다. 그러면 자동 배포가 새 이미지 pull → migrate → collectstatic까지 정상적으로 합니다.
+- 고치는 PR이 준비되면: `.env`를 `IMAGE_TAG=latest`로 되돌린 **뒤** 머지합니다. 그러면 자동 배포가 새 이미지 pull → collectstatic → 재시작 → migrate까지 정상적으로 합니다.
   이미 머지했다면 `IMAGE_TAG=latest`로 바꾸고 Actions에서 "Deploy to EC2"를 수동 실행합니다.
 
 > ⚠️ `IMAGE_TAG`를 `latest`로 되돌리는 걸 잊으면 이후 모든 배포가 반영되지 않습니다. 롤백이 끝나면 꼭 확인하세요: `grep IMAGE_TAG .env`

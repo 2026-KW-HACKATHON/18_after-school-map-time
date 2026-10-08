@@ -4,7 +4,7 @@
 # 흐름:
 #   Docker 이미지 빌드 → Docker Hub push (latest + 커밋 SHA 태그)
 #   → EC2 SSH 접속 → git pull (compose·nginx 설정 변경도 반영)
-#   → 이미지 pull → 재시작 → migrate → collectstatic
+#   → 이미지 pull → 새 이미지 collectstatic → 재시작 → migrate
 #   → 안 쓰는 이미지 정리 → /health/ 확인
 #
 # 필요한 GitHub Secrets (Settings → Secrets and variables → Actions):
@@ -67,9 +67,11 @@ jobs:
 
             COMPOSE="docker compose -f docker-compose.prod.yml"
             $COMPOSE pull web
+            # worker가 옛 manifest를 기억하지 않도록 새 정적 파일을 먼저 준비한다.
+            # --clear를 쓰지 않아 이전 페이지가 참조하는 해시 파일도 보존한다.
+            $COMPOSE run --rm --no-deps web python manage.py collectstatic --noinput
             $COMPOSE up -d
             $COMPOSE exec -T web python manage.py migrate --noinput
-            $COMPOSE exec -T web python manage.py collectstatic --noinput
 
             # 예전 이미지가 쌓여서 EC2 디스크가 차는 것 방지
             docker image prune -f

@@ -118,8 +118,9 @@ develop push (또는 Actions에서 수동 실행)
   → EC2 SSH 접속
   → cd ~/teokeopne && git pull origin develop
   → docker compose -f docker-compose.prod.yml pull
+  → 새 web 이미지로 collectstatic (--rm --no-deps, --clear 없이)
   → docker compose -f docker-compose.prod.yml up -d
-  → migrate → collectstatic
+  → migrate
   → docker image prune -f
   → /health/ 확인
 ```
