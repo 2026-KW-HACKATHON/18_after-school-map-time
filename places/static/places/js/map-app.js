@@ -128,10 +128,10 @@
   // 팝업을 연 마커 버튼 — 닫을 때 키보드 포커스를 그 자리로 돌려준다
   let popupOpener = null;
 
-  function closePopup() {
+  function closePopup(restoreFocus = true) {
     popupRequest += 1;
     els.popup.hidden = true;
-    if (popupOpener && document.contains(popupOpener)) popupOpener.focus();
+    if (restoreFocus && popupOpener && document.contains(popupOpener)) popupOpener.focus();
     popupOpener = null;
   }
 
@@ -144,6 +144,7 @@
     els.popupBody.textContent = "불러오는 중...";
     try {
       const d = await api(urls.detailApi(id));
+      if (request !== popupRequest) return;
       let j = d.judgments.find((x) => x.profile === state.profile) || d.judgments[0];
       if (mobility()?.needsEvaluation()) {
         const data = await mobility().evaluate({ region, place_ids: [id] });
@@ -177,12 +178,13 @@
       if (request === popupRequest) els.popupBody.textContent = err.message;
     }
   }
-  $("popup-close").addEventListener("click", closePopup);
+  $("popup-close").addEventListener("click", () => closePopup());
   els.popup.addEventListener("keydown", (e) => { if (e.key === "Escape") closePopup(); });
 
   // ── 데이터 불러오기 ────────────────────────────────────
   async function loadPlaces() {
     const request = ++placesRequest;
+    closePopup(false);
     // 전체(all=1)를 한 번 받아 화면에서 거른다 → 요약 개수와 '모든 장소 보기'를 서버 왕복 없이
     const params = new URLSearchParams({ region, all: "1" });
     if (state.profile) params.set("profile", state.profile);
@@ -223,7 +225,7 @@
     renderProfiles();
     document.addEventListener("mobility:change", () => {
       if (!mobility()) return;
-      state.profile = mobility().primaryProfile(); renderProfiles(); closePopup(); loadPlaces();
+      state.profile = mobility().primaryProfile(); renderProfiles(); loadPlaces();
     });
 
     els.showAll.addEventListener("change", () => setShowAll(els.showAll.checked));
