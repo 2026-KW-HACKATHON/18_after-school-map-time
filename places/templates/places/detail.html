@@ -30,8 +30,9 @@
         <button type="button" class="chip" data-profile="{{ row.profile.key }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}">{{ row.profile.label }}</button>
       {% endfor %}
     </div>
+    {% include "includes/mobility_settings.html" with mobility_mode="detail" %}
     {% for row in judgments %}
-      <div class="judge-panel" data-profile="{{ row.profile.key }}">
+      <div class="judge-panel" data-profile="{{ row.profile.key }}" data-mobility-baseline>
         <p class="judge-status">
           <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
           <strong>{{ row.judgment.label }}</strong>
@@ -182,6 +183,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/mobility-settings.js' %}"></script>
 <script>
   // 이동 조건 칩: 고른 조건의 판단 근거만 보여줌 (지도에서 고른 조건을 기억해 둔 게 있으면 그걸로 시작)
   (function () {
@@ -195,7 +197,16 @@
     try { saved = localStorage.getItem("teokeopne.profile"); } catch (e) {}
     const keys = [...chips].map((c) => c.dataset.profile);
     select(keys.includes(saved) ? saved : keys[0]);
+    function syncMobility() {
+      if (!window.TeokMobility?.state()) return;
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.profile === window.TeokMobility.primaryProfile())));
+      if (window.TeokMobility.needsEvaluation()) panels.forEach((p) => { p.hidden = true; });
+      else select(window.TeokMobility.primaryProfile());
+    }
+    document.addEventListener("mobility:change", syncMobility);
+    window.TeokMobility?.ready().then(syncMobility).catch(() => {});
     chips.forEach((c) => c.addEventListener("click", () => {
+      if (window.TeokMobility?.state()) { window.TeokMobility.selectPreset(c.dataset.profile); return; }
       select(c.dataset.profile);
       try { localStorage.setItem("teokeopne.profile", c.dataset.profile); } catch (e) {}
     }));

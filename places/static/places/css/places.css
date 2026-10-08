@@ -114,3 +114,26 @@ html.large-text .result-status { font-size: 18px; }
 html.large-text .place-detail h2 { font-size: 23px; }
 html.large-text .place-detail h3 { font-size: 20px; }
 html.large-text .judge-dot { width: 26px; height: 26px; }
+
+/* 개인화: 기본 화면은 간단하게, 세부 입력은 기존 field/btn를 사용하는 dialog에 분리 */
+.mobility-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.mobility-toolbar select { min-width: 0; max-width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.mobility-settings > p:empty { display: none; }
+.mobility-settings > p { margin: 4px 0; }
+.map-condition-tools { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 4px 8px; align-items: center; margin-bottom: 8px; }
+.map-condition-tools .panel-label { margin: 0; }
+.map-condition-tools .mobility-settings, .map-condition-tools .mobility-toolbar { display: contents; }
+.map-condition-tools .mobility-settings > p, .map-condition-tools .mobility-result { grid-column: 1 / -1; }
+.map-condition-tools .btn { padding: 8px; white-space: nowrap; }
+html.large-text .map-condition-tools .btn { padding: 10px 8px; }
+.mobility-dialog { width: min(580px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text); }
+.mobility-dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+.mobility-dialog h2 { margin-top: 0; }
+.mobility-dialog select { width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.mobility-field { margin: 12px 0; }
+.mobility-multiple { margin: 16px 0; }
+.mobility-multiple-choice { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+.mobility-actions { justify-content: flex-end; }
+@media (max-width: 768px) {
+  .mobility-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: 16px 16px 32px; }
+}

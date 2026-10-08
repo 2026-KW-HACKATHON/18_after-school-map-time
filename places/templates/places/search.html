@@ -19,7 +19,9 @@
     </select>
     <button type="submit" class="btn btn-primary">검색</button>
   </form>
+  {% include "includes/mobility_settings.html" with mobility_mode="search" %}
 
+  <div data-mobility-baseline>
   {% if searched %}
     {% if results %}
       <h2 class="small muted">검색 결과 {{ results|length }}곳 · {{ profile.label }} 기준</h2>
@@ -50,5 +52,8 @@
       </div>
     {% endif %}
   {% endif %}
+  </div>
 </section>
 {% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/mobility-settings.js' %}"></script>{% endblock %}

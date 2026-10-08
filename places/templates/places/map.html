@@ -28,7 +28,10 @@
       <button type="submit" class="btn">검색</button>
     </form>
 
-    <p class="panel-label" id="profile-label">이동 조건</p>
+    <div class="map-condition-tools">
+      <p class="panel-label" id="profile-label">이동 조건</p>
+      {% include "includes/mobility_settings.html" with mobility_mode="map" %}
+    </div>
     <div id="profile-chips" class="chips" role="group" aria-labelledby="profile-label"></div>
 
     {# 상태 요약: 어려움 개수는 보여주지 않는다 (지역 집계 공개 금지, 기획 v2 3.2) #}
@@ -95,6 +98,7 @@
     <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ KAKAO_JAVASCRIPT_KEY }}&autoload=false"></script>
   {% endif %}
   <script src="{% static 'js/map/kakao-adapter.js' %}"></script>
+  <script src="{% static 'js/mobility-settings.js' %}"></script>
   <script src="{% static 'places/js/map-app.js' %}"></script>
 {% endif %}
 {% endblock %}

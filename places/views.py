@@ -48,6 +48,7 @@ def search_page(request):
 
     return render(request, "places/search.html", {
         "q": q, "results": results, "profiles": profiles, "profile": profile, "searched": bool(q),
+        "region": region,
     })
 
 
