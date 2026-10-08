@@ -42,6 +42,8 @@ class KeepPhotoTests(TempMediaMixin, TestCase):
         self.assertContains(res, "올리신 사진을 그대로 쓸게요")
         token = token_in(res)
         self.assertTrue(token)
+        self.assertFalse(res.context["form"].fields["photo"].required)
+        self.assertNotRegex(res.content.decode(), r'<input[^>]*name="photo"[^>]*\brequired\b')
         res = self.client.post(self.url, {"photo_token": token, "has_ramp": "true"})  # 사진 다시 안 고름
         self.assertRedirects(res, reverse("reports:done"))
         report = Report.objects.get()
@@ -53,6 +55,7 @@ class KeepPhotoTests(TempMediaMixin, TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("photo", res.context["form"].errors)
         self.assertFalse(Report.objects.exists())
+        self.assertTrue(res.context["form"].fields["photo"].required)
 
     def test_owner_form_keeps_photo_too(self):
         from owners.models import ClaimCode, OwnerClaim

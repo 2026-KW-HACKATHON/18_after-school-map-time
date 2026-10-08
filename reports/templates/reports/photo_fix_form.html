@@ -3,10 +3,14 @@
 
 {% block title %}사진 수정 요청 | 턱없네{% endblock %}
 
+{% block header_brand %}사진 수정 요청{% endblock %}
+{% block body_class %}flow-shell{% endblock %}
+{% block tabbar %}{% endblock %}
 {% block content %}
-<section class="page narrow">
+<section class="page narrow screen-page photo-fix-page" data-figma-node="1:520">
   <p class="muted small"><a href="{{ next }}">← {{ place.name }}</a></p>
-  <h1>입구 사진 수정 요청</h1>
+  <h1>사진에 어떤 문제가 있나요?</h1>
+  {% if current_photo %}<div class="photo-slot"><img src="{{ current_photo.url }}" alt="수정 요청할 {{ entrance.name }} 사진"></div>{% endif %}
   <p class="muted">{{ entrance.name }} 사진이 예전 모습이거나, 내 얼굴·아는 사람 얼굴·차량 번호판이 보이면 알려 주세요. 운영진이 확인하고 새 사진으로 바꾸거나 지금 사진을 내려요. 처리되면 알림으로 알려 드려요.</p>
   {% if form.non_field_errors %}<div class="alert" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
   <form method="post" enctype="multipart/form-data" class="card form-stack">

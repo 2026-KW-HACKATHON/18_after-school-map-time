@@ -45,6 +45,13 @@ class PhotoFixTests(TempMediaMixin, TestCase):
         self.assertContains(self.client.get(self.detail), "사진에 문제가 있나요? 수정 요청하기")
         self.assertEqual(self.client.get(self.url).status_code, 302)
 
+    def test_fix_form_shows_only_the_current_verified_photo(self):
+        Report.objects.create(source="USER_REPORT", status="PENDING", entrance=self.door, photo=photo())
+        self.client.force_login(self.jumin)
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["current_photo"], self.shown.photo)
+        self.assertContains(response, f'src="{self.shown.photo.url}"')
+
     def test_request_without_photo_is_operator_only(self):
         res = self.request_fix()
         self.assertRedirects(res, self.detail)

@@ -111,6 +111,8 @@ class KeepPhotoMixin:
             token = keep(photo)
             self.data = self.data.copy()
             self.data["photo_token"] = token
+            # The retry page already has a valid photo; do not require a new file in the browser.
+            self.fields["photo"].required = False
 
     @property
     def kept_photo_url(self):

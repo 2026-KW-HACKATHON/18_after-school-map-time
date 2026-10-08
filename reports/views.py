@@ -21,6 +21,7 @@ from places.models import Building, Entrance, Place, Region
 from . import ai
 from .forms import PhotoFixForm, ReportForm
 from .models import PHOTO_FIX_PREFIX, AccessibilityValue, Report
+from .selectors import latest_photo
 from .services import ConfirmationError, confirm_report, reconfirm_place
 
 
@@ -228,7 +229,7 @@ def photo_fix_request(request, pk):
     if request.method == "POST":
         form.keep_photo_for_retry()
     return render(request, "reports/photo_fix_form.html", {"form": form, "entrance": entrance, "place": place,
-                                                          "next": back})
+                                                          "current_photo": latest_photo(entrance), "next": back})
 
 
 @login_required
