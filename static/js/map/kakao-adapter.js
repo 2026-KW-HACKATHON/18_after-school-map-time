@@ -19,7 +19,19 @@
         });
         map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
         // 화면 크기가 바뀌면(폰 가로·세로 전환, 패널 접힘) 지도 크기를 다시 계산 → 타일이 일부만 그려지는 문제 방지
-        window.addEventListener("resize", () => map.relayout());
+        const relayout = () => {
+          const center = map.getCenter();
+          map.relayout();
+          map.setCenter(center);
+        };
+        window.addEventListener("resize", relayout);
+        // 뒤로가기로 복원된 페이지는 resize가 발생하지 않아도 타일 크기를 다시 맞춘다.
+        window.addEventListener("pageshow", (event) => { if (event.persisted) relayout(); });
+        if (window.ResizeObserver) {
+          new window.ResizeObserver(() => {
+            if (element.clientWidth && element.clientHeight) relayout();
+          }).observe(element);
+        }
         let overlays = [];
         let myLocation = null;
 
