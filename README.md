@@ -120,7 +120,7 @@
 | DB | PostgreSQL 16 (Docker 없이 실행 시 SQLite 폴백) |
 | 서버 | Gunicorn, Nginx (리버스 프록시·HTTPS·정적 파일) |
 | 인프라 | Docker, Docker Compose, AWS EC2 |
-| CI/CD | GitHub Actions (PR마다 Django 테스트 + 화면 JS 테스트, `develop` 머지 시 EC2 자동 배포) |
+| CI/CD | GitHub Actions (PR마다 Django 테스트 + 화면 JS 테스트, `develop` → `main` 릴리스 PR 머지 시 EC2 자동 배포) |
 
 ---
 
