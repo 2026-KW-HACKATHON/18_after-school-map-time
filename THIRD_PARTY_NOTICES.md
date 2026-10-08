@@ -1,6 +1,6 @@
 # 제3자 소프트웨어·서비스 고지 (Third-Party Notices)
 
-턱없네(18조 방과 후 지도타임)는 아래 오픈소스와 외부 서비스를 사용합니다.
+턱없네(18조 방과 후 지도타임)는 아래 오픈소스와 외부 서비스를 사용합니다. 팀이 작성한 코드는 [MIT License](LICENSE)이며, 아래 구성요소에는 MIT가 적용되지 않습니다.
 각 구성요소의 저작권은 원저작자에게 있으며, 각자의 라이선스·약관을 따릅니다.
 버전은 `requirements.txt`·`Dockerfile`·`docker-compose*.yml`·`.github/workflows/`에 고정된 값입니다 (2026-10-08 기준).
 

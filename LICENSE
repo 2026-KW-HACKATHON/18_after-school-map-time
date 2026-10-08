@@ -1,0 +1,33 @@
+MIT License
+
+Copyright (c) 2026 18조 방과 후 지도타임 (강성훈, 신지현, 박현웅, 윤재석)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+This license covers the source code and documentation written by the team in this
+repository. It does NOT relicense:
+
+- Third-party software, fonts and services used by this project. They remain under
+  their own licenses and terms (see THIRD_PARTY_NOTICES.md).
+- places/data/public/ (snapshot from the Public Data Portal, data.go.kr,
+  "한국사회보장정보원_장애인편의시설 현황"), which follows the portal's terms of use.
+- Photos and text submitted by users of the deployed service (not stored in this
+  repository).
