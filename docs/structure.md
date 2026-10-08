@@ -88,6 +88,9 @@
 │   ├── css/common.css          ←   디자인 변수(색·간격)와 공통 컴포넌트
 │   ├── js/common.js            ←   api() fetch 헬퍼 (CSRF 자동 처리)
 │   ├── js/photo-resize.js      ←   사진 올리기 전 브라우저에서 1600px JPEG로 줄이기 (사진 업로드 폼 공통)
+│   ├── js/reports/report-wizard.js ← 제보 5단계·입력 보존·사진 대기·요약·AI 확인 상태
+│   ├── js/activity.js           ← 내 활동에 표시된 최근 제보 상태 필터
+│   ├── js/ops-review.js         ← 기존 반려 사유 패널 열기·입력 포커스
 │   ├── js/map/kakao-adapter.js ←   카카오맵 호출은 여기 한 곳만 (지도 SDK 교체 대비)
 │   ├── js/map/location-picker.js ← 지도를 눌러 위치 고르기 (새 장소 제보·운영자 공용)
 │   └── img/
@@ -103,6 +106,8 @@
 ├── docs/
 │   ├── deploy.md               ← 배포 런북 (EC2 → HTTPS → 자동 배포 → 백업)
 │   ├── structure.md            ← (이 문서)
+│   ├── figma-integration.md     ← Figma 전체 화면 대응·기존 기능 유지·검증 범위
+│   ├── screenshots/figma/       ← 격리된 QA 데이터로 확인한 모바일/PC 지도·제보/운영자 완료 화면
 │   └── context/                ← 기획·규칙·인프라 설계 (Claude Code와 팀 공용 배경 자료)
 │
 ├── .github/
@@ -111,6 +116,8 @@
 │   └── workflows/
 │       ├── ci.yml              ← PR마다 자동 테스트
 │       └── deploy.yml          ← EC2 자동 배포
+│
+├── tests/js/report-wizard.test.cjs ← 제보 단계 이동·사진 필수·사진 보관·오류 복귀 회귀 테스트
 │
 ├── .claude/commands/           ← Claude Code 팀 공용 커맨드
 │
