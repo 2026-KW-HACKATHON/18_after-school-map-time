@@ -2,7 +2,7 @@
 공개 읽기 API /api/v1/ (기획 v2 8장 — 지도 화면이 쓰고, 구청 등 외부에도 열 수 있는 읽기 전용 API)
 
 GET /api/v1/meta/?region=wolgye1                        지역 정보, 이동 조건 목록, 표시 정책
-GET /api/v1/places/?region=wolgye1&profile=WHEELCHAIR   지도용 목록 (기본: 어려움·미확인 숨김, &all=1 이면 모두)
+GET /api/v1/places/?region=wolgye1&profile=WHEELCHAIR   지도용 목록 (기본: 어려움만 숨김, &all=1 이면 모두)
 GET /api/v1/places/<id>/                                장소 상세 (건물 공용 / 가게 섹션)
 GET /api/v1/places.geojson?region=wolgye1               GeoJSON 내보내기 (전체 이동 조건 판정 포함)
 """

@@ -145,7 +145,7 @@ class MobilityAPITests(TestCase):
         self.assertEqual(self.evaluate(q="개인화").json()["count"], 1)
         self.assertEqual(self.evaluate(q="존재하지 않는 이름").json()["count"], 0)
         self.assertEqual(self.evaluate(q="\x00").status_code, 400)
-        self.assertEqual(self.evaluate(all=False).json()["count"], 0)
+        self.assertEqual(self.evaluate(all=False).json()["count"], 1)  # 미확인은 기본으로도 보인다 (어려움만 숨김)
 
     def test_member_csrf_and_logout_does_not_expose_settings(self):
         client = Client(enforce_csrf_checks=True)
