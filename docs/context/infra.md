@@ -112,11 +112,11 @@
 ## 6. CI/CD
 
 ```
-develop push (또는 Actions에서 수동 실행)
+main push = develop → main 릴리스 PR 머지 (또는 Actions에서 수동 실행)
   → Docker 이미지 빌드
   → Docker Hub push (`latest` + 커밋 SHA 태그)
   → EC2 SSH 접속
-  → cd ~/teokeopne && git pull origin develop
+  → cd ~/teokeopne && git checkout main && git pull --ff-only origin main
   → docker compose -f docker-compose.prod.yml pull
   → 새 web 이미지로 collectstatic (--rm --no-deps, --clear 없이)
   → docker compose -f docker-compose.prod.yml up -d
@@ -125,7 +125,8 @@ develop push (또는 Actions에서 수동 실행)
   → /health/ 확인
 ```
 
-- 수동 배포(Deploy to EC2 #1) 성공 후 `push`(develop) 트리거를 활성화했다. `workflow_dispatch`(수동 실행)도 유지.
+- 수동 배포(Deploy to EC2 #1) 성공 후 `push` 트리거를 활성화했다. `workflow_dispatch`(수동 실행)도 유지.
+- 2026-10-09: 배포 브랜치를 `develop` → `main`으로 변경 (GitHub 기본 브랜치도 `main`). 작업은 `develop`에 모으고 릴리스 PR로 `main`에 반영할 때만 배포.
 - 필요한 GitHub Secrets: `DOCKER_USERNAME`, `DOCKER_PASSWORD`(Docker Hub 액세스 토큰 권장), `EC2_HOST`, `EC2_KEY`
 
 ---

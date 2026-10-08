@@ -19,14 +19,14 @@
 ### 브랜치 전략
 
 ```
-main        ← 최종 제출/릴리스용. 직접 push 금지.
- └ develop  ← 통합 브랜치 (기본 브랜치). push/머지 시 EC2 자동 배포.
+main        ← 릴리스 브랜치 (2026-10-09부터 GitHub 기본 브랜치). develop에서 릴리스 PR로만. 머지 시 EC2 자동 배포.
+ └ develop  ← 통합 브랜치. feature가 머지되는 곳 (CI만, 배포 없음).
     └ feature/기능명   ← 이슈 단위 개인 작업 브랜치
 ```
 
 - 이름 규칙: `feature/기능명`, `fix/버그명`, `docs/문서명` (+ 이번 레포에서 추가: `chore/작업명` — 설정·인프라)
 - 이슈 하나 = 브랜치 하나 = PR 하나. 항상 최신 `develop`에서 분기.
-- `develop`은 항상 실행 가능한 상태 유지 (push하면 바로 배포되므로).
+- `develop`은 항상 실행 가능한 상태 유지 (곧 `main`으로 릴리스되므로). 작업 PR의 base는 `develop`.
 
 ### 커밋 컨벤션
 
@@ -90,7 +90,7 @@ main        ← 최종 제출/릴리스용. 직접 push 금지.
 
 - `Dockerfile`: `python:3.12-slim`, `PYTHONUNBUFFERED=1`, `PYTHONDONTWRITEBYTECODE=1`, `gcc`·`libpq-dev` 설치, requirements 먼저 복사(레이어 캐시), CMD는 gunicorn. 줄마다 한국어 주석.
 - `docker-compose.yml`(개발): `web`은 `runserver`로 오버라이드 + 코드 볼륨 마운트, `db`는 `postgres:16` + named volume
-- `deploy.yml`: `develop` push 또는 수동 실행 → Docker Hub 로그인 → 빌드·push → `appleboy/ssh-action`으로 EC2 접속 → `docker compose pull && up -d` → `migrate` → `collectstatic`
+- `deploy.yml`: `main` push(릴리스 PR 머지) 또는 수동 실행 → Docker Hub 로그인 → 빌드·push → `appleboy/ssh-action`으로 EC2 접속 → `docker compose pull && up -d` → `migrate` → `collectstatic`
 - GitHub Secrets: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `EC2_HOST`, `EC2_KEY`
 - 워크플로우 상단에 무엇을 하는지 주석 블록
 
