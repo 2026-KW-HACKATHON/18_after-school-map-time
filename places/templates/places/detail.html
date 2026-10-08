@@ -70,6 +70,7 @@
   <section class="card" aria-labelledby="trust-title">
     <h2 id="trust-title">정보 신뢰도</h2>
     <p class="small">출처: {% if sources %}{{ sources|join:", " }}{% else %}아직 없음{% endif %}</p>
+    {% if "공공데이터" in sources %}<p class="muted small">공공데이터: 공공데이터포털 「한국사회보장정보원_장애인편의시설 현황」 (data.go.kr)</p>{% endif %}
     <p class="small">최근 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}</p>
     {% if verified_user_reports %}<p class="small">💬 주민 제보 {{ verified_user_reports }}건이 반영됐어요.</p>{% endif %}
     {% if reconfirm_count %}<p class="small">👍 최근 30일 동안 주민 {{ reconfirm_count }}명이 "지금도 맞아요"라고 확인했어요.</p>{% endif %}

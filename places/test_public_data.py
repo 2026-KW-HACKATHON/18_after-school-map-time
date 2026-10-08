@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.core.management import call_command
+from django.urls import reverse
 from django.test import TestCase, override_settings
 
 from judgments.models import Judgment
@@ -80,6 +81,9 @@ class PublicDataTests(TestCase):
         # 문 폭이 없으니 휠체어는 '정보 없음', 유아차는 단차 0cm로 '들어갈 수 있어요'
         results = dict(Judgment.objects.filter(place=office).values_list("profile_id", "result"))
         self.assertEqual((results["WHEELCHAIR"], results["STROLLER"]), ("UNKNOWN", "ACCESSIBLE"))
+        # 이용 조건: 상세 화면에 공공데이터 출처(제공 기관·데이터 이름)를 표시
+        page = self.client.get(reverse("places:detail", args=[office.pk]))
+        self.assertContains(page, "한국사회보장정보원_장애인편의시설 현황")
 
     def test_generic_names_get_address_and_reimport_is_noop(self):
         data, _, _ = self.fetch()
