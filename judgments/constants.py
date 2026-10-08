@@ -4,6 +4,8 @@
 - 빨간색 금지 (가게 낙인 방지). 색은 static/css/common.css 의 --judge-* 변수와 같은 이름을 쓴다.
 - 색만으로 구분하지 않고 모양·아이콘을 같이 쓴다 (색약 대응).
 - hidden_by_default: 지도에서 기본으로 숨김 ("모든 장소 보기"를 켜야 보임, 기획 v2 3.2)
+  · 어려움만 숨긴다 (가게 낙인 방지). 미확인은 점선으로 보여 준다 — 숨기면 정보가 부족한
+    지역(예: 문 폭이 없는 공공데이터)에서 지도가 거의 비고, "알려주세요"로 제보를 받을 기회도 사라진다 (2026-10-09)
 """
 
 from .models import Outcome
@@ -35,7 +37,7 @@ DISPLAY = {
         "css_var": "--judge-unknown",
         "shape": "dashed-circle",
         "icon": "",
-        "hidden_by_default": True,
+        "hidden_by_default": False,
     },
 }
 

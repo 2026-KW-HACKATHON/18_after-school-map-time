@@ -54,9 +54,11 @@ class PlaceListApiTests(ViewTestBase):
         self.assertEqual(res.status_code, 200)
         return {r["name"]: r["judgment"] for r in res.json()["results"]}
 
-    def test_default_hides_difficult_and_unknown(self):
+    def test_default_hides_only_difficult(self):
+        # 어려움만 숨긴다. 미확인은 점선으로 보여서 "알려주세요" 제보를 받는다
         rows = self.names(profile="WHEELCHAIR")
-        self.assertEqual(set(rows), {"턱없는 카페"})
+        self.assertEqual(set(rows), {"턱없는 카페", "정보 없는 약국"})
+        self.assertEqual(rows["정보 없는 약국"]["code"], "UNKNOWN")
         self.assertEqual(rows["턱없는 카페"]["label"], "들어갈 수 있어요")
 
     def test_show_all_includes_everything_with_v2_labels(self):
@@ -99,6 +101,7 @@ class MetaAndGeoJsonTests(ViewTestBase):
         self.assertEqual(data["region"]["code"], "wolgye1")
         self.assertEqual([p["key"] for p in data["profiles"]], ["WHEELCHAIR", "STROLLER", "WALKER", "CRUTCH"])
         self.assertTrue(data["display"]["DIFFICULT"]["hidden_by_default"])
+        self.assertFalse(data["display"]["UNKNOWN"]["hidden_by_default"])
         self.assertNotIn("red", str(data["display"]).lower())
 
     def test_geojson(self):
