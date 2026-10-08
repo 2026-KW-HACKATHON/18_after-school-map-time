@@ -13,8 +13,9 @@ function metadata(authenticated = false, consented = authenticated) {
   const presets = ["WHEELCHAIR", "STROLLER", "WALKER", "CRUTCH"].map((key) => ({ key, label: key, profile: key,
     fields: key === "CRUTCH" ? ["max_step_height_cm", "can_use_stairs"] : Object.keys(fields), defaults: { max_step_height_cm: "2" } }));
   presets.push({ ...presets[2], key: "LIMITED_WALKING", recommendation: "초기 추천이며 실제 조건을 수정하세요." });
-  presets.push({ ...presets[1], key: "WITH_CHILD", companion: true, recommendation: "실제 동반자 조건을 선택하세요." });
-  presets.push({ ...presets[0], key: "ASSISTED_COMPANION", companion: true, recommendation: "실제 동반자 조건을 선택하세요." });
+  presets.push({key:"COMPANION",label:"동반자/보호자",profile:null,companion:true,required_selection:true,fields:[],defaults:{}});
+  presets.push({ ...presets[1], key: "WITH_CHILD", companion: true, legacy:true, recommendation: "실제 동반자 조건을 선택하세요." });
+  presets.push({ ...presets[0], key: "ASSISTED_COMPANION", companion: true, legacy:true, recommendation: "실제 동반자 조건을 선택하세요." });
   return { fields, presets, rule_version: 2, authenticated, consented, companion_options: presets.filter((p) => !p.companion), notice: "안전 보장 아님",
     settings: { version: 1, rule_version: 2, selected: ["WHEELCHAIR"], overrides: {}, companions: {} } };
 }
@@ -34,7 +35,8 @@ async function setup({ authenticated = false, consented = authenticated, storage
   const meta = metadata(authenticated, consented), calls = [];
   if (settings) meta.settings = clone(settings);
   const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice",
-    "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status", "consent-box", "consent", "browser-note"].map((key) => [key, element()]));
+    "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status", "consent-box", "consent", "browser-note",
+    "customize", "custom", "extra-fields", "other", "multiple-box", "consent-details", "draft-summary", "body"].map((key) => [key, element()]));
   const baseline = element(); baseline.hidden = true;
   const searchProfile = element(); searchProfile.value = "WHEELCHAIR";
   const root = { dataset: { mode, page, category, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placesUrl: "/places", referenceUrl: "/reference/0/reference/", placeId: mode === "detail" ? "1" : "" },
@@ -57,7 +59,7 @@ async function setup({ authenticated = false, consented = authenticated, storage
     async expandReference() { nodes.reference.open = true; nodes.reference.handlers.toggle(); await new Promise(setImmediate); },
     async referencePlace(id) { nodes["reference-place"].value = String(id); await nodes["reference-place"].handlers.change(); },
     directStep(checked = true) { nodes["reference-step"].checked = checked; nodes["reference-step"].handlers.change(); },
-    field(key, value) { const container = nodes.fields.children.find((c) => c.children[1].id === `mobility-field-${key}`);
+    field(key, value) { const container = [...nodes.fields.children,...nodes['extra-fields'].children].find((c) => c.children[1].id === `mobility-field-${key}`);
       const input = container.children[1]; input.value = value; (input.handlers.input || input.handlers.change)(); } };
 }
 
@@ -247,6 +249,89 @@ test("빈 전체 목록과 검색 불일치 안내는 구분하고 페이지가 
     assert.ok(p.nodes.result.children.some(n=>n.textContent===expected));
     assert.equal(p.nodes.result.children.some(n=>n['aria-label']==="장소 목록 페이지"),false);
   }
+});
+
+test("간단한 첫 화면은 6개 Preset과 접힌 세부/동반자/계정 안내를 제공한다",async()=>{
+  const p=await setup({authenticated:true,consented:false});p.open();
+  assert.equal(p.nodes.preset.children.length,6);
+  assert.deepEqual(p.nodes.preset.children.map(n=>n.value),["WHEELCHAIR","STROLLER","WALKER","CRUTCH","LIMITED_WALKING","COMPANION"]);
+  assert.equal(p.nodes.custom.hidden,true);assert.equal(p.nodes.customize['aria-expanded'],"false");
+  for(const name of ["other","reference","multiple-box","consent-details"]) assert.equal(p.nodes[name].open,false);
+  assert.equal(p.nodes.consent.checked,false);assert.equal(p.nodes['consent-box'].hidden,false);
+});
+test("설정을 접어도 입력 노드와 값은 유지하며 접힌 상태에서도 저장한다",async()=>{
+  const p=await setup();p.open();p.nodes.customize.handlers.click();p.field("max_step_height_cm","4");
+  const field=p.nodes.fields.children[0].children[1];p.nodes.customize.handlers.click();
+  assert.equal(p.nodes.custom.hidden,true);assert.equal(p.nodes.fields.children[0].children[1],field);assert.equal(field.value,"4");
+  p.nodes.customize.handlers.click();assert.equal(field.value,"4");await p.submit();
+  assert.equal(p.controller.state().overrides.WHEELCHAIR.max_step_height_cm,"4");
+});
+test("자주 쓰는 필드를 먼저 표시하고 나머지는 별도 접이식 영역에 둔다",async()=>{
+  const p=await setup();p.open();
+  assert.deepEqual(p.nodes.fields.children.map(n=>n.children[1].id),["mobility-field-max_step_height_cm","mobility-field-min_door_width_cm"]);
+  assert.equal(p.nodes['extra-fields'].children[0].children[1].id,"mobility-field-can_use_stairs");
+  p.select("CRUTCH");assert.equal(p.nodes['extra-fields'].children.length,0);assert.equal(p.nodes.other.hidden,true);
+  assert.equal(p.nodes.fields.children[0].children[0].textContent,"통과 가능한 턱 높이 (cm)");
+  const help=p.nodes.fields.children[0].children[3];assert.equal(help.hidden,true);
+  p.nodes.fields.children[0].children[2].handlers.click();assert.equal(help.hidden,false);
+});
+test("새 동반자 선택은 즉시 저장/판정하지 않고 실제 이동 조건을 명시적으로 받는다",async()=>{
+  const p=await setup();await p.controller.selectPreset("COMPANION");
+  assert.equal(p.nodes.dialog.open,true);assert.equal(p.nodes.companion.value,"");assert.equal(p.nodes.customize.disabled,true);
+  assert.deepEqual(clone(p.controller.state().selected),["WHEELCHAIR"]);
+  await p.submit();assert.match(p.nodes.error.textContent,/실제 이동 조건/);
+  p.nodes.companion.value="CRUTCH";p.nodes.companion.handlers.change();
+  assert.equal(p.nodes.customize.disabled,false);p.field("max_step_height_cm","1");await p.submit();
+  const saved=p.controller.state();assert.deepEqual(clone(saved.selected),["COMPANION"]);
+  assert.equal(saved.companions.COMPANION,"CRUTCH");assert.equal(saved.overrides.COMPANION.max_step_height_cm,"1");
+});
+test("두 기존 동반자 저장값은 UI만 통합하고 각 실제 조건·Override를 그대로 보존한다",async()=>{
+  const data=metadata().settings;data.selected=["WITH_CHILD","ASSISTED_COMPANION"];
+  data.companions={WITH_CHILD:"STROLLER",ASSISTED_COMPANION:"CRUTCH"};
+  data.overrides={WITH_CHILD:{max_step_height_cm:"4"},ASSISTED_COMPANION:{max_step_height_cm:"1",can_use_stairs:false}};
+  const p=await setup({storage:memoryStorage({[helpers.GUEST_KEY]:JSON.stringify(data)})});p.open();
+  assert.equal(p.nodes.preset.value,"COMPANION");assert.equal(p.nodes.companion.value,"STROLLER");
+  assert.match(p.controller.label(),/동반자\/보호자/);assert.doesNotMatch(p.controller.label(),/어린이 동반/);
+  assert.equal(helpers.selectionKey(p.meta,data,"COMPANION"),"WITH_CHILD");
+  await p.submit();assert.deepEqual(clone(p.controller.state()),data);
+  p.open();p.field("max_step_height_cm","5");await p.submit();
+  assert.deepEqual(clone(p.controller.state().overrides.ASSISTED_COMPANION),data.overrides.ASSISTED_COMPANION);
+  assert.equal(p.controller.state().overrides.WITH_CHILD.max_step_height_cm,"5");
+});
+test("선택하지 않은 기존 동반자 개인화도 통합 메뉴에서 다시 불러올 수 있다",async()=>{
+  const data=metadata().settings;data.overrides.ASSISTED_COMPANION={max_step_height_cm:"1"};
+  const p=await setup({settings:data});p.open();p.select("COMPANION");
+  assert.equal(p.nodes.preset.value,"COMPANION");assert.equal(p.nodes.companion.value,"WHEELCHAIR");
+  assert.equal(p.nodes.fields.children[0].children[1].value,"1");await p.submit();
+  assert.deepEqual(clone(p.controller.state().selected),["ASSISTED_COMPANION"]);
+});
+test("동반자 함께 적용은 동일한 실제 조건 선택과 개인화 편집 경로를 쓴다",async()=>{
+  const p=await setup();p.open();p.field("max_step_height_cm","4");
+  const label=p.nodes.multiple.children.find(n=>n.children[1]?.textContent==="동반자/보호자");
+  label.children[0].checked=true;label.children[0].handlers.change();
+  const holder=()=>p.nodes.multiple.children.find(n=>n.children[1]?.['data-companion-key']==="COMPANION");
+  assert.equal(holder().children[1].value,"");assert.equal(holder().children[2].disabled,true);
+  holder().children[1].value="CRUTCH";holder().children[1].handlers.change();holder().children[2].handlers.click();
+  assert.equal(p.nodes.custom.hidden,false);assert.equal(p.nodes.preset.value,"COMPANION");
+  p.field("max_step_height_cm","1");await p.submit();
+  assert.equal(p.controller.state().overrides.WHEELCHAIR.max_step_height_cm,"4");
+  assert.equal(p.controller.state().overrides.COMPANION.max_step_height_cm,"1");
+  assert.deepEqual(clone(p.controller.state().selected),["COMPANION","WHEELCHAIR"]);
+});
+test("접힌 필드의 잘못된 입력을 제출하면 세부 설정을 열어 오류 위치에 접근시킨다",async()=>{
+  const p=await setup();p.open();p.nodes.form.handlers.invalid({target:{id:"mobility-field-max_step_height_cm"}});
+  assert.equal(p.nodes.custom.hidden,false);assert.equal(p.nodes.other.open,false);
+  p.nodes['extra-fields'].contains=()=>true;
+  p.nodes.form.handlers.invalid({target:{id:"mobility-field-can_use_stairs"}});assert.equal(p.nodes.other.open,true);
+  p.nodes.form.handlers.invalid({target:{getAttribute:()=>"COMPANION"}});assert.equal(p.nodes['multiple-box'].open,true);
+});
+test("동반자 초기화는 실제 이동 조건과 다른 사람의 설정을 유지한다",async()=>{
+  const data=metadata().settings;data.selected=["COMPANION","WHEELCHAIR"];data.companions={COMPANION:"CRUTCH"};
+  data.overrides={COMPANION:{max_step_height_cm:"1"},WHEELCHAIR:{max_step_height_cm:"4"}};
+  const p=await setup({settings:data});p.open();p.nodes.reset.handlers.click();await p.submit();
+  assert.equal(p.controller.state().overrides.COMPANION,undefined);
+  assert.equal(p.controller.state().companions.COMPANION,"CRUTCH");
+  assert.equal(p.controller.state().overrides.WHEELCHAIR.max_step_height_cm,"4");
 });
 
 function referenceRoute(height = "7", width = "80", id = "entrance:1") {

@@ -45,12 +45,13 @@ def profile_key(key, companions=None):
 
 
 def field_keys(key, companions=None):
-    return FIELDS_BY_PRESET.get(base_preset(key, companions), ("max_step_height_cm", "can_use_stairs"))
+    actual = base_preset(key, companions)
+    return FIELDS_BY_PRESET.get(actual, ("max_step_height_cm", "can_use_stairs")) if actual is not None else ()
 
 
 def active_presets():
     profiles = {p.key: p for p in ConditionProfile.objects.filter(is_active=True)}
-    out = [deepcopy(p) for p in PRESETS if p["profile"] in profiles]
+    out = [deepcopy(p) for p in PRESETS if p["profile"] in profiles or (p.get("required_selection") and profiles)]
     for preset in out:
         if preset["key"] == preset["profile"]:
             preset["label"] = profiles[preset["profile"]].label
@@ -120,6 +121,9 @@ def normalize_settings(raw):
         raise ValidationError("개인화 설정 형식을 확인해 주세요.")
     if any(not isinstance(v, str) or k not in COMPANIONS or k not in presets or v not in presets or v in COMPANIONS for k, v in companions.items()):
         raise ValidationError("동반자의 실제 이동 조건을 확인해 주세요.")
+    # 새 동반자 Preset에는 신분에 따른 기본 이동 제약을 임의로 적용하지 않는다.
+    if any(presets[key].get("required_selection") and key not in companions for key in selected):
+        raise ValidationError("동반자의 실제 이동 조건을 먼저 선택해 주세요.")
     normalized = {}
     for preset, values in overrides.items():
         if preset not in presets or not isinstance(values, dict) or set(values) - set(field_keys(preset, companions)):

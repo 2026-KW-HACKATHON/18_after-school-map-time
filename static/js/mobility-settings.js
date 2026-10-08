@@ -5,11 +5,19 @@
   const LEGACY_KEY = "teokeopne.profile";
   const clone = (data) => JSON.parse(JSON.stringify(data));
   const preset = (meta, key) => meta.presets.find((p) => p.key === key);
+  const visiblePresets = (meta) => meta.presets.filter((p) => !p.legacy);
+  const uiKey = (p) => p?.legacy && p.companion ? "COMPANION" : p?.key;
+  function selectionKey(meta, data, key) {
+    if (key !== "COMPANION") return key;
+    // 표시만 통합한다. 두 사람의 기존 Override를 한 슬롯으로 덮어쓰지 않는다.
+    return data.selected.find((k) => preset(meta, k)?.companion) ||
+      meta.presets.find((p) => p.legacy && (data.companions[p.key] || data.overrides[p.key]))?.key || key;
+  }
   function actualPreset(meta, data, key) {
     const p = preset(meta, key);
-    return p.companion ? preset(meta, data.companions[key] || p.profile) : p;
+    return p.companion ? preset(meta, Object.hasOwn(data.companions, key) ? data.companions[key] : p.profile) : p;
   }
-  function fieldsFor(meta, data, key) { return actualPreset(meta, data, key).fields; }
+  function fieldsFor(meta, data, key) { return actualPreset(meta, data, key)?.fields || []; }
   function validateState(data, meta) {
     if (!data || Array.isArray(data) || data.version !== 1 || typeof data.version !== "number" ||
         Object.keys(data).some((k) => !["version", "rule_version", "selected", "overrides", "companions"].includes(k)) ||
@@ -22,6 +30,8 @@
       if (!preset(meta, key)?.companion || !preset(meta, value) || preset(meta, value).companion)
         throw new Error("동반자의 이동 조건을 확인해 주세요.");
     });
+    if (data.selected.some((key) => preset(meta, key).required_selection && !companions[key]))
+      throw new Error("동반자의 실제 이동 조건을 먼저 선택해 주세요.");
     const clean = {};
     Object.entries(overrides).forEach(([key, values]) => {
       if (!preset(meta, key) || !values || typeof values !== "object" || Array.isArray(values)) throw new Error("개인 설정을 확인해 주세요.");
@@ -89,7 +99,7 @@
     if (agreed) return "account";
     return meta.consented ? "withdraw" : "browser";
   }
-  const helpers = { GUEST_KEY, validateState, restoreGuest, switchPreset, resetPreset, switchCompanion, fieldsFor, referenceValues, saveTarget };
+  const helpers = { GUEST_KEY, validateState, restoreGuest, switchPreset, resetPreset, switchCompanion, fieldsFor, referenceValues, saveTarget, visiblePresets, selectionKey };
   if (typeof module !== "undefined" && module.exports) module.exports = helpers;
   if (typeof document === "undefined") return;
   const root = document.querySelector("[data-mobility]");
@@ -112,7 +122,7 @@
   function label() {
     return settings.selected.map((key) => {
       const p = preset(meta, key);
-      return p.label + (p.companion ? ` (${actualPreset(meta, settings, key).label})` : "");
+      return (p.companion ? "동반자/보호자" : p.label) + (p.companion ? ` (${actualPreset(meta, settings, key).label})` : "");
     }).join(" + ");
   }
   function needsEvaluation() {
@@ -124,10 +134,10 @@
   function primaryProfile() { return actualPreset(meta, settings, settings.selected[0]).profile; }
   function publish() {
     const primary = preset(meta, settings.selected[0]), actual = actualPreset(meta, settings, primary.key);
-    const brief = `${primary.label}${settings.selected.length > 1 ? ` 외 ${settings.selected.length - 1}개 조건` : ""}`;
+    const brief = `${primary.companion ? "동반자/보호자" : primary.label}${settings.selected.length > 1 ? ` 외 ${settings.selected.length - 1}개 조건` : ""}`;
     // 기본 기준 그대로(바꾼 값 없음)면 아무 표시도 하지 않는다. 바꾼 값이 없는데 "내 조건 적용"이라고 하면 사실과 다름
     text("summary", !needsEvaluation() ? "" : `${brief}${primary.recommendation ? ` · 적용 기준: ${actual.label}` : " · 내 조건 적용"}`);
-    $("more").value = ["WITH_CHILD", "ASSISTED_COMPANION", "LIMITED_WALKING"].includes(settings.selected[0]) ? settings.selected[0] : "";
+    $("more").value = primary.companion ? "COMPANION" : primary.key === "LIMITED_WALKING" ? primary.key : "";
     if (root.dataset.mode === "search") document.getElementById("search-profile").value = primaryProfile();
     document.dispatchEvent(new CustomEvent("mobility:change", { detail: clone(settings) }));
     refreshView();
@@ -159,30 +169,55 @@
   async function apply(data, consent) { settings = await persist(data, consent); publish(); }
   async function selectPreset(key) {
     if (!meta || !preset(meta, key)) return;
+    if (preset(meta, key).companion) {
+      showDialog(switchPreset(settings, selectionKey(meta, settings, key)));
+      return;
+    }
     try { await apply({ ...clone(settings), selected: [key] }); text("warning", persistenceWarning); }
     catch (e) { text("warning", e.message); }
   }
+  function customize(expanded) {
+    $("custom").hidden = !expanded;
+    $("customize").setAttribute("aria-expanded", String(expanded));
+    $("customize").textContent = expanded ? "세부 설정 접기" : "내 상황에 맞게 수정";
+  }
+  function draftSummary(key) {
+    const count = Object.keys(draft.overrides[key] || {}).length;
+    text("draft-summary", count ? `직접 바꾼 항목 ${count}개` : "");
+    $("draft-summary").hidden = count === 0;
+  }
+  const SHORT_LABELS = {
+    max_step_height_cm: "통과 가능한 턱 높이", min_door_width_cm: "필요한 출입문 폭",
+    max_slope_deg: "허용 경사", can_use_stairs: "계단 이용", needs_elevator: "엘리베이터 필요",
+    needs_accessible_toilet: "장애인 화장실 필요", needs_handrail: "난간·손잡이 필요",
+    min_passage_width_cm: "필요한 실내 통로 폭", prefers_rest_seat: "휴식 좌석 선호",
+  };
   function renderDraft(resetReference = true) {
     if (resetReference) clearReference();
     const key = draft.selected[0], p = preset(meta, key), actual = actualPreset(meta, draft, key);
-    $("preset").value = key;
+    $("preset").value = uiKey(p);
     $("companion-box").hidden = !p.companion;
-    $("companion").value = draft.companions[key] || p.profile;
-    text("recommendation", p.recommendation ? `${p.recommendation} 현재 적용 기준: ${actual.label}` : "");
-    $("recommendation").hidden = !p.recommendation;
-    const fields = $("fields"); fields.replaceChildren();
+    $("companion").value = Object.hasOwn(draft.companions, key) ? draft.companions[key] : p.profile || "";
+    $("companion").required = Boolean(p.companion);
+    text("recommendation", !p.companion && p.recommendation ? `${actual.label} 기준의 초기 추천값이에요. 상황에 맞게 바꿀 수 있어요.` : "");
+    $("recommendation").hidden = p.companion || !p.recommendation;
+    $("customize").disabled = !actual;
+    draftSummary(key);
+    const fields = $("fields"), extra = $("extra-fields"); fields.replaceChildren(); extra.replaceChildren();
+    const frequent = ["max_step_height_cm", actual?.key === "WALKER" ? "min_passage_width_cm" :
+      ["WHEELCHAIR", "STROLLER"].includes(actual?.key) ? "min_door_width_cm" : "can_use_stairs"];
     fieldsFor(meta, draft, key).forEach((field) => {
       const spec = meta.fields[field], current = draft.overrides[key]?.[field], defaultValue = actual.defaults[field];
       const container = create("div", null, { class: "field mobility-field" });
       const id = `mobility-field-${field}`;
-      container.appendChild(create("label", `${spec.label}${spec.unit ? ` (${spec.unit})` : ""} · ${spec.preference ? "선호" : "필수 조건"}`, { for: id }));
+      container.appendChild(create("label", `${SHORT_LABELS[field] || spec.label}${spec.unit ? ` (${spec.unit})` : ""}`, { for: id }));
       let input;
       if (spec.type === "number") {
-        input = create("input", null, { id, type: "number", min: spec.min, max: spec.max, step: spec.step, inputmode: "decimal", placeholder: defaultValue == null ? "입력하지 않으면 기본 규칙" : `기본값 ${defaultValue}${spec.unit}` });
+        input = create("input", null, { id, type: "number", min: spec.min, max: spec.max, step: spec.step, inputmode: "decimal", placeholder: defaultValue == null ? "기본값 사용" : `기본값 ${defaultValue}${spec.unit}` });
         input.value = current ?? "";
       } else {
         input = create("select", null, { id });
-        option(input, "", "기본 규칙 사용");
+        option(input, "", "기본값 사용");
         option(input, "true", field === "can_use_stairs" ? "가능" : spec.preference ? "선호" : "필요");
         option(input, "false", field === "can_use_stairs" ? "불가" : spec.preference ? "선호하지 않음" : "필요하지 않음");
         input.value = current == null ? "" : String(current);
@@ -192,34 +227,65 @@
         draft.overrides[key] ||= {};
         if (input.value === "") delete draft.overrides[key][field];
         else draft.overrides[key][field] = spec.type === "bool" ? input.value === "true" : input.value;
+        draftSummary(key);
       };
       input.addEventListener("change", update);
       if (spec.type === "number") input.addEventListener("input", update);
       container.appendChild(input);
-      container.appendChild(create("p", `${defaultValue != null ? `현재 기본 기준: ${defaultValue}${spec.unit}. ` : ""}${spec.help || "바꾸지 않은 항목은 이 이동 조건의 기본 기준을 사용해요."}`, { id: `${id}-help`, class: "muted small" }));
-      fields.appendChild(container);
+      const help = create("p", `${spec.preference ? "선호 항목으로 접근 불가 판정을 만들지 않아요. " : "접근 판정에 필요한 조건이에요. "}${spec.help || ""}`, { id: `${id}-help`, class: "muted small" });
+      help.hidden = true;
+      const helpButton = create("button", "도움말", { type: "button", class: "mobility-help", "aria-expanded": "false", "aria-controls": `${id}-help`, "aria-label": `${SHORT_LABELS[field] || spec.label} 도움말` });
+      helpButton.addEventListener("click", () => { help.hidden = !help.hidden; helpButton.setAttribute("aria-expanded", String(!help.hidden)); });
+      container.appendChild(helpButton); container.appendChild(help);
+      (frequent.includes(field) ? fields : extra).appendChild(container);
     });
+    $("other").hidden = extra.children.length === 0;
     const multiple = $("multiple"); multiple.replaceChildren();
-    meta.presets.forEach((p) => {
+    meta.presets.filter((item) => !item.legacy || draft.selected.includes(item.key) || draft.overrides[item.key] || draft.companions[item.key]).forEach((p) => {
+      if (p.key === "COMPANION" && key !== p.key && preset(meta, key).legacy) return;
       const label = create("label", null, { class: "mobility-multiple-choice" });
       const input = create("input", null, { type: "checkbox" });
       input.checked = draft.selected.includes(p.key); input.disabled = p.key === key;
-      input.addEventListener("change", () => { draft.selected = input.checked ? [...draft.selected, p.key] : draft.selected.filter((k) => k !== p.key); });
-      label.appendChild(input); label.appendChild(create("span", p.label)); multiple.appendChild(label);
+      input.addEventListener("change", () => { draft.selected = input.checked ? [...draft.selected, p.key] : draft.selected.filter((k) => k !== p.key); renderDraft(); });
+      const slotLabel = p.legacy ? `저장된 동반자 조건 ${p.key === "WITH_CHILD" ? "1" : "2"}` : p.label;
+      label.appendChild(input); label.appendChild(create("span", slotLabel)); multiple.appendChild(label);
+      if (p.companion && p.key !== key && draft.selected.includes(p.key)) {
+        const holder = create("div", null, { class: "field" }), id = `mobility-companion-${p.key}`;
+        const choice = create("select", null, { id, required: "required", "data-companion-key": p.key });
+        holder.appendChild(create("label", `${slotLabel}의 실제 이동 조건`, { for: id }));
+        option(choice, "", "이동 조건을 선택해 주세요");
+        meta.companion_options.forEach((item) => option(choice, item.key, item.label));
+        choice.value = Object.hasOwn(draft.companions, p.key) ? draft.companions[p.key] : p.profile || "";
+        choice.addEventListener("change", () => { draft = switchCompanion(draft, p.key, choice.value); renderDraft(); });
+        holder.appendChild(choice);
+        const edit = create("button", "이 동반자의 세부 조건 수정", { type: "button", class: "btn" });
+        edit.disabled = !actualPreset(meta, draft, p.key);
+        edit.addEventListener("click", () => { draft = switchPreset(draft, p.key); renderDraft(); customize(true); $("preset").focus(); });
+        holder.appendChild(edit); multiple.appendChild(holder);
+      }
     });
   }
   function close() { clearReference(); referenceListRequest++; dialog.close(); draft = null; openButton.focus(); }
-  openButton.addEventListener("click", () => {
-    draft = clone(settings); text("error", ""); renderDraft();
+  function showDialog(data = settings) {
+    draft = clone(data); text("error", ""); renderDraft(); customize(false);
+    ["other", "reference", "multiple-box", "consent-details"].forEach((name) => { $(name).open = false; });
     // 회원: 계정 저장 동의 칸(현재 동의 상태로 시작). 비회원: 브라우저에만 저장된다는 안내
     $("consent-box").hidden = !meta.authenticated; $("consent").checked = Boolean(meta.consented);
     $("browser-note").hidden = meta.authenticated;
     dialog.showModal(); $("preset").focus();
-    if ($("reference").open && !referencePlaces) loadReferencePlaces();
-  });
+  }
+  openButton.addEventListener("click", () => showDialog());
+  $("customize").addEventListener("click", () => customize($("custom").hidden));
+  form.addEventListener("invalid", (event) => {
+    if (event.target.getAttribute?.("data-companion-key")) $("multiple-box").open = true;
+    else if (event.target.id?.startsWith("mobility-field-")) {
+      customize(true);
+      if ($("extra-fields").contains?.(event.target)) $("other").open = true;
+    }
+  }, true);
   $("cancel").addEventListener("click", () => { if (!busy) close(); });
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); if (!busy) close(); });
-  $("preset").addEventListener("change", () => { draft = switchPreset(draft, $("preset").value); renderDraft(); });
+  $("preset").addEventListener("change", () => { draft = switchPreset(draft, selectionKey(meta, draft, $("preset").value)); renderDraft(); });
   $("companion").addEventListener("change", () => { draft = switchCompanion(draft, draft.selected[0], $("companion").value); renderDraft(); });
   $("reset").addEventListener("click", () => { draft = resetPreset(draft, draft.selected[0]); renderDraft(); });
   $("more").addEventListener("change", () => { if ($("more").value) selectPreset($("more").value); });
@@ -411,14 +477,15 @@
       settings = { ...settings, selected: [linked] };
     }
     text("warning", restored.warning);
-    meta.presets.forEach((p) => option($("preset"), p.key, p.label));
+    visiblePresets(meta).forEach((p) => option($("preset"), p.key, p.label));
+    option($("companion"), "", "이동 조건을 선택해 주세요");
     meta.companion_options.forEach((p) => option($("companion"), p.key, p.label));
-    meta.presets.filter((p) => ["LIMITED_WALKING", "WITH_CHILD", "ASSISTED_COMPANION"].includes(p.key)).forEach((p) => option($("more"), p.key, p.label));
+    visiblePresets(meta).filter((p) => ["LIMITED_WALKING", "COMPANION"].includes(p.key)).forEach((p) => option($("more"), p.key, p.label));
     text("notice", meta.notice); openButton.disabled = false; $("more").disabled = false;
     publish(); return meta;
   })();
   if (root.dataset.mode === "search") document.getElementById("search-profile")?.addEventListener("change", (event) => selectPreset(event.target.value));
   ready.catch(() => text("warning", "개인화 설정을 읽을 수 없어요. 기본 이동 조건으로 계속 이용할 수 있어요."));
-  window.TeokMobility = { ready: () => ready, state: () => clone(settings), presets: () => meta.presets,
+  window.TeokMobility = { ready: () => ready, state: () => clone(settings), presets: () => visiblePresets(meta),
     primaryProfile, label, needsEvaluation, evaluate, selectPreset };
 })();

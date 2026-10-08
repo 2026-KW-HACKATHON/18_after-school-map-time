@@ -45,7 +45,8 @@ class MobilityAPITests(TestCase):
     def test_guest_catalogue_and_evaluation_do_not_save(self):
         response = self.client.get("/api/v1/mobility/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["presets"]), 7)
+        self.assertEqual(len([p for p in response.json()["presets"] if not p.get("legacy")]), 6)
+        self.assertEqual({p["key"] for p in response.json()["presets"] if p.get("legacy")}, {"WITH_CHILD", "ASSISTED_COMPANION"})
         self.assertFalse(response.json()["authenticated"])
         self.assertEqual(self.evaluate().status_code, 200)
         self.assertFalse(MobilityPreference.objects.exists())
@@ -54,6 +55,31 @@ class MobilityAPITests(TestCase):
         self.assertEqual(self.put().status_code, 403)
         self.assertEqual(self.client.get("/api/v1/mobility/preferences/").status_code, 403)
         self.assertEqual(self.client.delete("/api/v1/mobility/preferences/").status_code, 403)
+
+    def test_legacy_account_read_and_roundtrip_preserve_both_companions(self):
+        self.client.force_login(self.user)
+        legacy=default_settings();legacy["selected"]=["WITH_CHILD","ASSISTED_COMPANION"]
+        legacy["companions"]={"WITH_CHILD":"STROLLER","ASSISTED_COMPANION":"CRUTCH"}
+        legacy["overrides"]={"WITH_CHILD":{"max_step_height_cm":"4"},"ASSISTED_COMPANION":{"max_step_height_cm":"1"}}
+        preference=MobilityPreference.objects.create(user=self.user,data=legacy)
+        for url in ("/api/v1/mobility/preferences/","/api/v1/mobility/"):
+            self.assertEqual(self.client.get(url).json()["settings"],legacy)
+        preference.refresh_from_db();self.assertEqual(preference.data,legacy)
+        self.assertEqual(self.put(legacy).json()["settings"],legacy)
+        self.data=legacy;self.assertEqual(self.evaluate().status_code,200)
+
+    def test_unified_account_choice_is_required_and_consent_still_required(self):
+        self.client.force_login(self.user)
+        data=default_settings();data["selected"]=["COMPANION"]
+        self.assertEqual(self.put(data).status_code,400)
+        data["companions"]={"COMPANION":"LIMITED_WALKING"}
+        data["overrides"]={"COMPANION":{"max_step_height_cm":"4","can_use_stairs":False}}
+        self.assertEqual(self.put(data,consent=False).status_code,400)
+        self.assertFalse(MobilityPreference.objects.exists())
+        self.assertEqual(self.put(data).json()["settings"],data)
+        self.data=data;self.assertEqual(self.evaluate().status_code,200)
+        self.assertEqual(self.client.delete("/api/v1/mobility/preferences/").status_code,200)
+        self.assertFalse(MobilityPreference.objects.exists())
 
     def test_member_roundtrip_reset_and_other_user_isolation(self):
         self.client.force_login(self.user)
