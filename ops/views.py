@@ -168,8 +168,8 @@ def report_review(request, pk):
     # 승인하면 판정이 어떻게 바뀌는지 (판정 엔진에 제보 값을 가상으로 넣어 계산)
     effect = report_effect(report) if report.status == Report.Status.PENDING else []
     changes = [
-        {"profile": c.profile.label, "before_label": display(c.before)["label"],
-         "after_label": display(c.after)["label"], "direction": c.direction}
+        {"profile": c.profile.label, "before_label": display(c.before, internal=True)["label"],
+         "after_label": display(c.after, internal=True)["label"], "direction": c.direction}
         for c in effect if c.before != c.after
     ]
     return render(request, "ops/report_review.html", {
@@ -403,8 +403,8 @@ def poster(request):
     return render(request, "ops/poster.html", {
         "site_url": request.build_absolute_uri(reverse("places:map")),
         "region": _region(),
-        # 지도 표시 설명: 문구·색은 판정 표시 상수 한 곳에서 (기획 v2 3.1). 미확인은 포스터에서 생략
-        "legend": [display(o) for o in (Outcome.ACCESSIBLE, Outcome.CONDITIONAL, Outcome.DIFFICULT)],
+        # 공개 지도와 같은 3종 범례. 운영자 판정 검토의 원본 분류와 별도 표시.
+        "legend": [display(o) for o in (Outcome.ACCESSIBLE, Outcome.CONDITIONAL, Outcome.UNKNOWN)],
     })
 
 

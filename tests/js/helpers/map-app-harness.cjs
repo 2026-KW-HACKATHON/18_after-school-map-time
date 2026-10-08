@@ -36,20 +36,21 @@ const detail = (name) => ({
   ],
 });
 
-async function page({ mapFails = false, personalized = false, boundary = null, layers = null, boundaryFails = false } = {}) {
+async function page({ mapFails = false, personalized = false, boundary = null, layers = null, boundaryFails = false, results } = {}) {
   const nodes = {};
   const handlers = {};
   const doc = {
     getElementById: (id) => nodes[id] || (nodes[id] = element(doc)),
     createElement: () => element(doc),
     createTextNode: (text) => ({ textContent: text }),
-    querySelectorAll: () => [], contains: () => true,
+    querySelectorAll: () => Object.values(nodes).filter(node => node.dataset.count), contains: () => true,
     addEventListener: (key, fn) => { handlers[key] = fn; },
   };
   doc.getElementById("map-app").dataset = {
     region: "test", metaUrl: "/meta/", placesUrl: "/places/",
     detailUrl: "/detail/0/", detailApiUrl: "/api/detail/0/",
   };
+  ["ACCESSIBLE", "CONDITIONAL", "UNKNOWN"].forEach(code => { doc.getElementById(`count-${code}`).dataset.count = code; });
   ["map-error", "popup", "empty-state"].forEach((id) => { doc.getElementById(id).hidden = true; });
   const requests = [];
   const map = { setMarkers(items, onClick) { this.items = items; this.onClick = onClick; } };
@@ -60,6 +61,7 @@ async function page({ mapFails = false, personalized = false, boundary = null, l
     return !boundaryFails;
   };
   doc.getElementById("show-boundary").checked = true;
+  doc.getElementById("show-all").checked = true;
   ["boundary-control", "boundary-status", "boundary-credit", "boundary-legend"].forEach(id => doc.getElementById(id).hidden = true);
   let selected = "wheelchair";
   const evaluate = (options) => {
@@ -91,7 +93,7 @@ async function page({ mapFails = false, personalized = false, boundary = null, l
     },
   });
   await flush();
-  requests[0].resolve({ results: [place(1, "첫 장소"), place(2, "둘째 장소")] });
+  requests[0].resolve({ results: results || [place(1, "첫 장소"), place(2, "둘째 장소")] });
   await flush();
   return { nodes, requests, map, doc, mobility };
 }

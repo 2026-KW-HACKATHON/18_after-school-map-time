@@ -64,7 +64,7 @@ class OwnerMenuTests(OwnerTestBase):
         self.approved_owner()
         res = self.client.get(reverse("owners:dashboard", args=[self.place.pk]))
         self.assertContains(res, "지금 지도에 이렇게 보여요")
-        self.assertContains(res, "혼자 들어가기 어려워요")
+        self.assertContains(res, "아직 정보가 없어요 · 알려주세요")  # 공용 표시 정책, 원본 판정/수요 기능은 유지
 
 
 class PhotoRequestTests(OwnerTestBase):

@@ -28,7 +28,7 @@
         <li><a class="card result-card" href="{% url 'places:detail' r.place.pk %}?profile={{ profile.key }}">
           <strong>{{ r.place.name }}</strong>
           <span class="muted">{% if r.facts %}{{ r.facts }}{% else %}입구 정보 확인이 필요해요{% endif %}</span>
-          <span class="result-status status-{{ r.judgment.code }}"><span class="judge-dot judge-{{ r.judgment.code }}" aria-hidden="true">{% if r.judgment.icon == "hand" %}✋{% endif %}</span>{{ r.judgment.label }}</span>
+          <span class="result-status status-{{ r.judgment.display_code|default:r.judgment.code }}"><span class="judge-dot judge-{{ r.judgment.display_code|default:r.judgment.code }}" aria-hidden="true">{% if r.judgment.icon == "hand" %}✋{% endif %}</span>{{ r.judgment.label }}</span>
           <span class="muted small">{% if r.last_checked %}확인 {{ r.last_checked|date:"Y.m" }}{% else %}확인 정보 없음{% endif %}</span>
         </a></li>
         {% endfor %}
