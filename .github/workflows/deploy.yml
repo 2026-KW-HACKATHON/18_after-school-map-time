@@ -13,7 +13,9 @@
 #   EC2_HOST         EC2 탄력적 IP
 #   EC2_KEY          EC2 접속용 .pem 파일 내용 전체
 #
-# 트리거: develop에 push(=PR 머지)되면 자동 실행. Actions 탭 → Run workflow로 수동 실행도 가능.
+# 트리거: main에 push(=develop → main 릴리스 PR 머지)되면 자동 실행. Actions 탭 → Run workflow로 수동 실행도 가능.
+#   2026-10-09 변경: 예전에는 develop 머지마다 배포했지만, 이제 develop은 통합·테스트용이고
+#   main에 반영(릴리스)할 때만 서버에 배포한다. 서버의 레포도 main 브랜치를 쓴다.
 # ─────────────────────────────────────────────────────────
 
 name: Deploy to EC2
@@ -23,7 +25,7 @@ on:
 
   push:
     branches:
-      - develop
+      - main
 
 # 배포가 동시에 두 개 돌지 않게 (먼저 시작한 배포가 끝날 때까지 대기)
 concurrency:
@@ -63,7 +65,10 @@ jobs:
           script: |
             set -e
             cd ~/teokeopne
-            git pull origin develop
+            # 서버 레포를 main으로 맞춘다 (처음 한 번은 develop → main 전환, 이후에는 그대로 pull)
+            git fetch origin main
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git pull --ff-only origin main
 
             COMPOSE="docker compose -f docker-compose.prod.yml"
             $COMPOSE pull web

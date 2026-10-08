@@ -1,6 +1,6 @@
 # 🚀 배포 런북 (AWS EC2 + Docker Compose + HTTPS)
 
-위에서부터 순서대로 따라 하면 **`https://<도메인>`으로 턱없네가 뜨고, `develop`에 머지하면 자동 배포**되는 상태가 됩니다.
+위에서부터 순서대로 따라 하면 **`https://<도메인>`으로 턱없네가 뜨고, `main`에 머지(develop → main 릴리스 PR)하면 자동 배포**되는 상태가 됩니다.
 명령어는 복사해서 그대로 쓰면 되고, `<...>` 부분만 자기 값으로 바꿉니다.
 
 ```
@@ -138,7 +138,7 @@ sudo fail2ban-client status sshd   # "Status for the jail: sshd" 가 나오면 S
 ```bash
 git clone https://github.com/2026-KW-HACKATHON/18_after-school-map-time.git ~/teokeopne
 cd ~/teokeopne
-git checkout develop
+git checkout main
 cp .env.example .env
 
 # 값 생성 (출력값을 복사해 두기)
@@ -326,15 +326,15 @@ https://<도메인>/accounts/kakao/login/callback/
 
 ### 5-3. 수동 배포로 확인
 
-레포 → Actions → **Deploy to EC2** → Run workflow (branch: `develop`) → 모든 단계 초록불 확인.
+레포 → Actions → **Deploy to EC2** → Run workflow (branch: `main`) → 모든 단계 초록불 확인.
 
 ### 5-4. 자동 배포 (켜져 있음)
 
-`.github/workflows/deploy.yml`은 `push`(develop) 트리거가 켜져 있어서 **`develop`에 머지 = 자동 배포**입니다. 진행 상황은 Actions 탭에서 확인합니다.
+`.github/workflows/deploy.yml`은 `push`(main) 트리거가 켜져 있어서 **`main`에 머지 = 자동 배포**입니다. 작업은 `develop`에 모으고, 배포할 때 `develop` → `main` 릴리스 PR을 머지합니다. 배포 스크립트가 서버 레포도 `main`으로 맞춥니다(처음 한 번 develop → main 전환). 진행 상황은 Actions 탭에서 확인합니다.
 
 새 이미지 pull → `run --rm --no-deps web python manage.py collectstatic --noinput` → `up -d` → `migrate` 순서입니다. 정적 파일을 먼저 준비해야 새 worker가 이전 manifest를 기억한 채 새 HTML에 옛 CSS를 연결하지 않습니다. `collectstatic --clear`는 쓰지 않아 이전 페이지/뒤로가기가 참조하는 해시 파일을 보존합니다. 수동 정적 파일 재수집 시에는 `CacheBustingStaticStorage`도 변경된 manifest를 다시 읽습니다.
 
-> 서버를 처음부터 새로 구축하는 중이라면(1~5-3단계 진행 중) `develop` 머지 때 배포가 실패합니다.
+> 서버를 처음부터 새로 구축하는 중이라면(1~5-3단계 진행 중) `main` 머지 때 배포가 실패합니다.
 > 그동안은 `deploy.yml`의 `push:` 트리거 3줄을 잠시 주석 처리하고, 5-3 수동 배포가 성공한 뒤 다시 켜세요.
 
 ### 5-5. AI 검토 보조 켜기 (팀 결정·개인정보 고지 확정 후에만)
@@ -460,20 +460,20 @@ docker compose -f docker-compose.prod.yml logs -f --tail 100 web     # Ctrl+C로
   예: `reports 0006` 이후 시설만 있는 제보가 있으면 `0005`로 되돌릴 때 예전 제약조건을 다시 걸지 못해 실패합니다.
   억지로 맞추려고 데이터를 지우거나 바꾸지 않습니다.
 - 그래서 마이그레이션은 **이전 코드가 새 DB에서도 돌아가게** 만듭니다 (칼럼 추가는 비워도 되게, 제약은 완화 위주, 칼럼 삭제·이름 변경은 피함). 앱 롤백이 DB를 건드리지 않아도 되는 이유입니다.
-- 앱 롤백과 DB 복원은 **PM(강성훈)이 결정**하고, 팀 단톡방에 "롤백 중 — develop 머지 금지"를 알린 뒤 시작합니다.
+- 앱 롤백과 DB 복원은 **PM(강성훈)이 결정**하고, 팀 단톡방에 "롤백 중 — main 반영 금지"를 알린 뒤 시작합니다.
 
 ### 7-2. 앱 롤백 (이전 버전 이미지로)
 
 배포마다 Docker Hub에 `latest`와 **커밋 SHA 태그**가 같이 올라갑니다. `docker-compose.prod.yml`의 web 이미지는 `cjs1004ounds/teokeopne:${IMAGE_TAG:-latest}` 입니다.
 
-**① 되돌릴 SHA 고르기**: GitHub `develop` 커밋 목록(머지 커밋) 또는 Actions의 성공한 "Deploy to EC2" 실행. 문제가 생기기 직전 배포의 SHA 40자리.
+**① 되돌릴 SHA 고르기**: GitHub `main` 커밋 목록(릴리스 머지 커밋) 또는 Actions의 성공한 "Deploy to EC2" 실행. 문제가 생기기 직전 배포의 SHA 40자리.
 
 **② 호환성 확인 (내 PC 레포에서)**: 그 SHA 이후에 들어온 마이그레이션이 이전 코드를 깨뜨리지 않는지 봅니다.
 
 ```bash
 git fetch origin
-git diff --stat <이전 SHA> origin/develop -- '*/migrations/*'
-git diff <이전 SHA> origin/develop -- '*/migrations/*' | grep -nE "RemoveField|RenameField|DeleteModel|RenameModel|null=False"
+git diff --stat <이전 SHA> origin/main -- '*/migrations/*'
+git diff <이전 SHA> origin/main -- '*/migrations/*' | grep -nE "RemoveField|RenameField|DeleteModel|RenameModel|null=False"
 ```
 
 - 아무것도 안 나오면 안전합니다 (칼럼 추가·제약 완화만 있음).
@@ -492,9 +492,9 @@ docker compose -f docker-compose.prod.yml up -d web
 
 **⑤ 롤백 중 자동 배포와의 관계**
 
-- 롤백 중에 develop에 머지하면 자동 배포가 돌지만 `IMAGE_TAG`가 SHA로 고정돼 있어 **web 이미지는 그대로**입니다.
+- 롤백 중에 main에 반영하면 자동 배포가 돌지만 `IMAGE_TAG`가 SHA로 고정돼 있어 **web 이미지는 그대로**입니다.
   그런데 `git pull`은 되므로 compose·nginx 설정만 새 버전이 되고, `migrate`는 이전 이미지로 실행돼 새 마이그레이션이 적용되지 않습니다.
-  → 코드와 설정이 어긋나므로 **롤백 중에는 develop 머지를 멈춥니다.**
+  → 코드와 설정이 어긋나므로 **롤백 중에는 main 반영(릴리스 PR 머지)을 멈춥니다.**
 - 고치는 PR이 준비되면: `.env`를 `IMAGE_TAG=latest`로 되돌린 **뒤** 머지합니다. 그러면 자동 배포가 새 이미지 pull → collectstatic → 재시작 → migrate까지 정상적으로 합니다.
   이미 머지했다면 `IMAGE_TAG=latest`로 바꾸고 Actions에서 "Deploy to EC2"를 수동 실행합니다.
 

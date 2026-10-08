@@ -82,7 +82,7 @@ docker compose exec web python manage.py import_survey places/data/survey/wolgye
 
 ### 5-3. 배포 서버에 넣기
 
-CSV를 커밋해서 `develop`에 머지하면 배포 이미지에 들어갑니다. 사진은 레포에 없으므로 서버로 따로 복사합니다.
+CSV를 커밋해서 `develop`에 머지하고 `main`에 반영(릴리스)하면 배포 이미지에 들어갑니다. 사진은 레포에 없으므로 서버로 따로 복사합니다.
 
 ```bash
 # 내 PC → 서버 (Git Bash)

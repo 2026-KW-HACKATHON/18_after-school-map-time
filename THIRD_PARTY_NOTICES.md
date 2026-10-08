@@ -95,7 +95,7 @@
 | Google Gemini API (유료 등급) | 제보 사진·설명에서 접근성 항목 후보 추출 (운영자 검토 보조, 주민 'AI로 항목 채우기') | [Gemini API 추가 약관](https://ai.google.dev/gemini-api/terms) — 유료 등급은 입력·출력을 제품 개선에 쓰지 않음. 결과는 운영자·주민이 확인하며 자동 승인하지 않음 |
 | OpenAI API (선택, 기본 사용 안 함) | 위와 같은 용도의 대체 제공자 | [OpenAI 이용약관](https://openai.com/policies/) |
 | 공공데이터포털 「한국사회보장정보원_장애인편의시설 현황」 | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 · [데이터 페이지](https://www.data.go.kr/data/15092317/openapi.do) · 출처: 공공데이터포털(한국사회보장정보원) |
-| 행정동 경계 (통계청 SGIS 원자료 → [vuski/admdongkor](https://github.com/vuski/admdongkor) 2026-07-01) | 지도의 월계1동 경계 (`places/data/wolgye1.geojson`, 월계1동 Feature만 추출·좌표 변경 없음, 화면에 출처 표시) | 원자료 공공누리 제1유형(출처표시) · 가공 데이터 CC BY 4.0 · 자세한 내용은 [docs/region-boundary.md](docs/region-boundary.md) |
+| 행정동 경계 (통계청 SGIS 원자료 → [vuski/admdongkor](https://github.com/vuski/admdongkor) 2026-07-01) | 지도의 월계1·2·3동 경계 (`places/data/wolgye*.geojson`, 각 동 원본 좌표 보존 및 전체 외곽 합집합, 화면에 출처 표시) | 원자료 공공누리 제1유형(출처표시) · 가공 데이터 CC BY 4.0 · 자세한 내용은 [docs/region-boundary.md](docs/region-boundary.md) |
 | 도메인 `teokeopne.help` (Porkbun) | 서비스 대표 주소 | Porkbun 약관 |
 | DuckDNS | 이전 주소 `teokeopne.duckdns.org` (대표 주소로 자동 이동) | https://www.duckdns.org/ |
 | Let's Encrypt | HTTPS 인증서 | [Subscriber Agreement](https://letsencrypt.org/repository/) |

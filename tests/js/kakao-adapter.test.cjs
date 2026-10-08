@@ -12,7 +12,8 @@ async function setup({ observer = true, sdk = true } = {}) {
   const kakao = { maps: {
     load: (fn) => fn(), LatLng, ZoomControl: class {}, ControlPosition: { RIGHT: "right" },
     Map: class {
-      constructor(_element, options) { instance = this; this.center = options.center; this.layouts = 0; }
+      constructor(_element, options) { instance = this; this.center = options.center; this.level = options.level; this.layouts = 0; }
+      getLevel() { return this.level; }
       addControl() {}
       getCenter() { return this.center; }
       relayout() { this.layouts++; this.center = new LatLng(0, 0); }
@@ -21,6 +22,7 @@ async function setup({ observer = true, sdk = true } = {}) {
     },
     CustomOverlay: class { constructor(options) { Object.assign(this, options); markers.push(this); } setMap(map) { this.map = map; } },
     Polygon: class { constructor(options) { Object.assign(this, options); polygons.push(this); } setMap(map) { this.map = map; } },
+    event: { addListener(map, name, fn) { listeners[name] = fn; } },
   } };
   const window = { addEventListener(name, fn) { listeners[name] = fn; } };
   if (sdk) window.kakao = kakao;
@@ -36,6 +38,48 @@ test("창 크기 변경 후 사용자가 이동한 지도 중심을 보존한다
   const p = await setup(); p.adapter.panTo(37.7, 127.1); p.listeners.resize();
   assert.equal(p.map.layouts, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(p.adapter.getCenter())), { lat: 37.7, lng: 127.1 });
+});
+
+const layers = () => ({ detail_max_level: 5,
+  overview: { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] } },
+  districts: { type: "FeatureCollection", features: ["#7b4fc9", "#245ccc", "#16804a"].map((color) =>
+    ({ type: "Feature", properties: { display_color: color }, geometry: { type: "Polygon", coordinates: [ring] } })) },
+});
+test("확대하면 세 동 색상·2.6px 점선을 표시하고 축소하면 외곽 하나만 표시한다", async () => {
+  const p = await setup(), modes = [];
+  assert.equal(p.adapter.setBoundaryLayers(layers(), (mode) => modes.push(mode)), true);
+  assert.deepEqual(p.polygons.map(x => x.strokeColor), ["#7b4fc9", "#245ccc", "#16804a"]);
+  assert.ok(p.polygons.every(x => x.strokeWeight === 2.6 && x.strokeStyle === "dash" && x.fillOpacity === 0));
+  p.map.level = 5; p.listeners.zoom_changed(); assert.equal(p.polygons.length, 3);
+  p.map.level = 6; p.listeners.zoom_changed();
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 1);
+  p.map.level = 7; p.listeners.zoom_changed(); assert.equal(p.polygons.length, 4);
+  p.map.level = 5; p.listeners.zoom_changed();
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 3);
+  assert.deepEqual(modes, ["districts", "overview", "districts"]);
+  assert.equal(p.adapter.getCenter().lat, 37.62);
+});
+test("축소 초기화·토글 끄기·다시 켜기는 현재 확대 단계와 마커를 보존한다", async () => {
+  const p = await setup(); p.map.level = 6;
+  p.adapter.setMarkers([{id:1,lat:37,lng:127,label:"장소"}], () => {});
+  p.adapter.setBoundaryLayers(layers());
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 1);
+  p.adapter.setBoundaryLayers(null); p.map.level = 4; p.listeners.zoom_changed();
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 0);
+  p.adapter.setBoundaryLayers(layers());
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 3);
+  assert.equal(p.markers[0].map, p.map);
+  p.adapter.setBoundary({type:"Polygon",coordinates:[ring]}); p.map.level = 6; p.listeners.zoom_changed();
+  assert.equal(p.polygons.filter(x => x.map === p.map).length, 1);
+});
+test("잘못된 레이어는 일부 경계만 남기지 않으며 이후 정상 표시가 가능하다", async () => {
+  const p = await setup();
+  for (const invalid of [{...layers(), overview:null}, {...layers(), detail_max_level:"5"},
+    {...layers(), districts:{type:"FeatureCollection",features:[]}}]) {
+    assert.equal(p.adapter.setBoundaryLayers(invalid), false);
+    assert.equal(p.polygons.filter(x => x.map === p.map).length, 0);
+  }
+  assert.equal(p.adapter.setBoundaryLayers(layers()), true);
 });
 test("뒤로가기 캐시 복원에서 다시 배치하며 일반 pageshow는 중복 처리하지 않는다", async () => {
   const p = await setup(); p.listeners.pageshow({ persisted: false }); assert.equal(p.map.layouts, 0);

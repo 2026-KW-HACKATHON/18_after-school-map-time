@@ -18,7 +18,7 @@
 - **무엇:** 휠체어·유아차·보행 보조기 등 이동 조건별로 월계1동 가게에 **들어가는 방법**을 알려주고, 들어가기 어려운 곳은 **개선(구청 경사로 지원사업)으로 연결**하는 접근성 지도 웹서비스
 - **핵심 문장:** "턱없네는 가게를 평가하지 않습니다. 들어가는 방법을 알려주고, 문턱을 없앨 수 있게 연결합니다."
 - **이해관계자:** 이동약자 · 가게 사장님 · 건물주 · 노원구청 (4자 모두 얻는 게 있어야 함 — 중간발표 피드백)
-- **배포:** https://teokeopne.help (`develop` 머지 시 자동 배포. www·이전 주소 teokeopne.duckdns.org는 대표 주소로 301)
+- **배포:** https://teokeopne.help (`main` 머지 시 자동 배포 — feature → `develop` → `main` 릴리스 PR. www·이전 주소 teokeopne.duckdns.org는 대표 주소로 301)
 - **대회:** 2026 광운대학교 해커톤 (노원구 월계1동 생활 밀착형 문제, 카테고리: 배리어프리 및 생활 편의)
 - **스택:** Python · Django · DRF · 카카오맵 · PostgreSQL · Nginx · Gunicorn · Docker Compose · AWS EC2 · GitHub Actions
 - **레포 규칙의 원본:** 팀장(강성훈)이 PM·인프라를 맡았던 피로그래밍 프로젝트 [Dopamine-Ledger](https://github.com/pirogramming/Dopamine-Ledger)
@@ -62,6 +62,7 @@
 | 기능 코드 | 도메인 앱은 v2 개발 계획(모델 변경 목록) 승인 + 운영진 확인 후 착수 |
 | 도메인 | `teokeopne.help` 대표 (2026-10-08 구입). `www.teokeopne.help`·이전 `teokeopne.duckdns.org`는 대표 주소로 301. 인증서 하나에 세 주소 (서버 certbot webroot, 자동 갱신) |
 | PR 승인 인원 | 1명 + CI 통과 |
+| 기본 브랜치·배포 (2026-10-09) | GitHub 기본 브랜치 `main`. 작업 PR은 `develop`으로, 배포는 `develop` → `main` 릴리스 PR 머지 시 |
 
 ## 미정 사항 (진행 전 사용자 확인 필요)
 
