@@ -28,7 +28,7 @@
       const allowed = fieldsFor(meta, { companions }, key);
       const entry = {};
       Object.entries(values).forEach(([field, value]) => {
-        if (!allowed.includes(field)) throw new Error("이 Preset에서 지원하지 않는 설정이에요.");
+        if (!allowed.includes(field)) throw new Error("이 이동 조건에서 지원하지 않는 설정이에요.");
         if (value === null) return;
         const spec = meta.fields[field];
         if (spec.type === "bool") {
@@ -116,7 +116,8 @@
   function publish() {
     const primary = preset(meta, settings.selected[0]), actual = actualPreset(meta, settings, primary.key);
     const brief = `${primary.label}${settings.selected.length > 1 ? ` 외 ${settings.selected.length - 1}개 조건` : ""}`;
-    text("summary", root.dataset.mode === "map" && !needsEvaluation() ? "" : `${brief}${primary.recommendation ? ` · 적용 기준: ${actual.label}` : " · 내 조건 적용"}`);
+    // 기본 기준 그대로(바꾼 값 없음)면 아무 표시도 하지 않는다. 바꾼 값이 없는데 "내 조건 적용"이라고 하면 사실과 다름
+    text("summary", !needsEvaluation() ? "" : `${brief}${primary.recommendation ? ` · 적용 기준: ${actual.label}` : " · 내 조건 적용"}`);
     $("more").value = ["WITH_CHILD", "ASSISTED_COMPANION", "LIMITED_WALKING"].includes(settings.selected[0]) ? settings.selected[0] : "";
     if (root.dataset.mode === "search") document.getElementById("search-profile").value = primaryProfile();
     document.dispatchEvent(new CustomEvent("mobility:change", { detail: clone(settings) }));
@@ -176,7 +177,7 @@
       input.addEventListener("change", update);
       if (spec.type === "number") input.addEventListener("input", update);
       container.appendChild(input);
-      container.appendChild(create("p", `${defaultValue != null ? `현재 기본 기준: ${defaultValue}${spec.unit}. ` : ""}${spec.help || "바꾸지 않은 항목은 기존 Preset 규칙을 사용해요."}`, { id: `${id}-help`, class: "muted small" }));
+      container.appendChild(create("p", `${defaultValue != null ? `현재 기본 기준: ${defaultValue}${spec.unit}. ` : ""}${spec.help || "바꾸지 않은 항목은 이 이동 조건의 기본 기준을 사용해요."}`, { id: `${id}-help`, class: "muted small" }));
       fields.appendChild(container);
     });
     const multiple = $("multiple"); multiple.replaceChildren();

@@ -123,7 +123,7 @@ def normalize_settings(raw):
     normalized = {}
     for preset, values in overrides.items():
         if preset not in presets or not isinstance(values, dict) or set(values) - set(field_keys(preset, companions)):
-            raise ValidationError("이 Preset에서 지원하지 않는 설정 항목입니다.")
+            raise ValidationError("이 이동 조건에서 지원하지 않는 설정 항목입니다.")
         clean = {}
         for key, value in values.items():
             if value is None:  # 이 항목의 Override 초기화

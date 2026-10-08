@@ -25,7 +25,7 @@ def restored_settings(user):
     except DjangoValidationError:
         return defaults, "저장된 이동 조건을 복원할 수 없어 기본 설정을 표시해요. 다시 저장하면 복구할 수 있어요."
     if data["rule_version"] != defaults["rule_version"]:
-        warning = "기본 판정 기준이 바뀌었어요. 입력한 Override는 유지하고 수정하지 않은 항목은 최신 기본값을 사용해요."
+        warning = "기본 판정 기준이 바뀌었어요. 직접 바꾼 값은 유지하고, 바꾸지 않은 항목은 최신 기본값을 사용해요."
     return data, warning
 
 

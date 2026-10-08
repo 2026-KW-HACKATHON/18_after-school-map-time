@@ -314,3 +314,10 @@ test("늦게 온 이전 장소 응답과 취소·Preset 변경 뒤 응답을 무
   pending.shift()({ routes: [referenceRoute()], notice: "old" }); await cancelled;
   assert.equal(ui.nodes["reference-apply"].disabled, true); assert.deepEqual(clone(ui.controller.state().overrides), {});
 });
+test("바꾼 값이 없으면 '내 조건 적용'이라고 표시하지 않는다", async () => {
+  const p = await setup({ mode: "detail", search: "?profile=STROLLER" });
+  assert.equal(p.nodes.summary.textContent, "");
+  const storage = memoryStorage(), ui = await setup({ mode: "detail", storage });
+  ui.open(); ui.field("max_step_height_cm", "4"); await ui.submit();
+  assert.match(ui.nodes.summary.textContent, /내 조건 적용/);
+});

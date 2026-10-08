@@ -19,12 +19,12 @@
       {% csrf_token %}
       <h2 id="mobility-title">내 이동 조건 수정</h2>
       <p class="muted small">기본값으로 바로 이용할 수 있어요. 필요한 항목만 바꾸세요.</p>
-      <div class="field"><label for="mobility-preset">현재 Preset</label><select id="mobility-preset" data-mobility-preset></select></div>
+      <div class="field"><label for="mobility-preset">이동 조건</label><select id="mobility-preset" data-mobility-preset></select></div>
       <p class="notice small" data-mobility-recommendation hidden></p>
       <div class="field" data-mobility-companion-box hidden>
         <label for="mobility-companion">동반자의 실제 이동 조건</label>
         <select id="mobility-companion" data-mobility-companion></select>
-        <p class="small muted">추천값은 신분에 따른 판정이 아니에요. 조건을 바꾸면 이 동반자 Preset의 수정값만 초기화하고, 다른 설정은 유지해요.</p>
+        <p class="small muted">추천값은 신분에 따른 판정이 아니에요. 조건을 바꾸면 이 동반자 조건에서 바꾼 값만 초기화하고, 다른 설정은 유지해요.</p>
       </div>
       <details class="mobility-reference" data-mobility-reference>
         <summary>가본 장소로 참고값 가져오기</summary>
