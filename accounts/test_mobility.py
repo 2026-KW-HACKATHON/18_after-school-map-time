@@ -2,12 +2,18 @@ import json
 from copy import deepcopy
 from io import StringIO
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import connection
 from django.test import Client, TestCase
+from django.test.utils import CaptureQueriesContext
 
 from judgments.mobility import default_settings
+from places.mobility_api import EvaluateThrottle
 from places.tests import make_place, make_region
 from .models import MobilityPreference
 
@@ -23,11 +29,15 @@ class MobilityAPITests(TestCase):
         cls.place = make_place(cls.region, "개인화 테스트 장소")
 
     def setUp(self):
+        cache.clear()  # 요청 횟수 제한 기록이 다른 테스트로 넘어가지 않게
         self.data = default_settings()
         self.data["overrides"] = {"WHEELCHAIR": {"max_step_height_cm": "4"}}
 
-    def put(self, data=...):
-        return self.client.put("/api/v1/mobility/preferences/", json.dumps(self.data if data is ... else data), content_type="application/json")
+    def put(self, data=..., consent=True):
+        body = deepcopy(self.data if data is ... else data)
+        if isinstance(body, dict) and consent is not None:
+            body["consent"] = consent
+        return self.client.put("/api/v1/mobility/preferences/", json.dumps(body), content_type="application/json")
 
     def evaluate(self, **kwargs):
         return self.client.post("/api/v1/mobility/places/", json.dumps({"settings": self.data, "region": self.region.code, **kwargs}), content_type="application/json")
@@ -134,3 +144,52 @@ class MobilityAPITests(TestCase):
         self.assertIn("last_checked", response["results"][0])
         self.data["selected"] = ["LIMITED_WALKING"]
         self.assertTrue(self.evaluate().json()["preferences"])
+
+    def test_member_save_requires_separate_consent(self):
+        # 이동 조건은 민감정보일 수 있어 동의(consent: true) 없이는 계정에 저장하지 않는다
+        self.client.force_login(self.user)
+        self.assertFalse(self.client.get("/api/v1/mobility/").json()["consented"])
+        for consent in (None, False, "true", 1):
+            with self.subTest(consent=consent):
+                response = self.put(consent=consent)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("동의", response.json()["detail"])
+        self.assertFalse(MobilityPreference.objects.exists())
+
+        response = self.put()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["consented"])
+        self.assertNotIn("consent", MobilityPreference.objects.get(user=self.user).data)  # 동의 표시는 설정값에 섞지 않음
+        self.assertTrue(self.client.get("/api/v1/mobility/").json()["consented"])
+        self.assertTrue(self.client.get("/api/v1/mobility/preferences/").json()["consented"])
+
+        # 철회(DELETE)하면 바로 지워지고 동의하지 않은 상태로 돌아간다
+        self.assertFalse(self.client.delete("/api/v1/mobility/preferences/").json()["consented"])
+        self.assertFalse(MobilityPreference.objects.exists())
+        self.assertFalse(self.client.get("/api/v1/mobility/").json()["consented"])
+
+    def test_guest_is_never_consented(self):
+        self.assertFalse(self.client.get("/api/v1/mobility/").json()["consented"])
+
+    def test_evaluation_is_rate_limited_per_client(self):
+        with mock.patch.object(EvaluateThrottle, "rate", "2/min"):
+            self.assertEqual(self.evaluate().status_code, 200)
+            self.assertEqual(self.evaluate().status_code, 200)
+            response = self.evaluate()
+            self.assertEqual(response.status_code, 429)
+            self.assertIn("잠시 후", response.json()["detail"])
+            self.assertTrue(int(response.headers["Retry-After"]) > 0)
+            # 다른 회원은 따로 센다
+            self.client.force_login(self.user)
+            self.assertEqual(self.evaluate().status_code, 200)
+
+    def test_evaluation_reads_rules_once_not_per_place(self):
+        def rule_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(self.evaluate().status_code, 200)
+            return sum('FROM "judgments_rule"' in q["sql"] for q in queries.captured_queries)
+
+        one = rule_queries()
+        for i in range(4):
+            make_place(self.region, f"규칙 조회 확인 장소 {i}")
+        self.assertEqual(rule_queries(), one)

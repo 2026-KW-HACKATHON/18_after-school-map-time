@@ -28,7 +28,7 @@
       const allowed = fieldsFor(meta, { companions }, key);
       const entry = {};
       Object.entries(values).forEach(([field, value]) => {
-        if (!allowed.includes(field)) throw new Error("이 Preset에서 지원하지 않는 설정이에요.");
+        if (!allowed.includes(field)) throw new Error("이 이동 조건에서 지원하지 않는 설정이에요.");
         if (value === null) return;
         const spec = meta.fields[field];
         if (spec.type === "bool") {
@@ -80,14 +80,23 @@
     }
     return out;
   }
-  const helpers = { GUEST_KEY, validateState, restoreGuest, switchPreset, resetPreset, switchCompanion, fieldsFor, referenceValues };
+  // 저장 위치: 회원이 계정 저장에 동의했으면 계정(서버), 아니면 이 브라우저(localStorage)에만.
+  // consent는 이번에 체크 칸에서 고른 값(설정 창에서 저장할 때만). 없으면 지금까지의 동의 상태를 따른다.
+  // 동의했던 회원이 체크를 풀고 저장하면 "withdraw": 계정에 저장된 값을 지우고 브라우저에만 저장한다.
+  function saveTarget(meta, consent) {
+    if (!meta.authenticated) return "browser";
+    const agreed = consent === undefined ? meta.consented : consent;
+    if (agreed) return "account";
+    return meta.consented ? "withdraw" : "browser";
+  }
+  const helpers = { GUEST_KEY, validateState, restoreGuest, switchPreset, resetPreset, switchCompanion, fieldsFor, referenceValues, saveTarget };
   if (typeof module !== "undefined" && module.exports) module.exports = helpers;
   if (typeof document === "undefined") return;
   const root = document.querySelector("[data-mobility]");
   if (!root) return;
   const $ = (name) => root.querySelector(`[data-mobility-${name}]`);
   const dialog = $("dialog"), form = $("form"), openButton = $("open"), warning = $("warning");
-  let meta = null, settings = null, draft = null, busy = false, viewRequest = 0, persistenceWarning = "";
+  let meta = null, settings = null, draft = null, busy = false, viewRequest = 0, persistenceWarning = "", savedTo = "";
   let referencePlaces = null, referenceData = null, referenceRequest = 0, referenceListRequest = 0;
   const serverSearchProfile = document.getElementById("search-profile")?.value;
   const storage = () => { try { return localStorage; } catch (e) { return { getItem: () => null, setItem: () => { throw e; } }; } };
@@ -116,27 +125,38 @@
   function publish() {
     const primary = preset(meta, settings.selected[0]), actual = actualPreset(meta, settings, primary.key);
     const brief = `${primary.label}${settings.selected.length > 1 ? ` 외 ${settings.selected.length - 1}개 조건` : ""}`;
-    text("summary", root.dataset.mode === "map" && !needsEvaluation() ? "" : `${brief}${primary.recommendation ? ` · 적용 기준: ${actual.label}` : " · 내 조건 적용"}`);
+    // 기본 기준 그대로(바꾼 값 없음)면 아무 표시도 하지 않는다. 바꾼 값이 없는데 "내 조건 적용"이라고 하면 사실과 다름
+    text("summary", !needsEvaluation() ? "" : `${brief}${primary.recommendation ? ` · 적용 기준: ${actual.label}` : " · 내 조건 적용"}`);
     $("more").value = ["WITH_CHILD", "ASSISTED_COMPANION", "LIMITED_WALKING"].includes(settings.selected[0]) ? settings.selected[0] : "";
     if (root.dataset.mode === "search") document.getElementById("search-profile").value = primaryProfile();
     document.dispatchEvent(new CustomEvent("mobility:change", { detail: clone(settings) }));
     refreshView();
   }
-  async function persist(data) {
+  async function persist(data, consent) {
     persistenceWarning = "";
     const validated = validateState(data, meta);
     validated.rule_version = meta.rule_version;
-    if (meta.authenticated) {
-      // 회원 설정을 익명 localStorage로 옮기지 않는다. 순서대로 저장해 이전 요청의 덮어쓰기를 방지한다.
-      const saving = saveQueue.catch(() => {}).then(() => api(root.dataset.preferencesUrl, { method: "PUT", body: validated }));
+    savedTo = saveTarget(meta, consent);
+    if (savedTo === "account") {
+      // 동의한 회원: 계정에 저장. 익명 localStorage는 건드리지 않는다. 순서대로 저장해 이전 요청의 덮어쓰기를 방지한다.
+      const saving = saveQueue.catch(() => {}).then(() => api(root.dataset.preferencesUrl, { method: "PUT", body: { ...validated, consent: true } }));
       saveQueue = saving;
-      return (await saving).settings;
+      const saved = (await saving).settings;
+      meta.consented = true;
+      return saved;
+    }
+    if (savedTo === "withdraw") {
+      // 동의 철회: 계정에 저장된 이동 조건을 바로 지운다
+      const removing = saveQueue.catch(() => {}).then(() => api(root.dataset.preferencesUrl, { method: "DELETE" }));
+      saveQueue = removing;
+      await removing;
+      meta.consented = false;
     }
     try { storage().setItem(GUEST_KEY, JSON.stringify(validated)); }
     catch (e) { persistenceWarning = "브라우저 저장을 사용할 수 없어요. 현재 화면에서는 적용되지만 새로고침 후에는 복원되지 않아요."; }
     return validated;
   }
-  async function apply(data) { settings = await persist(data); publish(); }
+  async function apply(data, consent) { settings = await persist(data, consent); publish(); }
   async function selectPreset(key) {
     if (!meta || !preset(meta, key)) return;
     try { await apply({ ...clone(settings), selected: [key] }); text("warning", persistenceWarning); }
@@ -176,7 +196,7 @@
       input.addEventListener("change", update);
       if (spec.type === "number") input.addEventListener("input", update);
       container.appendChild(input);
-      container.appendChild(create("p", `${defaultValue != null ? `현재 기본 기준: ${defaultValue}${spec.unit}. ` : ""}${spec.help || "바꾸지 않은 항목은 기존 Preset 규칙을 사용해요."}`, { id: `${id}-help`, class: "muted small" }));
+      container.appendChild(create("p", `${defaultValue != null ? `현재 기본 기준: ${defaultValue}${spec.unit}. ` : ""}${spec.help || "바꾸지 않은 항목은 이 이동 조건의 기본 기준을 사용해요."}`, { id: `${id}-help`, class: "muted small" }));
       fields.appendChild(container);
     });
     const multiple = $("multiple"); multiple.replaceChildren();
@@ -190,7 +210,11 @@
   }
   function close() { clearReference(); referenceListRequest++; dialog.close(); draft = null; openButton.focus(); }
   openButton.addEventListener("click", () => {
-    draft = clone(settings); text("error", ""); renderDraft(); dialog.showModal(); $("preset").focus();
+    draft = clone(settings); text("error", ""); renderDraft();
+    // 회원: 계정 저장 동의 칸(현재 동의 상태로 시작). 비회원: 브라우저에만 저장된다는 안내
+    $("consent-box").hidden = !meta.authenticated; $("consent").checked = Boolean(meta.consented);
+    $("browser-note").hidden = meta.authenticated;
+    dialog.showModal(); $("preset").focus();
     if ($("reference").open && !referencePlaces) loadReferencePlaces();
   });
   $("cancel").addEventListener("click", () => { if (!busy) close(); });
@@ -301,7 +325,11 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault(); if (busy || !form.reportValidity()) return;
     busy = true; $("save").disabled = true; text("error", "저장 중...");
-    try { await apply(draft); close(); text("warning", persistenceWarning || "설정을 저장했어요."); }
+    try {
+      await apply(draft, meta.authenticated ? $("consent").checked : undefined); close();
+      const done = { account: "내 계정에 저장했어요.", withdraw: "동의를 철회해 계정에 저장된 이동 조건을 지웠어요. 이 브라우저에만 저장했어요.", browser: "이 브라우저에 저장했어요." };
+      text("warning", persistenceWarning || done[savedTo]);
+    }
     catch (e) { text("error", e.message); }
     finally { busy = false; $("save").disabled = false; }
   });
@@ -349,7 +377,8 @@
   }
   const ready = (async () => {
     meta = await api(root.dataset.catalogueUrl);
-    const restored = meta.authenticated ? { settings: validateState(meta.settings, meta), warning: meta.warning } : restoreGuest(storage(), meta);
+    // 계정 저장에 동의한 회원만 서버 값으로 복원. 그 밖(비회원·동의하지 않은 회원)은 이 브라우저 값으로 복원
+    const restored = meta.authenticated && meta.consented ? { settings: validateState(meta.settings, meta), warning: meta.warning } : restoreGuest(storage(), meta);
     settings = restored.settings;
     const linked = root.dataset.mode === "detail" ? new URLSearchParams(location.search).get("profile") : null;
     // Apply a valid linked profile for this page without overwriting saved preferences.

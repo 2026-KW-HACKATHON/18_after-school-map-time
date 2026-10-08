@@ -137,6 +137,16 @@ html.large-text .map-condition-tools .btn { padding: 10px 8px; }
 .mobility-reference .field-row { flex-wrap: wrap; }
 .mobility-reference .field-row dd { overflow-wrap: anywhere; }
 .mobility-multiple-choice { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+/* 계정 저장 동의 (회원만 보임) */
+.mobility-consent { margin: 16px 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); }
+.mobility-consent legend { padding: 0 4px; font-weight: 600; }
+.mobility-consent .consent-terms { margin: 8px 0; }
+.mobility-consent .consent-terms div { margin: 4px 0; }
+.mobility-consent .consent-terms dt { display: inline; font-weight: 600; }
+.mobility-consent .consent-terms dt::after { content: " · "; }
+.mobility-consent .consent-terms dd { display: inline; margin: 0; }
+.mobility-consent-check { display: flex; gap: 8px; align-items: flex-start; padding-top: 4px; font-weight: 600; }
+.mobility-consent-check input { flex: none; width: 20px; height: 20px; margin-top: 2px; }
 .mobility-actions { justify-content: flex-end; }
 @media (max-width: 768px) {
   .mobility-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: 16px 16px 32px; }
