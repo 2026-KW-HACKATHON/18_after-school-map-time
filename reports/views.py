@@ -180,6 +180,7 @@ def ai_prefill(request):
         "warnings": [ai.WARNINGS[w] for w in result["warnings"]],
         "token": out["token"],
         "remaining": out["remaining"],
+        "needs_text": out["needs_text"],  # 사진만으로는 알 수 없어 비운 항목 → 설명을 적으라고 안내
     })
 
 

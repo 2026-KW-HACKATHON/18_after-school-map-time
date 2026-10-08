@@ -103,7 +103,7 @@
                     <td><input type="checkbox" name="selected_keys" value="{{ row.key }}" id="ai-pick-{{ row.key }}" aria-label="{{ row.label }} 저장"{% if row.key in f.selected_keys.value %} checked{% endif %}></td>
                     <th scope="row"><label for="ai-pick-{{ row.key }}">{{ row.label }}</label></th>
                     <td>{% if row.current %}{{ row.current }}{{ row.unit }}{% else %}<span class="muted">-</span>{% endif %}</td>
-                    <td>{% if row.candidate != "" %}<strong>{{ row.candidate }}{{ row.unit }}</strong>{% else %}<span class="muted">모름</span>{% endif %}
+                    <td>{% if row.candidate != "" %}<strong>{{ row.candidate }}{{ row.unit }}</strong>{% elif row.needs_text %}<span class="muted">설명 필요</span><br><span class="muted small">사진만으로는 알 수 없는 항목이에요</span>{% else %}<span class="muted">모름</span>{% endif %}
                       {% if row.evidence %}<br><span class="muted small">{{ row.certainty }} · {{ row.source }} — {{ row.evidence }}</span>{% endif %}</td>
                     <td>{{ row.field }}{% for e in row.field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</td>
                   </tr>

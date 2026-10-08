@@ -239,3 +239,26 @@ test("분석 중 다시 실행해도 중복 요청을 보내거나 버튼을 풀
   await running;
   assert.equal(p.button.disabled, false);
 });
+
+test("사진만으로는 알 수 없어 비운 칸은 '추가 설명'에 적으라고 안내한다", async () => {
+  const { run } = load();
+  const response = { ...ok, fields: { ...ok.fields, step_height_cm: { value: null, certainty: "모름", evidence: "" } },
+    needs_text: [{ key: "step_height_cm", label: "입구 단차" }, { key: "entrance_available", label: "입구 이용 가능 여부" }] };
+  const p = page();
+  await run(p.form, p.box, deps(p.doc, response));
+  assert.equal(p.elements.step_height_cm.value, "");
+  assert.match(p.elements.step_height_cm.inserted[0].textContent, /사진만으로는 알 수 없어요/);
+  // 화면에 없는 칸은 건너뛰고, 안내 문구에는 붙인 칸만
+  assert.match(p.status.textContent, /입구 단차은\(는\) 사진만으로는 알 수 없어요/);
+  assert.doesNotMatch(p.status.textContent, /입구 이용 가능 여부/);
+});
+
+test("주민이 이미 적은 칸에는 '설명 필요' 안내를 붙이지 않는다", async () => {
+  const { run } = load();
+  const response = { ...ok, fields: { ...ok.fields, step_height_cm: { value: null, certainty: "모름", evidence: "" } },
+    needs_text: [{ key: "step_height_cm", label: "입구 단차" }] };
+  const p = page({ values: { step_height_cm: "4" } });
+  await run(p.form, p.box, deps(p.doc, response));
+  assert.equal(p.elements.step_height_cm.inserted.length, 0);
+  assert.doesNotMatch(p.status.textContent, /사진만으로는 알 수 없어요/);
+});

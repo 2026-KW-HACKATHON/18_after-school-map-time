@@ -162,7 +162,7 @@ class AISelectionForm(forms.Form):
     def __init__(self, *args, analysis, definitions, report_values=None, labels=None, all_keys=None, **kwargs):
         from places.models import FieldDefinition
         from places.validation import INTEGER_KEYS
-        from reports.ai import AUTOMATIC_DOOR, CERTAINTY, ENTRANCE_KEYS, EVIDENCE_SOURCES
+        from reports.ai import AUTOMATIC_DOOR, CERTAINTY, ENTRANCE_KEYS, EVIDENCE_SOURCES, needs_text
 
         super().__init__(*args, **kwargs)
         # 분석할 때와 지금 모두 켜져 있는 항목만 고를 수 있음. 나머지는 표에 '분석 제외'로 (출입구 7개 고정)
@@ -203,6 +203,7 @@ class AISelectionForm(forms.Form):
                 "certainty": CERTAINTY.get(candidate.get("certainty"), ""),
                 "source": EVIDENCE_SOURCES.get(candidate.get("evidence_source"), ""),
                 "evidence": candidate.get("evidence", ""),
+                "needs_text": value is None and needs_text(f),  # 사진만으로는 알 수 없는 항목 → '모름' 대신 '설명 필요'
                 "field": self[name],
             })
         labels = labels or {}
