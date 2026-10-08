@@ -362,6 +362,22 @@ docker compose -f docker-compose.prod.yml up -d web   # .env 다시 읽기
 
 4. 끄기: `AI_ENABLED=False`로 바꾸고 `up -d web`. 이미 저장된 분석 기록·선택 값은 그대로 남습니다.
 
+5. 설정 비교 실험 (AI가 잘 못 알아본다 싶을 때): 같은 제보 사진을 여러 설정으로 보내 결과를 나란히 봅니다.
+   DB에는 저장하지 않고, 안내를 보고 제출한 사진 제보만 보냅니다. 호출 수만큼 비용이 듭니다(기본 5조건 × 5건 = 25회).
+
+```bash
+docker compose -f docker-compose.prod.yml exec web python manage.py compare_ai               # 최근 사진 제보 5건 × 조건 A~E
+docker compose -f docker-compose.prod.yml exec web python manage.py compare_ai --reports 12,15
+```
+
+| 조건 | 바꾸는 것 | 이 조건만 좋아지면 |
+|---|---|---|
+| A | 지금 설정 그대로 | 기준 |
+| B | 생각 단계 high | 추론이 부족했음 |
+| C | 상위 모델 (`--flash-model`, 기본 `gemini-3.5-flash`) | 모델 등급이 부족했음 |
+| D | 지시문 완화 (보이는 것은 답하기. cm·각도 추정 금지는 유지) | 지시문이 너무 엄격했음 |
+| E | 이미지 해상도 HIGH | 사진을 낮은 해상도로 보고 있었음 (입력 토큰도 같이 봄) |
+
 ---
 
 ## 6. 백업 · 최종 점검
