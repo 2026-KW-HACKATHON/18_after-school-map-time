@@ -19,8 +19,12 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      # 설정 템플릿의 ${DOMAIN} 을 이 값으로 치환 (nginx 공식 이미지 기능)
+      # 설정 템플릿의 ${DOMAIN} 등을 이 값으로 치환 (nginx 공식 이미지 기능). 뜻은 nginx/https/default.conf.template 맨 위
       DOMAIN: ${DOMAIN:-localhost}
+      # 비어 있으면 아무도 이동시키지 않도록, 절대 쓰일 일 없는 주소(.invalid는 예약된 최상위 도메인)를 넣어 둠
+      REDIRECT_DOMAINS: ${REDIRECT_DOMAINS:-redirect.invalid}
+      # 인증서 폴더 이름. 비우면 DOMAIN과 같음 (예전 주소로 처음 발급한 인증서에 새 주소를 추가했다면 예전 주소)
+      CERT_NAME: ${CERT_NAME:-${DOMAIN:-localhost}}
     volumes:
       # NGINX_CONF=http(기본, 인증서 발급 전·로컬) / https(인증서 발급 후) 중 하나를 템플릿으로 사용
       - ./nginx/${NGINX_CONF:-http}:/etc/nginx/templates:ro
