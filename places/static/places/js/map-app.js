@@ -26,7 +26,7 @@
   };
 
   const STORAGE_KEY = "teokeopne.profile";
-  const state = { profiles: [], profile: null, showAll: false, center: null, me: null, map: null, all: [] };
+  const state = { profiles: [], profile: null, showAll: false, center: null, me: null, map: null, all: [], loading: false, error: null };
   let placesRequest = 0, popupRequest = 0;
   const mobility = () => window.TeokMobility?.state() ? window.TeokMobility : null;
 
@@ -89,9 +89,10 @@
       .sort((a, b) => (a.dist ?? 0) - (b.dist ?? 0) || a.name.localeCompare(b.name, "ko"));
 
     els.list.innerHTML = "";
-    els.empty.hidden = rows.length > 0;
+    els.empty.hidden = state.loading || state.error !== null || rows.length > 0;
     els.emptyProfile.textContent = profileLabel();
-    els.status.textContent = rows.length ? `${rows.length}곳${state.me ? " · 내 위치에서 가까운 순" : " · 가까운 순"}` : "";
+    els.status.textContent = state.loading ? "불러오는 중..." : state.error !== null ? state.error
+      : rows.length ? `${rows.length}곳${state.me ? " · 내 위치에서 가까운 순" : " · 가까운 순"}` : "";
 
     rows.forEach((p) => {
       const a = el("a", { class: "place-item", href: urls.detail(p.id) });
@@ -187,22 +188,25 @@
     const params = new URLSearchParams({ region, all: "1" });
     if (state.profile) params.set("profile", state.profile);
     state.all = [];
-    renderSummary(); renderMarkers(); renderList(); els.empty.hidden = true;
-    els.status.textContent = "불러오는 중...";
+    state.loading = true;
+    state.error = null;
+    renderSummary(); renderMarkers(); renderList();
     try {
       const data = mobility()?.needsEvaluation()
         ? await mobility().evaluate({ region })
         : await api(`${urls.places}?${params}`);
       if (request !== placesRequest) return;
       state.all = data.results;
+      state.loading = false;
       renderSummary();
       renderMarkers();
       renderList();
     } catch (err) {
       if (request !== placesRequest) return;
       state.all = [];
-      renderSummary(); renderMarkers(); renderList(); els.empty.hidden = true;
-      els.status.textContent = err.message;
+      state.loading = false;
+      state.error = err.message;
+      renderSummary(); renderMarkers(); renderList();
     }
   }
 
