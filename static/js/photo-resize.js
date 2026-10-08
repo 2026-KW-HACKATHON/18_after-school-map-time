@@ -158,7 +158,8 @@
     doc.addEventListener("submit", onSubmit);
   }
 
-  const api = { MAX_PX, SKIP_BELOW, UPLOAD_LIMIT, targetSize, jpegName, formatMB, shrink, init };
+  const ready = (form) => Promise.all([...(pending.get(form) || [])]);
+  const api = { MAX_PX, SKIP_BELOW, UPLOAD_LIMIT, targetSize, jpegName, formatMB, shrink, init, ready };
   root.PhotoResize = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root.document && typeof root.document.addEventListener === "function") init(root.document);

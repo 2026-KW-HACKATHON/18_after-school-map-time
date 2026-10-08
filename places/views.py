@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404, render
+from django.db.models import Q
 from django.utils import timezone
 
 from judgments.models import ConditionProfile, Judgment
@@ -7,6 +8,17 @@ from .models import Place, Region
 from .selectors import judgment_payload, place_detail, place_summary, unknown_payload
 
 SEARCH_LIMIT = 30
+SEARCH_CATEGORIES = [("", "전체"), ("CAFE", "카페"), ("RESTAURANT", "음식점"), ("LIFE", "생활")]
+
+
+def search_places(region, query, category=""):
+    places = Place.objects.in_region(region).filter(is_closed=False)
+    places = places.filter(Q(name__icontains=query) | Q(address__icontains=query))
+    if category == "LIFE":
+        places = places.exclude(category__in=[Place.Category.CAFE, Place.Category.RESTAURANT])
+    elif category:
+        places = places.filter(category=category)
+    return places.order_by("name", "pk")
 
 
 def _region():
@@ -27,11 +39,14 @@ def search_page(request):
     q = request.GET.get("q", "").replace("\x00", "").strip()  # NUL 문자는 PostgreSQL이 거부 → 500 방지
     profiles = list(ConditionProfile.objects.filter(is_active=True))
     profile = next((p for p in profiles if p.key == request.GET.get("profile")), profiles[0] if profiles else None)
+    category = request.GET.get("category", "")
+    if category not in dict(SEARCH_CATEGORIES):
+        category = ""
 
     results = []
     if q and region:
         places = list(
-            Place.objects.in_region(region).filter(is_closed=False, name__icontains=q).order_by("name")[:SEARCH_LIMIT]
+            search_places(region, q, category)[:SEARCH_LIMIT]
         )
         judgments = {}
         if profile:
@@ -49,6 +64,7 @@ def search_page(request):
     return render(request, "places/search.html", {
         "q": q, "results": results, "profiles": profiles, "profile": profile, "searched": bool(q),
         "region": region,
+        "category": category, "categories": SEARCH_CATEGORIES,
     })
 
 

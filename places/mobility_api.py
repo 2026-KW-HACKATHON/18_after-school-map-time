@@ -67,7 +67,7 @@ def evaluate(request):
             response["Retry-After"] = str(int(wait) + 1)
         return response
     try:
-        if not isinstance(request.data, dict) or set(request.data) - {"settings", "region", "all", "q", "place_ids"}:
+        if not isinstance(request.data, dict) or set(request.data) - {"settings", "region", "all", "q", "place_ids", "category"}:
             raise DjangoValidationError("장소 판정의 입력 형식을 확인해 주세요.")
         settings = normalize_settings(request.data.get("settings"))
         region_code = request.data.get("region")
@@ -80,13 +80,16 @@ def evaluate(request):
         query = request.data.get("q")
         if query is not None and (not isinstance(query, str) or len(query) > 200 or "\x00" in query):
             raise DjangoValidationError("검색어를 확인해 주세요.")
+        from .views import SEARCH_CATEGORIES, SEARCH_LIMIT, search_places
+        category = request.data.get("category", "")
+        if not isinstance(category, str) or category not in dict(SEARCH_CATEGORIES) or (category and query is None):
+            raise DjangoValidationError("검색 업종을 확인해 주세요.")
         show_all = request.data.get("all", True)
         if type(show_all) is not bool:
             raise DjangoValidationError("표시 조건을 확인해 주세요.")
         places = Place.objects.in_region(region).filter(is_closed=False).select_related("building").prefetch_related("entrances", "building__entrances").order_by("name")
         if query is not None:
-            from .views import SEARCH_LIMIT
-            places = places.filter(name__icontains=query.strip())[:SEARCH_LIMIT] if query.strip() else places.none()
+            places = search_places(region, query.strip(), category).select_related("building").prefetch_related("entrances", "building__entrances")[:SEARCH_LIMIT] if query.strip() else places.none()
         ids = request.data.get("place_ids")
         if ids is not None:
             if query is not None or not isinstance(ids, list) or not ids:

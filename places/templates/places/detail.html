@@ -11,8 +11,9 @@
 {% block title %}{{ place.name }} | 턱없네{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
 
+{% block header_brand %}장소 상세{% endblock %}
 {% block content %}
-<article class="place-detail">
+<article class="place-detail" data-figma-node="1:147 1:170">
   <header class="detail-header">
     <p class="muted small"><a href="{% url 'places:map' %}">← 지도</a></p>
     <h1>{{ place.name }}{% if assistance_badge %} <span class="badge-positive">도움 제공 가게</span>{% endif %}</h1>
@@ -20,6 +21,12 @@
       {% if place.address %}{{ place.address }} · {% endif %}{{ place.get_category_display }}
       {% if place.floor != 1 %} · {% if place.floor < 0 %}지하 {{ place.floor|stringformat:"d"|slice:"1:" }}층{% else %}{{ place.floor }}층{% endif %}{% endif %}
     </p>
+    {% with main_entrance=place_section.entrances.0 %}
+    <div class="photo-slot detail-photo">
+      {% if main_entrance.photo %}<img src="{{ main_entrance.photo.url }}" alt="{{ main_entrance.name }} 사진">{% else %}<p>아직 확인된 입구 사진이 없어요.</p>{% endif %}
+    </div>
+    {% endwith %}
+    <p class="muted small">{% if last_checked %}최근 확인 {{ last_checked|date:"Y.m.d" }}{% else %}확인 정보가 필요해요{% endif %}</p>
   </header>
 
   {# 이동 조건 선택 → 판단 근거 (JS 없이도 전부 보이고, JS가 있으면 고른 조건만 보여줌) #}
@@ -33,7 +40,7 @@
     {% include "includes/mobility_settings.html" with mobility_mode="detail" %}
     {% for row in judgments %}
       <div class="judge-panel" data-profile="{{ row.profile.key }}" data-mobility-baseline>
-        <p class="judge-status">
+        <p class="judge-status status-{{ row.judgment.code }}">
           <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
           <strong>{{ row.judgment.label }}</strong>
           <span class="muted small">{{ row.profile.label }} 기준</span>
@@ -100,7 +107,10 @@
   </section>
   {% endif %}
 
-  <section class="card" aria-labelledby="entrance-title">
+  <nav class="facility-links" aria-label="출입구 및 시설 정보">
+    <a class="chip" href="#place-facilities">가게 전용</a>{% if building %}<a class="chip" href="#building-facilities">건물 공용</a>{% endif %}
+  </nav>
+  <section class="card facility-section" id="place-facilities" aria-labelledby="entrance-title">
     <h2 id="entrance-title">가게 입구</h2>
     {% for entrance in place_section.entrances %}
       {% include "places/_entrance.html" %}
@@ -110,7 +120,7 @@
   </section>
 
   {% if building %}
-  <section class="card section-building" aria-labelledby="building-title">
+  <section class="card section-building facility-section" id="building-facilities" aria-labelledby="building-title">
     <h2 id="building-title">건물 공용 입구 · 시설</h2>
     <p class="muted small">{{ building.building }} — 건물 공용 공간 정보예요. 가게가 아닌 건물의 구조입니다.</p>
     {% for entrance in building.entrances %}
@@ -122,7 +132,7 @@
   </section>
   {% endif %}
 
-  <section class="card" aria-labelledby="inside-title">
+  <section class="card facility-section" id="inside-facilities" aria-labelledby="inside-title">
     <h2 id="inside-title">가게 안 · 편의시설</h2>
     {% include "places/_fields.html" with fields=place_section.fields %}
     {% include "places/_facilities.html" with section=place_section %}

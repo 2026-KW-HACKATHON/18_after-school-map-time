@@ -107,7 +107,7 @@ def report_list(request):
     status = request.GET.get("status", "PENDING")
     reports = Report.objects.filter(source__in=REVIEW_SOURCES).select_related(
         "place", "entrance__place", "entrance__building", "building", "created_by"
-    ).prefetch_related("values__field").order_by("-created_at")
+    ).prefetch_related("values__field").order_by("created_at" if status == "PENDING" else "-created_at", "pk")
     counts = {s: reports.filter(status=s).count() for s, _ in STATUS_TABS if s}
     if status:
         reports = reports.filter(status=status)

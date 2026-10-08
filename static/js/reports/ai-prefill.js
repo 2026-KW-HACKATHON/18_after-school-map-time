@@ -122,6 +122,9 @@
       const needsText = markNeedsText(form, data.needs_text, deps.document);
       tokenInput.value = data.token;
       status.textContent = message(data, filled, needsText);
+      if (typeof root.CustomEvent === "function") {
+        deps.document.dispatchEvent(new root.CustomEvent("ai-prefill:complete", { detail: { filled, needsText } }));
+      }
     } catch (e) {
       if (isCurrent()) status.textContent = "연결이 불안정해요. 잠시 뒤 다시 누르거나 직접 입력해 주세요.";
     } finally {
@@ -144,6 +147,12 @@
         clearMarks(form);
       });
     }
+    form.elements.photo?.addEventListener("change", () => {
+      revisions.set(form, (revisions.get(form) || 0) + 1);
+      box.querySelector("#ai-prefill-token").value = "";
+      box.querySelector("#ai-prefill-status").textContent = "사진이 바뀌어 이전 AI 결과는 적용하지 않아요. 입력한 항목을 직접 확인하거나 다시 분석해 주세요.";
+      clearMarks(form);
+    });
   }
 
   const api = { fillForm, markNeedsText, clearMarks, message, run, init };

@@ -151,3 +151,92 @@ html.large-text .map-condition-tools .btn { padding: 10px 8px; }
 @media (max-width: 768px) {
   .mobility-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: 16px 16px 32px; }
 }
+
+
+/* Figma 01/19: mobile search → map → nearby list, desktop 342px panel. */
+.map-layout { padding: 16px 32px 32px; }
+#map-app { display: grid; grid-template-columns: 342px minmax(0, 1fr); gap: 24px; height: auto; min-height: calc(100dvh - 100px); align-items: start; }
+.map-panel { width: auto; border: 0; padding: 0; overflow: visible; gap: 16px; }
+.map-discovery { display: grid; gap: 14px; }
+.map-discovery h1 { font-size: 24px; }
+.map-mobile-title { display: none; }
+.map-discovery .search-bar { margin: 0; }
+.map-options { font-size: 12px; color: var(--color-muted); }
+.map-options summary { cursor: pointer; padding: 8px 0; }
+.map-options .summary { margin-top: 8px; }
+#profile-chips { margin: 0; }
+.map-condition-tools { display: block; margin: 0; }
+.map-condition-tools .mobility-settings { display: block; }
+.map-condition-tools .mobility-toolbar { display: flex; }
+.map-condition-tools .panel-label { display: none; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) .mobility-settings,
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) .mobility-toolbar { display: contents; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips { display: flex; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips .chip { width: 100%; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips .chip[aria-pressed="false"],
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) [data-mobility-more] { display: none; }
+.map-panel > .map-results { overflow: visible; max-height: none; }
+.map-wrap { height: min(700px, calc(100dvh - 140px)); min-height: 440px; border-radius: 18px; overflow: hidden; background: var(--color-bg); }
+.map-unavailable, .map:empty { background: var(--color-bg); }
+.map-wrap .map { border-radius: 18px; }
+.place-list { display: grid; gap: 14px; }
+.place-item { padding: 16px; border: 0; border-radius: var(--radius); background: var(--color-bg); }
+.place-item-body { gap: 6px; flex: 1; min-width: 0; }
+.place-item:hover, .place-item:focus-visible { background: var(--color-soft); }
+.map-results h2 { margin-bottom: 14px; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; grid-column: 2; color: var(--color-muted); margin: 0; font-size: 12px; }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.judge-dot, .map-marker { background: var(--color-gray); border: 0; color: var(--color-muted); box-shadow: none; }
+.judge-ACCESSIBLE { background: var(--color-green-soft); color: var(--judge-accessible); }
+.judge-CONDITIONAL { background: var(--color-soft); color: var(--judge-conditional); }
+.judge-DIFFICULT { background: var(--color-gray); color: var(--color-muted); }
+.judge-UNKNOWN { background: var(--color-surface); border: 1px dashed var(--judge-unknown-border); }
+.judge-ACCESSIBLE::before { content: '●'; }
+.judge-DIFFICULT::before { content: '○'; }
+.judge-UNKNOWN::before { content: '?'; }
+.map-marker { width: 38px; height: 38px; font-size: 18px; border-radius: 19px; }
+.result-status, .judge-status { padding: 10px; border-radius: 10px; background: var(--color-green-soft); color: var(--judge-accessible); }
+.result-status.status-CONDITIONAL, .judge-status.status-CONDITIONAL { background: var(--color-soft); color: var(--judge-conditional); }
+.result-status.status-DIFFICULT, .result-status.status-UNKNOWN, .judge-status.status-DIFFICULT, .judge-status.status-UNKNOWN { background: var(--color-gray); color: var(--color-muted); }
+.detail-header { display: grid; gap: 14px; }
+.detail-photo { min-height: 160px; border-radius: 0; }
+.detail-photo img { max-height: 220px; }
+.section-building { background: var(--color-soft); }
+.facility-section { scroll-margin-top: 90px; }
+.facility-links { display: flex; gap: 8px; }
+.facility-links a { flex: 1; justify-content: center; }
+.place-detail .entrance + .entrance { padding-top: 16px; }
+.mobility-toolbar > select, .mobility-toolbar > button { flex: 1; min-height: 40px; border: 0; border-radius: 12px; background: var(--color-bg); font-size: 12px; }
+.mobility-toolbar > button { background: var(--color-soft); }
+.mobility-dialog { border: 0; border-radius: 16px; padding: 24px; }
+.mobility-dialog h2 { font-size: 24px; }
+.mobility-dialog .field, .mobility-dialog .mobility-field { background: var(--color-bg); border-radius: 16px; padding: 16px; }
+.mobility-dialog select { background: var(--color-bg); }
+.mobility-dialog details { background: var(--color-soft); border: 0; padding: 16px; border-radius: 16px; }
+.category-filters { display: flex; gap: 8px; }
+.category-filters .chip { flex: 1; justify-content: center; }
+.search-page .search-bar { flex-wrap: wrap; margin: 0; }
+.search-page .search-bar input { flex-basis: calc(100% - 72px); }
+.search-page .search-bar select { flex: 1; background: var(--color-bg); border-radius: 12px; border-color: var(--color-border); }
+.search-page:has([data-mobility-open]:not(:disabled)) #search-profile { display: none; }
+.search-page [data-mobility-baseline] { display: grid; gap: 14px; }
+@media (max-width: 768px) {
+  .map-layout { padding: 8px 24px 24px; }
+  #map-app { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-height: auto; }
+  .map-panel { display: contents; }
+  .map-discovery { grid-row: 1; }
+  .map-discovery h1 { font-size: 16px; }
+  .map-desktop-title { display: none; }
+  .map-mobile-title { display: inline; }
+  .map-wrap { grid-row: 2; height: 240px; min-height: 240px; }
+  .map-results { grid-row: 3; }
+  .map-panel > .map-results { max-height: none; }
+  .map-legend { grid-column: 1; grid-row: 4; }
+  .map-error { left: 8px; right: 8px; top: 8px; gap: 4px; padding: 12px; }
+  .map-error .btn { min-height: 40px; padding: 8px; font-size: 12px; }
+  .map-error .actions { justify-content: start; }
+  .popup { bottom: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; }
+  .map-options { margin-top: -8px; }
+  .mobility-dialog { border-radius: 0; padding: 24px 24px 32px; }
+}

@@ -5,21 +5,22 @@
      data-evaluate-url="{% url 'api:mobility-evaluate' %}"
      data-places-url="{% url 'api:place-list' %}" data-reference-url="{% url 'api:mobility-reference' 0 %}"
      data-place-id="{{ place.pk|default:'' }}" data-mode="{{ mobility_mode|default:'map' }}"
+     data-category="{{ category|default:'' }}"
      data-region="{% if place %}{{ place.region.code }}{% elif region %}{{ region.code }}{% endif %}">
   <div class="mobility-toolbar">
     <label class="sr-only" for="mobility-more">다른 이동 조건 선택</label>
     <select id="mobility-more" data-mobility-more aria-label="다른 이동 조건 선택" disabled><option value="">다른 이동 조건</option></select>
-    <button type="button" class="btn" data-mobility-open aria-label="내 이동 조건 수정" disabled>내 조건 수정</button>
+    <button type="button" class="btn" data-mobility-open aria-label="내 이동 조건 수정" disabled>조건 변경</button>
   </div>
   <p class="muted small" data-mobility-summary></p>
   <p class="small" data-mobility-warning role="status" aria-live="polite"></p>
   <div class="{% if mobility_mode != 'search' %}card {% endif %}mobility-result" data-mobility-result hidden aria-live="polite"></div>
-  <dialog class="mobility-dialog" data-mobility-dialog aria-labelledby="mobility-title">
+  <dialog data-figma-node="1:85" class="mobility-dialog" data-mobility-dialog aria-labelledby="mobility-title">
     <form data-mobility-form>
       {% csrf_token %}
-      <h2 id="mobility-title">내 이동 조건 수정</h2>
+      <h2 id="mobility-title">나에게 맞는<br>출입 정보를 볼까요?</h2>
       <p class="muted small">기본값으로 바로 이용할 수 있어요. 필요한 항목만 바꾸세요.</p>
-      <div class="field"><label for="mobility-preset">이동 조건</label><select id="mobility-preset" data-mobility-preset></select></div>
+      <div class="field"><label for="mobility-preset">현재 이동 조건</label><select id="mobility-preset" data-mobility-preset></select></div>
       <p class="notice small" data-mobility-recommendation hidden></p>
       <div class="field" data-mobility-companion-box hidden>
         <label for="mobility-companion">동반자의 실제 이동 조건</label>
@@ -66,7 +67,7 @@
       <div class="actions mobility-actions">
         <button type="button" class="btn" data-mobility-reset>이 조건 기본값으로</button>
         <button type="button" class="btn" data-mobility-cancel>취소</button>
-        <button type="submit" class="btn btn-primary" data-mobility-save>설정 저장</button>
+        <button type="submit" class="btn btn-primary" data-mobility-save>이 조건으로 보기</button>
       </div>
     </form>
   </dialog>
