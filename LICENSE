@@ -19,15 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This license covers the source code and documentation written by the team in this
-repository. It does NOT relicense:
-
-- Third-party software, fonts and services used by this project. They remain under
-  their own licenses and terms (see THIRD_PARTY_NOTICES.md).
-- places/data/public/ (snapshot from the Public Data Portal, data.go.kr,
-  "한국사회보장정보원_장애인편의시설 현황"), which follows the portal's terms of use.
-- Photos and text submitted by users of the deployed service (not stored in this
-  repository).
