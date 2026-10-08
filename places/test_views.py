@@ -54,16 +54,17 @@ class PlaceListApiTests(ViewTestBase):
         self.assertEqual(res.status_code, 200)
         return {r["name"]: r["judgment"] for r in res.json()["results"]}
 
-    def test_default_hides_only_difficult(self):
-        # 어려움만 숨긴다. 미확인은 점선으로 보여서 "알려주세요" 제보를 받는다
+    def test_default_hides_unknown_and_internal_difficult(self):
         rows = self.names(profile="WHEELCHAIR")
-        self.assertEqual(set(rows), {"턱없는 카페", "정보 없는 약국"})
-        self.assertEqual(rows["정보 없는 약국"]["code"], "UNKNOWN")
+        self.assertEqual(set(rows), {"턱없는 카페"})
         self.assertEqual(rows["턱없는 카페"]["label"], "들어갈 수 있어요")
 
     def test_show_all_includes_everything_with_v2_labels(self):
         rows = self.names(profile="WHEELCHAIR", all="1")
-        self.assertEqual(rows["계단 식당"]["label"], "혼자 들어가기 어려워요")
+        self.assertEqual(rows["계단 식당"]["label"], rows["정보 없는 약국"]["label"])
+        self.assertEqual(rows["계단 식당"]["code"], "DIFFICULT")  # API/원본 판정 호환성 보존
+        self.assertEqual(rows["계단 식당"]["display_code"], "UNKNOWN")
+        self.assertEqual(rows["계단 식당"]["shape"], "dashed-circle")
         self.assertEqual(rows["계단 식당"]["reason"], "입구 단차 30cm · 계단 수 2칸")  # 어려움 옆 사실 한 줄
         self.assertEqual(rows["정보 없는 약국"]["code"], "UNKNOWN")
         self.assertEqual(rows["정보 없는 약국"]["shape"], "dashed-circle")
@@ -72,6 +73,37 @@ class PlaceListApiTests(ViewTestBase):
         rows = self.names()
         self.assertEqual(len(rows), 3)
         self.assertTrue(all(j is None for j in rows.values()))
+
+    def test_public_unknown_display_preserves_original_judgment_and_facts(self):
+        from judgments.models import Judgment
+        data = self.client.get(reverse("api:place-detail", args=[self.hard.pk])).json()
+        payload = next(j for j in data["judgments"] if j["profile"] == "WHEELCHAIR")
+        self.assertEqual((payload["code"], payload["display_code"]), ("DIFFICULT", "UNKNOWN"))
+        self.assertIn("30cm", payload["reason"])
+        self.assertEqual(Judgment.objects.get(place=self.hard, profile_id="WHEELCHAIR").result, "DIFFICULT")
+        page = self.client.get(reverse("places:detail", args=[self.hard.pk]))
+        self.assertContains(page, "judge-UNKNOWN")
+        self.assertContains(page, "가고 싶어요")  # 기존 owners 수요 신호를 숨기거나 변경하지 않음
+        self.assertNotContains(page, "혼자 들어가기 어려워요")
+
+    def test_personalized_filter_and_public_display_use_same_policy(self):
+        from judgments.mobility import default_settings
+        for show_all, count in ((False, 1), (True, 3)):
+            response = self.client.post(reverse("api:mobility-evaluate"), {
+                "settings": default_settings(), "all": show_all,
+            }, content_type="application/json")
+            self.assertEqual(response.status_code, 200)
+            rows = response.json()["results"]
+            self.assertEqual(len(rows), count)
+            if show_all:
+                hard = next(row for row in rows if row["id"] == self.hard.pk)
+                self.assertEqual((hard["judgment"]["code"], hard["judgment"]["display_code"]), ("DIFFICULT", "UNKNOWN"))
+
+    def test_operator_display_preserves_original_difficult_meaning(self):
+        from judgments.constants import display
+        raw = display("DIFFICULT", internal=True)
+        self.assertEqual((raw["display_code"], raw["label"]), ("DIFFICULT", "혼자 들어가기 어려워요"))
+        self.assertEqual(display("DIFFICULT")["display_code"], "UNKNOWN")
 
     def test_region_scope_and_closed_places(self):
         from .models import Region
@@ -101,7 +133,8 @@ class MetaAndGeoJsonTests(ViewTestBase):
         self.assertEqual(data["region"]["code"], "wolgye1")
         self.assertEqual([p["key"] for p in data["profiles"]], ["WHEELCHAIR", "STROLLER", "WALKER", "CRUTCH"])
         self.assertTrue(data["display"]["DIFFICULT"]["hidden_by_default"])
-        self.assertFalse(data["display"]["UNKNOWN"]["hidden_by_default"])
+        self.assertTrue(data["display"]["UNKNOWN"]["hidden_by_default"])
+        self.assertEqual(data["display"]["DIFFICULT"], data["display"]["UNKNOWN"])
         self.assertNotIn("red", str(data["display"]).lower())
 
     def test_geojson(self):
@@ -151,6 +184,7 @@ class DetailTests(ViewTestBase):
         res = self.client.get(reverse("places:map"))
         self.assertContains(res, 'data-region="wolgye1"')
         self.assertContains(res, "모든 장소 보기")
+        self.assertContains(res, 'id="show-all" checked')
         self.assertNotContains(res, "어려운 곳만")
 
 
@@ -186,7 +220,7 @@ class SearchPageTests(ViewTestBase):
     def test_finds_by_name_with_judgment_and_facts(self):
         res = self.client.get(self.url, {"q": "식당", "profile": "WHEELCHAIR"})
         self.assertContains(res, "계단 식당")
-        self.assertContains(res, "혼자 들어가기 어려워요")      # 이름으로 찾은 장소는 판정과 관계없이 보여줌
+        self.assertContains(res, "아직 정보가 없어요 · 알려주세요")  # 검색은 공개 표시만 통합
         self.assertContains(res, "입구 단차 30cm")              # 입구 핵심 값 요약
         self.assertNotContains(res, "턱없는 카페")
 

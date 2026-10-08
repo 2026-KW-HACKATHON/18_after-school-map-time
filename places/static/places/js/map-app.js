@@ -2,8 +2,8 @@
  * 지도 홈 (와이어프레임 1·2·3·6번). 지도 SDK는 TeokMap 어댑터(static/js/map/kakao-adapter.js)만 쓴다.
  *
  * 표시 정책 (기획 v2 3.2)
- * - 이동 조건을 고르면 기본으로 "들어갈 수 있어요"·"도움 받으면"·"정보가 필요해요"가 보인다 (hidden_by_default 인 어려움만 숨김)
- * - "모든 장소 보기"를 켜면 어려움(회색)·미확인(점선)도 보인다
+ * - "모든 장소 보기"는 기본 ON으로 정보 없음(내부 어려움 포함, 점선)까지 보인다
+ * - OFF이면 "들어갈 수 있어요"·"도움 받으면"만 보인다
  * - 목록은 거리순. "접근성 낮은 순" 정렬·"어려운 곳만 보기"·어려움 개수 집계는 만들지 않는다
  * - 지도 SDK를 못 불러와도 목록·검색·제보는 동작한다 (6번 화면)
  */
@@ -26,7 +26,7 @@
   };
 
   const STORAGE_KEY = "teokeopne.profile";
-  const state = { profiles: [], profile: null, showAll: false, center: null, me: null, map: null, all: [], loading: false, error: null };
+  const state = { profiles: [], profile: null, showAll: els.showAll.checked, center: null, me: null, map: null, all: [], loading: false, error: null };
   let placesRequest = 0, popupRequest = 0;
   const mobility = () => window.TeokMobility?.state() ? window.TeokMobility : null;
 
@@ -51,9 +51,12 @@
   }
   const formatDistance = (m) => (m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`);
   const profileLabel = () => mobility()?.label() || (state.profiles.find((p) => p.key === state.profile) || {}).label || "";
-  const judgmentClass = (p) => (p.judgment ? `judge-${p.judgment.code}` : "judge-NONE");
+  const displayCode = (j) => j?.display_code || (j?.code === "DIFFICULT" ? "UNKNOWN" : j?.code);
+  const judgmentClass = (p) => (p.judgment ? `judge-${displayCode(p.judgment)}` : "judge-NONE");
   const judgmentIcon = (p) => (p.judgment && p.judgment.icon === "hand" ? "✋" : "");
-  const visiblePlaces = () => state.all.filter((p) => state.showAll || !p.judgment || !p.judgment.hidden_by_default);
+  // 이전 API 응답의 UNKNOWN.hidden_by_default=false도 OFF에서 숨긴다.
+  const visiblePlaces = () => state.all.filter((p) => state.showAll || !p.judgment ||
+    (displayCode(p.judgment) !== "UNKNOWN" && !p.judgment.hidden_by_default));
 
   // ── 이동 조건 칩 ───────────────────────────────────────
   function renderProfiles() {
@@ -75,7 +78,7 @@
   // ── 상태 요약 (어려움 개수는 세지 않음) ────────────────
   function renderSummary() {
     const counts = { ACCESSIBLE: 0, CONDITIONAL: 0, UNKNOWN: 0 };
-    state.all.forEach((p) => { if (p.judgment && p.judgment.code in counts) counts[p.judgment.code] += 1; });
+    state.all.forEach((p) => { const code = displayCode(p.judgment); if (code in counts) counts[code] += 1; });
     document.querySelectorAll("[data-count]").forEach((node) => {
       node.textContent = `${counts[node.dataset.count]}곳`;
     });
@@ -167,7 +170,7 @@
         [j ? j.profile_label : "", brief && origin ? `거리 ${formatDistance(distance(origin, brief))}` : ""].filter(Boolean).join(" · ")));
       if (j) {
         const status = el("p", {});
-        status.appendChild(el("span", { class: `judge-dot judge-${j.code}`, "aria-hidden": "true" }, j.icon === "hand" ? "✋" : ""));
+        status.appendChild(el("span", { class: `judge-dot judge-${displayCode(j)}`, "aria-hidden": "true" }, j.icon === "hand" ? "✋" : ""));
         status.appendChild(document.createTextNode(` ${j.label}`));
         els.popupBody.appendChild(status);
         if (j.personalized) els.popupBody.appendChild(el("p", { class: "small" }, j.explanation));

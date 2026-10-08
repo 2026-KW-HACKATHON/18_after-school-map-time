@@ -425,8 +425,9 @@
       box.replaceChildren(create("strong", `${label()} · 내 이동 조건으로 보면`));
       const list = create("ul", null, { class: "result-list" });
       data.results.forEach((row) => {
-        const status = create("span", null, { class: `result-status status-${row.judgment.code}` });
-        status.appendChild(create("span", row.judgment.icon === "hand" ? "✋" : "", { class: `judge-dot judge-${row.judgment.code}`, "aria-hidden": "true" }));
+        const code = row.judgment.display_code || (row.judgment.code === "DIFFICULT" ? "UNKNOWN" : row.judgment.code);
+        const status = create("span", null, { class: `result-status status-${code}` });
+        status.appendChild(create("span", row.judgment.icon === "hand" ? "✋" : "", { class: `judge-dot judge-${code}`, "aria-hidden": "true" }));
         status.appendChild(create("strong", row.judgment.label));
         if (root.dataset.mode === "search") {
           const item = create("li"), link = create("a", null, { class: "card result-card", href: `/places/${row.id}/?profile=${encodeURIComponent(primaryProfile())}` });

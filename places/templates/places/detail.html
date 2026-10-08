@@ -40,8 +40,8 @@
     {% include "includes/mobility_settings.html" with mobility_mode="detail" %}
     {% for row in judgments %}
       <div class="judge-panel" data-profile="{{ row.profile.key }}" data-mobility-baseline>
-        <p class="judge-status status-{{ row.judgment.code }}">
-          <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
+        <p class="judge-status status-{{ row.judgment.display_code|default:row.judgment.code }}">
+          <span class="judge-dot judge-{{ row.judgment.display_code|default:row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
           <strong>{{ row.judgment.label }}</strong>
           <span class="muted small">{{ row.profile.label }} 기준</span>
           {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}

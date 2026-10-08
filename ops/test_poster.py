@@ -22,7 +22,8 @@ class PosterAndLargeTextTests(TestCase):
         res = self.client.get(url)
         self.assertContains(res, 'data-qr="http://testserver/map/"')
         self.assertContains(res, "도움 받으면 들어갈 수 있어요")     # 문구는 판정 표시 상수에서
-        self.assertNotContains(res, "아직 정보가 없어요")
+        self.assertContains(res, "아직 정보가 없어요")
+        self.assertNotContains(res, "혼자 들어가기 어려워요")
 
     def test_every_page_has_large_text_toggle(self):
         res = self.client.get(reverse("places:map"))
