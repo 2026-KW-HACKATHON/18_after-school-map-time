@@ -351,6 +351,8 @@ python manage.py runserver
 
 ## 📚 오픈소스 / 출처
 
+- 월계1동 안내 경계: SGIS(공공누리 제1유형) 기반 [vuski/admdongkor](https://github.com/vuski/admdongkor)의 2026-07-01 데이터(CC BY 4.0). 월계1동 Feature만 추출, 좌표 변경 없음. 상세 출처·기준일·갱신 방법은 [지역 경계 안내](docs/region-boundary.md).
+
 대회 규정에 따라 사용한 오픈소스와 외부 서비스를 명시합니다. **버전·하위 패키지·바이너리에 포함된 라이브러리까지 전체 목록과 라이선스 준수 방법은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** 에 있습니다.
 
 ### 라이선스 준수
