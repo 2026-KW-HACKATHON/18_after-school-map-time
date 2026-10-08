@@ -542,6 +542,7 @@ gzip 압축은 두 템플릿 맨 위에서 켭니다 (CSS·JS·JSON).
 | 파일 | 역할 |
 | --- | --- |
 | `README.md` | 프로젝트 소개, 실행 방법, 환경 변수, 로드맵, 팀, 오픈소스 출처 |
+| `docs/personalization.md` | 이동 Preset 추천·개인 기준·동반자 설정, API/저장 구조, 판정 한계와 테스트 정책 |
 | `docs/deploy.md` | 배포 런북: EC2 생성 → 서버 설정 → 도메인 → 인증서·HTTPS → Secrets·자동 배포 → 백업·점검 → 문제 해결·롤백 |
 | `CONTRIBUTING.md` | 협업 규칙: 소통, 브랜치, 이슈, 커밋 컨벤션, PR, 코드 규칙, 의사결정 |
 | `CLAUDE.md` | Claude Code가 이 레포에서 작업할 때 가장 먼저 읽는 안내서 (절대 규칙, 결정/미정 사항) |

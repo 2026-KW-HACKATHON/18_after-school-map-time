@@ -27,6 +27,8 @@
 
   const STORAGE_KEY = "teokeopne.profile";
   const state = { profiles: [], profile: null, showAll: false, center: null, me: null, map: null, all: [] };
+  let placesRequest = 0, popupRequest = 0;
+  const mobility = () => window.TeokMobility?.state() ? window.TeokMobility : null;
 
   // ── 작은 도우미 ─────────────────────────────────────────
   function savedProfile() {
@@ -48,7 +50,7 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   const formatDistance = (m) => (m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`);
-  const profileLabel = () => (state.profiles.find((p) => p.key === state.profile) || {}).label || "";
+  const profileLabel = () => mobility()?.label() || (state.profiles.find((p) => p.key === state.profile) || {}).label || "";
   const judgmentClass = (p) => (p.judgment ? `judge-${p.judgment.code}` : "judge-NONE");
   const judgmentIcon = (p) => (p.judgment && p.judgment.icon === "hand" ? "✋" : "");
   const visiblePlaces = () => state.all.filter((p) => state.showAll || !p.judgment || !p.judgment.hidden_by_default);
@@ -59,6 +61,7 @@
     state.profiles.forEach((p) => {
       const btn = el("button", { type: "button", class: "chip", "aria-pressed": String(p.key === state.profile) }, p.label);
       btn.addEventListener("click", () => {
+        if (mobility()) { mobility().selectPreset(p.key); return; }
         state.profile = p.key;
         saveProfile(p.key);
         renderProfiles();
@@ -126,12 +129,14 @@
   let popupOpener = null;
 
   function closePopup() {
+    popupRequest += 1;
     els.popup.hidden = true;
     if (popupOpener && document.contains(popupOpener)) popupOpener.focus();
     popupOpener = null;
   }
 
   async function openPopup(id) {
+    const request = ++popupRequest;
     const brief = state.all.find((p) => p.id === id);
     popupOpener = document.activeElement;
     els.popup.hidden = false;
@@ -139,7 +144,12 @@
     els.popupBody.textContent = "불러오는 중...";
     try {
       const d = await api(urls.detailApi(id));
-      const j = d.judgments.find((x) => x.profile === state.profile) || d.judgments[0];
+      let j = d.judgments.find((x) => x.profile === state.profile) || d.judgments[0];
+      if (mobility()?.needsEvaluation()) {
+        const data = await mobility().evaluate({ region, place_ids: [id] });
+        j = { ...data.results[0].judgment, profile_label: mobility().label() };
+      }
+      if (request !== popupRequest) return;
       const entrance = (d.place.entrances || [])[0];
       const facts = entrance
         ? entrance.fields.filter((f) => POPUP_FIELDS.includes(f.key) && f.value != null).map((f) => `${f.label} ${f.value}${f.unit}`)
@@ -158,12 +168,13 @@
         status.appendChild(el("span", { class: `judge-dot judge-${j.code}`, "aria-hidden": "true" }, j.icon === "hand" ? "✋" : ""));
         status.appendChild(document.createTextNode(` ${j.label}`));
         els.popupBody.appendChild(status);
+        if (j.personalized) els.popupBody.appendChild(el("p", { class: "small" }, j.explanation));
       }
       els.popupBody.appendChild(el("p", { class: "small" }, facts.length ? facts.join(" · ") : "아직 확인된 입구 정보가 없어요."));
       els.popupBody.appendChild(el("p", { class: "muted small" },
         d.last_checked ? `${d.last_checked.slice(0, 10)} 확인` : "확인 정보 없음"));
     } catch (err) {
-      els.popupBody.textContent = err.message;
+      if (request === popupRequest) els.popupBody.textContent = err.message;
     }
   }
   $("popup-close").addEventListener("click", closePopup);
@@ -171,16 +182,26 @@
 
   // ── 데이터 불러오기 ────────────────────────────────────
   async function loadPlaces() {
+    const request = ++placesRequest;
     // 전체(all=1)를 한 번 받아 화면에서 거른다 → 요약 개수와 '모든 장소 보기'를 서버 왕복 없이
     const params = new URLSearchParams({ region, all: "1" });
     if (state.profile) params.set("profile", state.profile);
+    state.all = [];
+    renderSummary(); renderMarkers(); renderList(); els.empty.hidden = true;
     els.status.textContent = "불러오는 중...";
     try {
-      state.all = (await api(`${urls.places}?${params}`)).results;
+      const data = mobility()?.needsEvaluation()
+        ? await mobility().evaluate({ region })
+        : await api(`${urls.places}?${params}`);
+      if (request !== placesRequest) return;
+      state.all = data.results;
       renderSummary();
       renderMarkers();
       renderList();
     } catch (err) {
+      if (request !== placesRequest) return;
+      state.all = [];
+      renderSummary(); renderMarkers(); renderList(); els.empty.hidden = true;
       els.status.textContent = err.message;
     }
   }
@@ -196,9 +217,14 @@
     const meta = await api(`${urls.meta}?region=${encodeURIComponent(region)}`);
     state.center = meta.region.center;
     state.profiles = meta.profiles;
+    try { await window.TeokMobility?.ready(); } catch (e) { /* 개인화만 실패하면 기본 서비스는 유지 */ }
     const keys = meta.profiles.map((p) => p.key);
-    state.profile = keys.includes(savedProfile()) ? savedProfile() : keys[0] || null;
+    state.profile = mobility() ? mobility().primaryProfile() : keys.includes(savedProfile()) ? savedProfile() : keys[0] || null;
     renderProfiles();
+    document.addEventListener("mobility:change", () => {
+      if (!mobility()) return;
+      state.profile = mobility().primaryProfile(); renderProfiles(); closePopup(); loadPlaces();
+    });
 
     els.showAll.addEventListener("change", () => setShowAll(els.showAll.checked));
     $("empty-show-all").addEventListener("click", () => setShowAll(true));

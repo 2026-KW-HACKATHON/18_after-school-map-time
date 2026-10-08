@@ -330,6 +330,10 @@ python manage.py runserver
 
 ---
 
+## 내 이동 조건 수정
+
+지도·검색·장소 상세에서 Preset 기본값으로 바로 탐색하거나 ‘내 조건 수정’으로 본인/동반자의 실제 이동 기준을 저장할 수 있습니다. 신규 Preset은 초기 추천이며 신분에 따른 제약을 뜻하지 않습니다. 데이터 구조·API·판정 한계·test DB Migration 정책은 [docs/personalization.md](docs/personalization.md)를 참고하세요.
+
 ## 👥 팀
 
 | 이름 | 역할 |

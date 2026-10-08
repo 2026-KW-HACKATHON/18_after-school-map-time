@@ -18,7 +18,7 @@
 overrides 로 가상의 값을 넣어 다시 계산할 수 있다 → "경사로를 놓으면?" 시뮬레이션 (기획 v2 5.2)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from django.db import transaction
@@ -72,7 +72,7 @@ class Result:
 # ── 1. 조건·규칙 평가 ─────────────────────────────────────
 
 
-def evaluate_condition(cond, subject):
+def evaluate_condition(cond, subject, criteria=None):
     """True / False / None(값이 없어 모름)"""
     value = subject.lookup(cond.field)
     if value is None:
@@ -93,6 +93,15 @@ def evaluate_condition(cond, subject):
     else:
         target = cond.threshold
 
+    # 장소 관측값(overrides 시뮬레이션)과 사용자 기준을 분리한다. Rule/DB는 변경하지 않는다.
+    criteria = criteria or {}
+    if not cond.ref_field_id:
+        key = {"step_height_cm": "max_step_height_cm", "door_width_cm": "min_door_width_cm"}.get(cond.field_id)
+        if key in criteria and cond.operator in (Op.LTE, Op.GTE):
+            target = Decimal(criteria[key])
+        if cond.field_id == "step_count" and "can_use_stairs" in criteria and cond.operator == Op.LTE:
+            return True if criteria["can_use_stairs"] else Decimal(value) == 0
+
     if isinstance(target, str):
         value = str(value)
     compare = {
@@ -106,11 +115,11 @@ def evaluate_condition(cond, subject):
     return compare(value, target)
 
 
-def evaluate_rule(rule, subject):
+def evaluate_rule(rule, subject, criteria=None):
     """조건 AND. 하나라도 False면 False, 모르는 조건이 있으면 None"""
     unknown = False
     for cond in rule.conditions.all():
-        ok = evaluate_condition(cond, subject)
+        ok = evaluate_condition(cond, subject, criteria)
         if ok is False:
             return False
         if ok is None:
@@ -118,10 +127,10 @@ def evaluate_rule(rule, subject):
     return None if unknown else True
 
 
-def evaluate_subject(rules, subject):
+def evaluate_subject(rules, subject, criteria=None):
     unknown = False
     for rule in rules:
-        matched = evaluate_rule(rule, subject)
+        matched = evaluate_rule(rule, subject, criteria)
         if matched:
             return Result(rule.outcome, subject.entrance, rule, subject=subject)
         if matched is None:
@@ -210,7 +219,7 @@ def floor_facts(subject, rules):
     return " · ".join(parts[:MAX_FACTS])
 
 
-def facts_line(result, rules, all_rules):
+def facts_line(result, rules, all_rules, criteria=None):
     """
     사실 한 줄 (기획 v2 3.1: 어려움 옆에 항상 사실 한 줄. 예: 입구 단차 30cm · 계단 수 2칸)
       1. 이 이동 조건의 기준에 걸린 출입구 숫자 값
@@ -234,7 +243,7 @@ def facts_line(result, rules, all_rules):
 
     failed, passed = [], set()
     for cond in numeric_entrance_fields(rules):
-        ok = evaluate_condition(cond, subject)
+        ok = evaluate_condition(cond, subject, criteria)
         if ok is False and cond.field not in failed:
             failed.append(cond.field)
         elif ok is True:
@@ -246,7 +255,7 @@ def facts_line(result, rules, all_rules):
         f = cond.field
         if f in failed or f in passed or f in extra:
             continue
-        if evaluate_condition(cond, subject) is False:
+        if evaluate_condition(cond, subject, criteria) is False:
             extra.append(f)
 
     fields = sorted(failed, key=lambda f: f.order) + sorted(extra, key=lambda f: f.order)
@@ -256,27 +265,47 @@ def facts_line(result, rules, all_rules):
 
 def judge(place, profile, rule_set=None, overrides=None):
     """장소 하나 × 이동 조건 하나 → Result (저장하지 않음)"""
+    return judge_profiles(place, [(profile, {})], rule_set=rule_set, overrides=overrides)
+
+
+def judge_profiles(place, requirements, rule_set=None, overrides=None):
+    """개인별 규칙을 동일 경로에 적용한다. 서로 다른 사람의 가장 좋은 입구를 섞지 않는다."""
     rule_set = rule_set or RuleSet.active()
-    if rule_set is None:
+    if rule_set is None or not requirements:
         return Result(Outcome.UNKNOWN)
     all_rules = list(
         rule_set.rules.prefetch_related("conditions__field", "conditions__ref_field").order_by("priority", "id")
     )
-    rules = [r for r in all_rules if r.profile_id == profile.pk]
-    stage_rules = {
-        stage: [r for r in rules if r.stage == stage] for stage in (Rule.Stage.ENTRANCE, Rule.Stage.FLOOR)
-    }
-    routes = build_routes(place, overrides, with_floor=bool(stage_rules[Rule.Stage.FLOOR]))
+    rule_groups = [[r for r in all_rules if r.profile_id == profile.pk] for profile, _ in requirements]
+    with_floor = any(r.stage == Rule.Stage.FLOOR for rules in rule_groups for r in rules) or any(
+        c.get("needs_elevator") is True or c.get("can_use_stairs") is False for _, c in requirements)
+    routes = build_routes(place, overrides, with_floor=with_floor)
     if not routes:
         return Result(Outcome.UNKNOWN)
 
-    def evaluate(subject):
-        return evaluate_subject(stage_rules[Rule.Stage.FLOOR if subject.is_floor else Rule.Stage.ENTRANCE], subject)
+    from .mobility_checks import elevator_fact, extra_requirements
 
-    route_results = [combine_route([evaluate(s) for s in route]) for route in routes]
+    def evaluate(subject, rules, criteria):
+        stage = Rule.Stage.FLOOR if subject.is_floor else Rule.Stage.ENTRANCE
+        if subject.is_floor and (criteria.get("needs_elevator") is True or criteria.get("can_use_stairs") is False) and elevator_fact(place, subject) is True:
+            # 연결 층까지 검증된 E/V 정보를 기존 층 이동 Rule에 공급한다. 건물 관측값은 덮어쓰지 않는다.
+            subject = replace(subject, building_values={**subject.building_values, "elevator": True})
+        stage_rules = [r for r in rules if r.stage == stage]
+        result = (Result(Outcome.ACCESSIBLE, subject=subject) if subject.is_floor and not stage_rules
+                  else evaluate_subject(stage_rules, subject, criteria))
+        extra = extra_requirements(place, subject, criteria, result, rules)
+        if extra and (result.outcome != Outcome.DIFFICULT or extra[0] == Outcome.ACCESSIBLE):
+            result = Result(extra[0], subject.entrance, reason=extra[1], subject=subject)
+        if result.outcome in (Outcome.DIFFICULT, Outcome.CONDITIONAL) and not result.reason:
+            result.reason = facts_line(result, rules, all_rules, criteria)
+        return result
+
+    route_results = [combine_route([
+        evaluate(subject, rules, criteria)
+        for subject in route
+        for (_, criteria), rules in zip(requirements, rule_groups)
+    ]) for route in routes]
     best = min(route_results, key=lambda r: BEST_ROUTE_ORDER.index(r.outcome))
-    if best.outcome in (Outcome.DIFFICULT, Outcome.CONDITIONAL):
-        best.reason = facts_line(best, rules, all_rules)
     return best
 
 
