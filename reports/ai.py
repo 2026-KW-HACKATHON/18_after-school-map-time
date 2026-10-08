@@ -431,6 +431,24 @@ KEY_RULES = {
     "facility_slope_deg": "facility_slope_deg는 각도가 '도'로 적혀 있을 때만. 사진으로 기울기를 재지 않는다.",
     "facility_direction": "facility_direction은 상승·하강·양방향이 적혀 있거나 안내판에 분명할 때만.",
 }
+# 사진만으로는 알 수 없어 설명(또는 사진 속 안내판 글자)에 적혀 있어야 채우는 항목 (위 규칙과 맞춘다).
+# 결과가 비었을 때 '모름' 대신 '설명이 필요해요'로 안내해서, AI가 못 본 것과 원래 사진으로 알 수 없는 것을 나눈다.
+# 2026-10-08 설정 비교 실험(compare_ai): 설명 없는 사진 제보에서 놓친 항목이 모두 이 종류였다.
+TEXT_ONLY_KEYS = {"entrance_available", "facility_available", "facility_connected_floors", "facility_interior_space"}
+
+
+def needs_text(definition):
+    """사진만으로는 알 수 없는 항목인지: 위 목록 + cm·도 수치 (사진 비율로 재지 않음)"""
+    return definition.key in TEXT_ONLY_KEYS or (
+        definition.value_type == FieldDefinition.ValueType.NUMBER and definition.unit in ("cm", "도"))
+
+
+def text_needed(defs, result):
+    """결과에서 비어 있는 '설명이 필요한' 항목 [{"key", "label"}]"""
+    return [{"key": f.key, "label": f.label} for f in defs
+            if needs_text(f) and result["fields"].get(f.key, {}).get("value") is None]
+
+
 TWO_STATE_RULE = ("{keys}는 사진에 분명히 보이거나 설명에 적혀 있을 때만 true. 없다고 적혀 있을 때만 false. "
                   "사진에 안 보인다는 이유로 false라고 하지 않는다.")
 TWO_STATE_KEYS = ["facility_accessible_buttons", "facility_braille", "facility_handrail",
@@ -1008,7 +1026,8 @@ def prefill(user, kind, note, photo=None, client=None):
         provider_response_id=analysis.provider_response_id, usage=analysis.usage)
     token = signing.dumps({"id": str(analysis.pk), "user": user.pk, "kind": kind, "result": result},
                           salt=PREFILL_SALT, compress=True)
-    return {"result": result, "token": token, "remaining": max(settings.AI_PREFILL_USER_DAILY_LIMIT - used - 1, 0)}
+    return {"result": result, "token": token, "remaining": max(settings.AI_PREFILL_USER_DAILY_LIMIT - used - 1, 0),
+            "needs_text": text_needed(defs, result)}
 
 
 def _same_value(submitted, candidate):

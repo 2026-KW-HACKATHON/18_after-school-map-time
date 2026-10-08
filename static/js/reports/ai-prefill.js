@@ -6,6 +6,8 @@
  * - 주민이 이미 적은 칸은 덮어쓰지 않는다. 채운 칸에는 'AI가 채움 — 근거'를 붙여 확인하게 한다.
  * - 돌려받은 표(token)는 숨은 칸에 넣어 두고 제출할 때 함께 보낸다 → 서버가 그 결과를 제보에 연결
  * - 시설 종류를 바꾸면 항목이 달라지므로 표를 비운다
+ * - 사진만으로는 알 수 없어 비운 항목(이용 가능 여부·연결 층·cm 수치)은 '설명이 필요해요'로 안내한다
+ *   → AI가 못 본 것과 원래 사진으로 알 수 없는 것을 나눔 (reports/ai.py TEXT_ONLY_KEYS)
  */
 (function (root) {
   "use strict";
@@ -45,10 +47,28 @@
     return filled;
   }
 
-  function message(data, filled) {
+  // 아직 비어 있는 '설명 필요' 칸에 안내를 붙인다 → 안내를 붙인 항목 이름들
+  function markNeedsText(form, items, doc) {
+    const marked = [];
+    (items || []).forEach((item) => {
+      const el = form.elements[item.key];
+      if (!el || el.value !== "") return;  // 주민이 이미 적었거나 AI가 채운 칸은 그대로
+      const note = doc.createElement("p");
+      note.className = NOTE_CLASS;
+      note.textContent = "사진만으로는 알 수 없어요 · '추가 설명'에 적어 주세요";
+      el.insertAdjacentElement("afterend", note);
+      marked.push(item.label);
+    });
+    return marked;
+  }
+
+  function message(data, filled, needsText = []) {
     const parts = [];
     if (filled.length) parts.push(`AI가 ${filled.length}칸을 채웠어요. 사진·현장과 다르면 고쳐 주세요.`);
     else parts.push("AI가 확실히 알 수 있는 빈 칸이 없었어요. 직접 입력해 주세요.");
+    if (needsText.length) {
+      parts.push(`${needsText.join(", ")}은(는) 사진만으로는 알 수 없어요. 아는 내용이 있으면 아래 '추가 설명'에 적어 주세요.`);
+    }
     if (data.warnings && data.warnings.length) parts.push(`참고: ${data.warnings.join(", ")}.`);
     parts.push(`오늘 ${data.remaining}번 더 쓸 수 있어요.`);
     return parts.join(" ");
@@ -99,8 +119,9 @@
       }
       clearMarks(form);
       const filled = fillForm(form, data.fields, deps.document);
+      const needsText = markNeedsText(form, data.needs_text, deps.document);
       tokenInput.value = data.token;
-      status.textContent = message(data, filled);
+      status.textContent = message(data, filled, needsText);
     } catch (e) {
       if (isCurrent()) status.textContent = "연결이 불안정해요. 잠시 뒤 다시 누르거나 직접 입력해 주세요.";
     } finally {
@@ -125,7 +146,7 @@
     }
   }
 
-  const api = { fillForm, clearMarks, message, run, init };
+  const api = { fillForm, markNeedsText, clearMarks, message, run, init };
   root.AIPrefill = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root.document && typeof root.document.getElementById === "function" && typeof root.fetch === "function") {
