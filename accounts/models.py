@@ -5,6 +5,26 @@ from django.db import models
 from django.utils import timezone
 
 
+class MobilityPreference(models.Model):
+    """회원 본인이 저장한 이동 설정. 장소의 공용 판정·다른 회원·동반자의 원본 설정과 분리한다."""
+    user = models.OneToOneField("accounts.User", on_delete=models.CASCADE, primary_key=True,
+                                related_name="mobility_preference", verbose_name="회원")
+    data = models.JSONField("선택 및 개인화 설정", default=dict)
+    updated_at = models.DateTimeField("수정 시각", auto_now=True)
+
+    class Meta:
+        verbose_name = "내 이동 조건 설정"
+        verbose_name_plural = "내 이동 조건 설정"
+
+    def clean(self):
+        from judgments.mobility import normalize_settings
+        self.data = normalize_settings(self.data)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
 class User(AbstractUser):
     """
     턱없네 회원. 일반 회원은 카카오 로그인으로만 가입하고, 관리자는 /admin/ 에서 로그인한다.
