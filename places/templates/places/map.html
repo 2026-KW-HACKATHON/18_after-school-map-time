@@ -47,6 +47,12 @@
       <input type="checkbox" id="show-all">
       <span class="toggle-label">모든 장소 보기</span> <span class="muted small">(정보가 없거나 혼자 들어가기 어려운 곳 포함)</span>
     </label>
+    <label class="toggle" id="boundary-control" hidden>
+      <input type="checkbox" id="show-boundary" checked>
+      <span class="toggle-label">{{ region.name }} 경계 표시</span>
+    </label>
+    <p class="muted small" id="boundary-status" role="status" hidden></p>
+    <p class="muted small" id="boundary-credit" hidden></p>
     </details>
     </div>
 

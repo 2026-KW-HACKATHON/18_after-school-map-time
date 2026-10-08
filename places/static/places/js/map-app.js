@@ -246,6 +246,27 @@
       els.mapError.hidden = false;  // 와이어프레임 6번
     }
 
+    const boundaryToggle = $("show-boundary"), boundaryStatus = $("boundary-status"), boundaryCredit = $("boundary-credit");
+    if (boundaryToggle && state.map?.setBoundary) {
+      if (meta.region.boundary) {
+        $("boundary-control").hidden = false;
+        const drawBoundary = () => {
+          const valid = state.map.setBoundary(boundaryToggle.checked ? meta.region.boundary : null);
+          boundaryStatus.hidden = valid;
+          boundaryStatus.textContent = valid ? "" : "지역 경계를 표시하지 못했어요. 지도와 장소 목록은 계속 이용할 수 있어요.";
+        };
+        boundaryToggle.addEventListener("change", drawBoundary);
+        drawBoundary();
+        const properties = meta.region.boundary.properties;
+        if (properties?.attribution) {
+          boundaryCredit.textContent = `${properties.attribution} · ${properties.boundary_date || ""} · ${properties.license || ""} (안내용 경계)`;
+          boundaryCredit.hidden = false;
+        }
+      } else {
+        boundaryStatus.textContent = "이 지역의 경계 정보는 아직 없어요."; boundaryStatus.hidden = false;
+      }
+    }
+
     // 현재 위치 (HTTPS 또는 localhost에서만 동작). 거부해도 지역 중심 기준으로 동작
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(

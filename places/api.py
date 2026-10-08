@@ -56,12 +56,14 @@ def _place_brief(place):
 @permission_classes([AllowAny])
 def meta(request):
     region = _region(request)
+    from .boundaries import region_boundary
     return Response({
         "region": {
             "code": region.code,
             "name": region.name,
             "center": {"lat": float(region.center_lat), "lng": float(region.center_lng)},
             "map_level": region.map_level,
+            "boundary": region_boundary(region),
         },
         "profiles": [{"key": p.key, "label": p.label} for p in ConditionProfile.objects.filter(is_active=True)],
         "display": {code: info for code, info in DISPLAY.items()},

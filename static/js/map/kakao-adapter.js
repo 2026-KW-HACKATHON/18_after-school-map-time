@@ -6,6 +6,23 @@
  * 마커 모양·색은 CSS 클래스(.map-marker.judge-XXX)로만 정한다 → 색만으로 구분하지 않고 모양·아이콘도 같이 (기획 v2 3.1)
  */
 (function () {
+  // GeoJSON은 [경도, 위도]. Polygon의 내부 고리(구멍)와 MultiPolygon을 보존한다.
+  function boundaryPaths(value) {
+    if (!value || typeof value !== "object") return [];
+    if (value.type === "Feature") return boundaryPaths(value.geometry);
+    if (value.type === "FeatureCollection") {
+      if (!Array.isArray(value.features) || !value.features.length) return [];
+      const paths = value.features.map(boundaryPaths);
+      return paths.every((p) => p.length) ? paths.flat() : [];
+    }
+    const polygons = value.type === "Polygon" ? [value.coordinates] : value.type === "MultiPolygon" ? value.coordinates : [];
+    if (!Array.isArray(polygons) || !polygons.length) return [];
+    const validRing = (ring) => Array.isArray(ring) && ring.length >= 4 && ring.every((point) =>
+      Array.isArray(point) && point.length >= 2 && Number.isFinite(point[0]) && Math.abs(point[0]) <= 180 &&
+      Number.isFinite(point[1]) && Math.abs(point[1]) <= 90) &&
+      ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1];
+    return polygons.every((rings) => Array.isArray(rings) && rings.length && rings.every(validRing)) ? polygons : [];
+  }
   function create(element, { lat, lng, level }) {
     return new Promise((resolve, reject) => {
       if (!window.kakao || !window.kakao.maps) {
@@ -34,8 +51,30 @@
         }
         let overlays = [];
         let myLocation = null;
+        let boundaries = [];
 
         resolve({
+          /** 경계는 검색/노출 정책을 바꾸지 않고, 마커와 별도의 레이어에 표시한다. */
+          setBoundary(geojson) {
+            boundaries.forEach((p) => p.setMap(null)); boundaries = [];
+            if (!geojson) return true;
+            const paths = boundaryPaths(geojson);
+            if (!paths.length || !kakao.maps.Polygon) return false;
+            const color = window.getComputedStyle?.(element).getPropertyValue("--color-primary").trim() || "#245ccc";
+            try {
+              paths.forEach((rings) => {
+                const polygon = new kakao.maps.Polygon({
+                  path: rings.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))),
+                  strokeWeight: 2, strokeColor: color, strokeOpacity: 0.7, strokeStyle: "dash",
+                  fillOpacity: 0, zIndex: -1,
+                });
+                boundaries.push(polygon); polygon.setMap(map);
+              });
+              return true;
+            } catch (e) {
+              boundaries.forEach((p) => p.setMap(null)); boundaries = []; return false;
+            }
+          },
           /** 장소 검색 결과는 화면에서 textContent로 표시한다. */
           searchPlaces(query) {
             return new Promise((resolveSearch, rejectSearch) => {
@@ -98,5 +137,5 @@
     });
   }
 
-  window.TeokMap = { create };
+  window.TeokMap = { create, boundaryPaths };
 })();

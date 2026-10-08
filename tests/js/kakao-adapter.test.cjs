@@ -5,7 +5,7 @@ const vm = require("node:vm");
 const source = fs.readFileSync(`${__dirname}/../../static/js/map/kakao-adapter.js`, "utf8");
 
 async function setup({ observer = true, sdk = true } = {}) {
-  const listeners = {}, observations = [], markers = [];
+  const listeners = {}, observations = [], markers = [], polygons = [];
   const element = { clientWidth: 600, clientHeight: 440 };
   let instance;
   class LatLng { constructor(lat, lng) { this.lat = lat; this.lng = lng; } getLat() { return this.lat; } getLng() { return this.lng; } }
@@ -20,6 +20,7 @@ async function setup({ observer = true, sdk = true } = {}) {
       panTo(center) { this.center = center; }
     },
     CustomOverlay: class { constructor(options) { Object.assign(this, options); markers.push(this); } setMap(map) { this.map = map; } },
+    Polygon: class { constructor(options) { Object.assign(this, options); polygons.push(this); } setMap(map) { this.map = map; } },
   } };
   const window = { addEventListener(name, fn) { listeners[name] = fn; } };
   if (sdk) window.kakao = kakao;
@@ -28,7 +29,7 @@ async function setup({ observer = true, sdk = true } = {}) {
     setAttribute(key, value) { this.attrs[key] = value; }, addEventListener(name, fn) { this.handlers[name] = fn; } }) };
   vm.runInNewContext(source, { window, kakao, document });
   const adapter = await window.TeokMap.create(element, { lat: 37.62, lng: 127.05 });
-  return { adapter, map: instance, listeners, observations, markers, element };
+  return { adapter, paths: window.TeokMap.boundaryPaths, map: instance, listeners, observations, markers, polygons, element };
 }
 
 test("창 크기 변경 후 사용자가 이동한 지도 중심을 보존한다", async () => {
@@ -57,4 +58,36 @@ test("ResizeObserver가 없는 브라우저도 복귀 처리와 마커 선택 �
 });
 test("SDK 실패는 기존 목록 대체 화면으로 처리할 수 있도록 reject한다", async () => {
   await assert.rejects(setup({ sdk: false }), /SDK/);
+});
+
+const ring = [[127, 37], [128, 37], [128, 38], [127, 37]];
+test("GeoJSON 경위도 순서와 Polygon 내부 고리를 보존한다", async () => {
+  const p = await setup();
+  assert.equal(p.adapter.setBoundary({type:"Feature", geometry:{type:"Polygon",coordinates:[ring,ring]}}),true);
+  assert.equal(p.polygons.length,1); assert.equal(p.polygons[0].path.length,2);
+  assert.equal(p.polygons[0].path[0][0].getLat(),37);assert.equal(p.polygons[0].path[0][0].getLng(),127);
+  assert.equal(p.polygons[0].fillOpacity,0);assert.equal(p.polygons[0].strokeStyle,"dash");
+});
+test("MultiPolygon·FeatureCollection은 여러 경계를 그리며 지도 중심을 바꾸지 않는다", async () => {
+  const p=await setup();
+  const multi={type:"MultiPolygon",coordinates:[[ring],[ring]]};
+  assert.equal(p.adapter.setBoundary({type:"FeatureCollection",features:[{type:"Feature",geometry:multi}]}),true);
+  assert.equal(p.polygons.length,2);assert.equal(p.adapter.getCenter().lat,37.62);
+});
+test("경계 토글과 교체는 마커를 지우지 않는다", async()=>{
+  const p=await setup();p.adapter.setMarkers([{id:1,lat:37,lng:127,label:"장소"}],()=>{});
+  p.adapter.setBoundary({type:"Polygon",coordinates:[ring]});p.adapter.setBoundary(null);
+  assert.equal(p.polygons[0].map,null);assert.equal(p.markers[0].map,p.map);
+  p.adapter.setBoundary({type:"Polygon",coordinates:[ring]});p.adapter.clearMarkers();
+  assert.equal(p.polygons[1].map,p.map);
+});
+test("잘못된 경계·좌표·빈 데이터는 지도 동작을 깨뜨리지 않는다",async()=>{
+  const p=await setup();
+  for(const data of [{type:"Point",coordinates:[127,37]},{type:"Polygon",coordinates:[]},
+    {type:"Polygon",coordinates:[[[999,37],[128,37],[128,38],[999,37]]]},
+    {type:"Polygon",coordinates:[[[127,37],[128,37],[128,38]]]},
+    {type:"MultiPolygon",coordinates:"bad"},{type:"FeatureCollection",features:[null]}]) {
+    assert.equal(p.adapter.setBoundary(data),false);
+  }
+  p.adapter.panTo(37.7,127.1);assert.equal(p.adapter.getCenter().lat,37.7);
 });
