@@ -19,9 +19,10 @@
 {% block tabbar %}{% endblock %}
 
 {% block content %}
-<section class="page">
+<section class="page" data-figma-node="1:617">
   {% include "ops/_nav.html" %}
-  <h1>제보 검토 목록</h1>
+  <h1>지역 정보를 함께 지켜요</h1>
+  <p class="muted">새 제보 {{ counts.PENDING }}건 · 오래된 순</p>
 
   <div class="stat-grid">
     <div class="card stat"><span class="muted small">대기 중</span><strong>{{ counts.PENDING }}건</strong></div>

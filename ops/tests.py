@@ -492,7 +492,7 @@ class PageSmokeTests(OpsTestBase):
             (reverse("ops:places"), "턱없는 카페"),
             (reverse("ops:places") + "?q=없는장소", "등록된 장소가 없어요"),
             (reverse("ops:place-saved", args=[place.pk]), "저장 완료"),
-            (reverse("ops:report-done", args=[report.pk]), "정상적으로 처리"),
+            (reverse("ops:report-done", args=[report.pk]), "확인해 주셔서 고맙습니다"),
             (reverse("ops:place-edit", args=[place.pk]), "장소 수정"),
         ]:
             with self.subTest(url=url):
@@ -500,6 +500,13 @@ class PageSmokeTests(OpsTestBase):
 
 
 class ListLabelTests(OpsTestBase):
+    def test_pending_queue_shows_oldest_first(self):
+        oldest = self.user_report()
+        newest = self.user_report()
+        Report.objects.filter(pk=oldest.pk).update(created_at=timezone.now() - timedelta(days=2))
+        response = self.client.get(reverse("ops:reports"))
+        self.assertEqual([row["report"].pk for row in response.context["rows"]], [oldest.pk, newest.pk])
+
     def test_processed_report_label_and_no_flags(self):
         _, door = self.cafe_with_door()
         report = self.user_report(door, step_height_cm=30)
