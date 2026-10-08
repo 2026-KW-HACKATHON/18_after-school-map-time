@@ -77,16 +77,18 @@
     </div>
 
     <div class="report-step" data-report-step="3">
-      <div class="photo-slot report-photo" id="report-photo-preview">
+      <div class="photo-slot report-photo" id="report-photo-preview" data-preview-url="{% url 'reports:photo-preview' %}">
         <p>＋ <span data-facility-label>{{ kind_label }}</span> 사진</p>
         <p class="small">바닥부터 시설까지, 턱이나 경사로가 함께 보이게 찍어 주세요.</p>
         <img id="report-preview-image" alt="선택한 제보 사진" {% if form.kept_photo_url %}src="{{ form.kept_photo_url }}"{% else %}hidden{% endif %}>
+        <p id="report-preview-status" class="small" role="status" aria-live="polite"></p>
       </div>
       <fieldset class="card">
         <legend><span data-facility-label>{{ kind_label }}</span> 사진</legend>
         {% include "reports/_field.html" with field=form.photo %}
         {{ form.photo_token }}
         <p class="notice small">사진은 필수예요. 10MB 이하로 올려 주세요. 아이폰 HEIC 사진도 사용할 수 있어요.</p>
+        <p class="small muted">HEIC/HEIF를 고르면 턱없네 서버에서 미리보기용 JPEG로 변환해요. 미리보기 사진은 저장하지 않아요.</p>
       </fieldset>
     </div>
 
@@ -142,4 +144,5 @@
 <script src="{% static 'js/reports/facility-switcher.js' %}"></script>
 {% if ai_prefill %}<script src="{% static 'js/reports/ai-prefill.js' %}"></script>{% endif %}
 <script src="{% static 'js/reports/report-wizard.js' %}"></script>
+<script src="{% static 'js/reports/photo-preview.js' %}"></script>
 {% endblock %}

@@ -189,6 +189,43 @@ def report_done(request):
     return render(request, "reports/report_done.html")
 
 
+@login_required
+@require_POST
+def photo_preview(request):
+    """HEIC 미리보기: 기존 사진 정리를 재사용하고 파일/제보를 저장하지 않는다."""
+    import warnings
+    from django import forms
+    from django.core.exceptions import ValidationError
+    from django.http import HttpResponse
+    from PIL import Image
+    from rest_framework.throttling import SimpleRateThrottle
+    from core.images import normalize_photo
+
+    class PreviewThrottle(SimpleRateThrottle):
+        scope = "photo_preview"
+        rate = "20/min"
+
+        def get_cache_key(self, req, view):
+            return self.cache_format % {"scope": self.scope, "ident": req.user.pk}
+
+    if not PreviewThrottle().allow_request(request, None):
+        return JsonResponse({"detail": "사진 요청이 많아요. 잠시 후 다시 골라 주세요."}, status=429)
+    photo = request.FILES.get("photo")
+    if photo is None or photo.size > PREFILL_MAX_BYTES:
+        return JsonResponse({"detail": "10MB 이하의 사진을 골라 주세요."}, status=400)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            validated = forms.ImageField().clean(photo)
+            cleaned = normalize_photo(validated)
+    except (ValidationError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        return JsonResponse({"detail": "사진을 열 수 없어요. 다른 사진이나 JPEG/PNG 파일을 골라 주세요."}, status=400)
+    response = HttpResponse(cleaned.read(), content_type="image/jpeg")
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 def _safe_next(request):
     back = request.POST.get("next") or "/"
     if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
