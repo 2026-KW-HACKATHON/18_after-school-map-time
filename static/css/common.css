@@ -307,7 +307,8 @@ input[type="search"], input[type="text"], input[type="password"], input[type="em
 .report-summary dd { margin: 4px 0 0; color: var(--color-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
 .report-place-finder { display: grid; gap: 14px; }
 .report-place-finder .picker-tools { flex-wrap: nowrap; }
-.report-place-finder input { min-width: 0; }
+.report-place-finder input { flex: 1; width: 0; min-width: 0; }
+.report-place-finder .btn { flex-shrink: 0; white-space: nowrap; }
 #report-new-place > summary { padding: 14px; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font-weight: 700; cursor: pointer; }
 #report-new-place > fieldset { margin-top: 16px; }
 .ai-review-mode, .ai-review-mode .topbar { background: var(--color-bg); }
