@@ -190,12 +190,47 @@ class SearchPageTests(ViewTestBase):
     def test_no_result_state(self):
         res = self.client.get(self.url, {"q": "없는가게"})
         self.assertContains(res, "등록된 장소가 없어요")
-        self.assertContains(res, "새 장소 제보하기")
+        self.assertContains(res, "새 장소 제안하기")
 
     def test_empty_query_shows_form_only(self):
         res = self.client.get(self.url)
-        self.assertContains(res, "어떤 장소를 찾으세요?")
+        self.assertContains(res, "장소 검색")
         self.assertNotContains(res, "검색 결과")
+
+    def test_address_and_category_match_personal_search(self):
+        from judgments.mobility import default_settings
+        self.easy.address = self.hard.address = "월계로 10"
+        self.easy.category, self.hard.category = "CAFE", "RESTAURANT"
+        self.easy.save()
+        self.hard.save()
+        for category, expected in (("", [self.hard.pk, self.easy.pk]), ("CAFE", [self.easy.pk]),
+                                   ("RESTAURANT", [self.hard.pk]), ("LIFE", [])):
+            with self.subTest(category=category):
+                page = self.client.get(self.url, {"q": "월계로", "category": category})
+                self.assertEqual([row["place"].pk for row in page.context["results"]], expected)
+                personal = self.client.post(reverse("api:mobility-evaluate"), {
+                    "settings": default_settings(), "q": "월계로", "category": category,
+                }, content_type="application/json")
+                self.assertEqual(personal.status_code, 200)
+                self.assertEqual([row["id"] for row in personal.json()["results"]], expected)
+
+    def test_category_is_filtered_before_result_limit_and_keeps_region_scope(self):
+        from .tests import make_region
+        for i in range(31):
+            make_place(self.region, f"a검색카페{i:02}", category="CAFE")
+        match = make_place(self.region, "z검색약국", category="PHARMACY")
+        make_place(self.region, "검색폐업약국", category="PHARMACY", is_closed=True)
+        make_place(make_region("other"), "검색다른동약국", category="PHARMACY")
+        response = self.client.get(self.url, {"q": "검색", "category": "LIFE"})
+        self.assertEqual([row["place"].pk for row in response.context["results"]], [match.pk])
+
+    def test_personal_search_rejects_invalid_category(self):
+        from judgments.mobility import default_settings
+        for category in ([], None, "UNKNOWN"):
+            response = self.client.post(reverse("api:mobility-evaluate"), {
+                "settings": default_settings(), "q": "카페", "category": category,
+            }, content_type="application/json")
+            self.assertEqual(response.status_code, 400)
 
 
 class MapHomeTests(ViewTestBase):

@@ -24,4 +24,5 @@ class AccessibilityHooksTests(TestCase):
         self.assertContains(res, 'aria-label="지도. 같은 장소를 목록에서도 볼 수 있어요"')
         self.assertContains(res, 'aria-label="장소 미리 보기"')
         self.assertContains(res, 'id="list-status" class="muted small" aria-live="polite"')   # 목록 개수 변화를 읽어 줌
-        self.assertContains(res, '<h1 class="sr-only">')
+        self.assertContains(res, '<h1>')
+        self.assertContains(res, '어디로 가볼까요?')

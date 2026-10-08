@@ -28,7 +28,7 @@ class UserModelTests(TestCase):
 class KakaoLoginTests(TestCase):
     def test_login_page_has_only_kakao(self):
         res = self.client.get(reverse("account_login"))
-        self.assertContains(res, "카카오로 시작하기")
+        self.assertContains(res, "카카오로 계속하기")
         self.assertNotContains(res, 'type="password"')  # 아이디·비밀번호 로그인 없음
 
     @override_settings(SOCIALACCOUNT_PROVIDERS=TEST_PROVIDERS)

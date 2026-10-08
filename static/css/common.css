@@ -1,25 +1,31 @@
 /* ── 디자인 토큰 (색·간격은 여기서만 바꾸기) ── */
 :root {
-  --color-primary: #3b6cf6;
-  --color-primary-dark: #2a55d0;
-  --color-text: #1f2328;
-  --color-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-bg: #f7f8fa;
+  --color-primary: #2855a4;
+  --color-primary-dark: #214789;
+  --color-text: #28384b;
+  --color-muted: #6e6b65;
+  --color-border: #e5dccb;
+  --color-bg: #fbf4e8;
   --color-surface: #ffffff;
   --color-error: #dc2626;
-  --color-success: #16a34a;
-  --radius: 12px;
+  --color-success: #39705b;
+  --color-soft: #e9f0fa;
+  --color-green-soft: #e8f2ec;
+  --color-gray: #f0ece4;
+  --radius-control: 12px;
+  --radius: 16px;
+  --space-page: 24px;
+  --space-card: 16px;
   --topbar-height: 56px;
 
   /* ── 판정 4단계 색 (기획 v2 3.1) ──
      빨간색은 "위험·금지"로 읽혀 가게에 낙인을 찍으므로 쓰지 않는다. DIFFICULT는 회색.
      색만으로 구분하지 않고 모양·아이콘을 같이 쓴다 (색약 대응). 표시 문구는 판정 앱의 상수에서 관리 */
-  --judge-accessible: #16a34a;   /* ACCESSIBLE  들어갈 수 있어요            초록 · 원 */
-  --judge-conditional: #2563eb;  /* CONDITIONAL 도움 받으면 들어갈 수 있어요 파랑 · 원 + 손 아이콘 */
-  --judge-difficult: #9ca3af;    /* DIFFICULT   혼자 들어가기 어려워요       회색 · 원 */
+  --judge-accessible: #39705b;   /* ACCESSIBLE  들어갈 수 있어요            초록 · 원 */
+  --judge-conditional: #2855a4;  /* CONDITIONAL 도움 받으면 들어갈 수 있어요 파랑 · 원 + 손 아이콘 */
+  --judge-difficult: #a3a09a;    /* DIFFICULT   혼자 들어가기 어려워요       회색 · 원 */
   --judge-unknown: #ffffff;      /* UNKNOWN     아직 정보가 없어요           흰색 · 점선 테두리 */
-  --judge-unknown-border: #6b7280;
+  --judge-unknown-border: #6e6b65;
 }
 
 * { box-sizing: border-box; }
@@ -31,7 +37,8 @@ body {
   margin: 0;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
   color: var(--color-text);
-  background: var(--color-bg);
+  background: var(--color-surface);
+  font-size: 16px; line-height: 1.5;
 }
 
 a { color: var(--color-primary); text-decoration: none; }
@@ -103,7 +110,7 @@ main:focus { outline: none; }  /* 본문 바로가기로 온 main 자체에는 �
 /* 카카오 로그인 버튼: 카카오 디자인 가이드 색 (배경 #FEE500, 글자 85% 검정) */
 .btn-kakao { background: #fee500; border-color: #fee500; color: rgba(0, 0, 0, 0.85); font-weight: 600; margin: 8px 0; }
 
-/* ── 일반 페이지·폼 (디자인은 추후 Figma CSS로 교체, 지금은 기능이 보이는 최소 스타일) ── */
+/* Shared page and form components. */
 .page { display: grid; gap: 16px; }
 .narrow { max-width: 640px; margin: 0 auto; }
 .center { text-align: center; }
@@ -225,3 +232,131 @@ html.large-text .tabbar a { font-size: 18px; }
 
 /* 사진을 불러오지 못했을 때 자리 (static/js/common.js) */
 .photo-missing { padding: 24px 12px; text-align: center; border: 1px dashed var(--color-border); border-radius: 8px; }
+
+
+/* Figma: UXLrlxcF0LV0ag6bqVk1RS, frames 01–25. */
+h1 { font-size: 24px; line-height: 1.5; margin: 0; }
+h2 { font-size: 18px; line-height: 1.5; margin: 0; }
+h3 { font-size: 16px; line-height: 1.5; }
+p { margin: 0; }
+button, input, select, textarea { font-family: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+input, select, textarea { color: var(--color-text); max-width: 100%; }
+input::placeholder, textarea::placeholder { color: var(--color-muted); opacity: 1; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary); width: 18px; height: 18px; flex-shrink: 0; }
+input[type="file"]::file-selector-button { min-height: 44px; border: 0; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font: inherit; padding: 8px 12px; margin-right: 12px; }
+.container { padding: 24px 32px; }
+.topbar { padding: 12px 32px; min-height: var(--topbar-height); height: auto; border: 0; gap: 24px; }
+.logo { color: var(--color-primary); font-size: 18px; }
+.nav { font-weight: 600; }
+.card { padding: var(--space-card); border: 0; background: var(--color-bg); }
+.card > p + p, .card > h2 + p { margin-top: 6px; }
+.page, .form-stack { gap: 14px; }
+.page.narrow, .place-detail { max-width: 640px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 12px 16px; border: 0; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font-weight: 700; line-height: 1.5; text-align: center; }
+.btn-primary { background: var(--color-primary); color: var(--color-surface); }
+.btn-kakao { background: #fee500; color: rgba(0, 0, 0, 0.85); }
+.btn:disabled { background: var(--color-gray); color: var(--color-muted); cursor: not-allowed; }
+.btn:hover:not(:disabled) { filter: brightness(.97); }
+.btn-primary:hover { background: var(--color-primary-dark); }
+.field { gap: 8px; margin: 8px 0; min-width: 0; }
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .field select, .field textarea,
+input[type="search"], input[type="text"], input[type="password"], input[type="email"], input[type="tel"] {
+  min-height: 54px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-bg);
+}
+.field input[type="file"] { padding: 8px; }
+.field ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.field ul label, .choice-card { display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 52px; background: var(--color-bg); border-radius: var(--radius-control); }
+.field ul label:has(input:checked), .choice-card:has(input:checked) { background: var(--color-soft); color: var(--color-primary); }
+.small, .errorlist { font-size: 12px; line-height: 1.5; }
+.notice { background: var(--color-soft); padding: 16px; border: 0; border-radius: var(--radius); }
+.chip { border: 0; border-radius: var(--radius-control); background: var(--color-bg); padding: 10px; min-height: 40px; }
+.chip[aria-pressed="true"], .chip[aria-current="page"] { background: var(--color-soft); color: var(--color-primary); }
+.result-list { gap: 14px; }
+.result-card { gap: 6px; overflow-wrap: anywhere; }
+.result-card strong { font-size: 16px; }
+.badge-positive { background: var(--color-green-soft); color: var(--judge-accessible); }
+.badge-neutral { background: var(--color-gray); }
+.text-size-toggle { border: 0; background: var(--color-soft); color: var(--color-primary); border-radius: var(--radius-control); min-height: 40px; }
+.screen-page { min-height: calc(100dvh - var(--topbar-height) - 48px); align-content: start; }
+.screen-page > .screen-actions { margin-top: auto; }
+.screen-actions { display: grid; gap: 8px; padding: 12px 0 20px; }
+.screen-page { display: flex; flex-direction: column; gap: 14px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.photo-slot { display: grid; align-content: center; gap: 10px; min-height: 150px; padding: 16px; background: var(--color-gray); color: var(--color-muted); }
+.photo-slot img { width: 100%; max-height: 240px; object-fit: contain; }
+.photo-fix-page #id_reason { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.photo-fix-page #id_reason label { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 14px; background: var(--color-bg); border-radius: var(--radius-control); }
+.photo-fix-page #id_reason label:has(input:checked) { background: var(--color-soft); }
+.photo-fix-page form.card { background: transparent; padding: 0; }
+.report-photo { min-height: 220px; }
+.report-progress { color: var(--color-primary); font-size: 12px; }
+.report-step { display: grid; gap: 14px; }
+.report-wizard > #report-form { flex: 1; display: flex; flex-direction: column; }
+.report-wizard .report-navigation { margin-top: auto; }
+#report-heading { scroll-margin-top: 76px; }
+.report-wizard { scroll-margin-top: 67px; }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.choice-grid .chip { white-space: normal; text-align: left; }
+.report-step > fieldset { min-width: 0; }
+.report-step > fieldset.card, #facility-selector.card { background: transparent; padding: 0; }
+.report-step legend { padding: 0; margin-bottom: 12px; }
+.report-summary { display: grid; gap: 14px; }
+.report-summary dl { margin: 0; }
+.report-summary dt { font-weight: 700; }
+.report-summary dd { margin: 4px 0 0; color: var(--color-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.report-place-finder { display: grid; gap: 14px; }
+.report-place-finder .picker-tools { flex-wrap: nowrap; }
+.report-place-finder input { min-width: 0; }
+#report-new-place > summary { padding: 14px; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font-weight: 700; cursor: pointer; }
+#report-new-place > fieldset { margin-top: 16px; }
+.ai-review-mode, .ai-review-mode .topbar { background: var(--color-bg); }
+.ai-review-mode #ai-report-review .card { background: var(--color-surface); }
+.ai-review-mode .report-navigation, .ai-review-mode #ai-prefill-button { display: none; }
+.ai-review-mode #ai-prefill { background: transparent; padding: 0; }
+#ai-report-facts { display: grid; gap: 8px; margin: 24px 0; }
+.report-navigation { display: grid; gap: 8px; }
+.report-wizard.is-enhanced .report-navigation { position: sticky; bottom: 0; z-index: 8; padding: 12px 0 max(20px, env(safe-area-inset-bottom)); background: var(--color-surface); }
+.report-wizard.is-enhanced { padding-bottom: 0; }
+.wizard-back { justify-self: start; min-height: 40px; }
+.report-retry { display: grid; gap: 6px; }
+.ops-shell { background: var(--color-bg); }
+.ops-shell .topbar { background: var(--color-bg); }
+.ops-shell .card { background: var(--color-surface); border-radius: 18px; }
+.ops-shell .btn { border-radius: 18px; min-height: 56px; }
+.ops-shell .ops-nav { border: 0; padding: 8px 0; }
+.ops-shell .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ops-shell .stat { padding: 12px; }
+.ops-reject-panel { display: grid; gap: 14px; }
+.activity-summary { background: var(--color-soft); }
+.activity-filters { display: flex; gap: 8px; }
+.activity-filters .chip { flex: 1; justify-content: center; }
+.activity-list > li { padding: 16px; background: var(--color-bg); border-radius: var(--radius); }
+.notification-new { background: var(--color-soft); }
+.auth-page .auth-actions { margin-top: auto; }
+.auth-page { text-align: left; }
+.auth-page form { margin: 0; }
+html.large-text h1 { font-size: 30px; }
+html.large-text h2 { font-size: 23px; }
+html.large-text h3, html.large-text .result-card strong { font-size: 20px; }
+html.large-text .report-progress { font-size: 16px; }
+html.large-text .btn { min-height: 60px; }
+@media (max-width: 768px) {
+  .container { padding: 16px var(--space-page); }
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  .topbar { padding: 8px 20px; min-height: 51px; gap: 12px; }
+  body { padding-bottom: 80px; }
+  body.flow-shell, body.ops-shell { padding-bottom: 0; }
+  .tabbar { height: auto; min-height: 80px; padding: 12px 24px max(20px, env(safe-area-inset-bottom)); border: 0; }
+  .tabbar a { min-height: 48px; font-size: 16px; }
+  .logo { font-size: 18px; }
+  .screen-page { min-height: calc(100dvh - 179px); }
+  .flow-shell .screen-page { min-height: calc(100dvh - 99px); }
+  .nav { font-size: 12px; }
+  .text-size-toggle { padding: 4px 10px; min-height: 35px; }
+  .report-wizard .card { border-radius: 16px; }
+  .ops-shell .container { padding: 24px 20px; }
+  .ops-shell .screen-page { min-height: calc(100dvh - 104px); }
+  .ops-shell .topbar .logo { font-size: 24px; }
+}

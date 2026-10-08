@@ -9,7 +9,7 @@
   <link rel="icon" href="{% static 'img/teokeopne-icon.svg' %}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <link rel="manifest" href="{% static 'site.webmanifest' %}">
-  <meta name="theme-color" content="#2F5DA8">
+  <meta name="theme-color" content="#2855a4">
   {# 큰 글씨 모드: 저장된 선택을 화면이 그려지기 전에 적용 (static/js/common.js 와 같은 키) #}
   <script>try { if (localStorage.getItem("teokeopne-large-text") === "1") document.documentElement.classList.add("large-text"); } catch (e) {}</script>
   <!-- Pretendard 웹폰트 (SIL OFL 1.1, README 오픈소스 / 출처 참고) -->
@@ -17,13 +17,12 @@
   <link rel="stylesheet" href="{% static 'css/common.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% if request.resolver_match.app_name == 'ops' %}ops-shell {% endif %}{% block body_class %}{% endblock %}">
   {# 키보드·스크린리더: 메뉴를 건너뛰고 본문으로 (Tab 을 처음 누르면 보임) #}
   <a class="skip-link" href="#main">본문 바로가기</a>
   <header class="topbar">
     <a class="logo" href="{% url 'core:home' %}">
-      <img src="{% static 'img/teokeopne-icon.svg' %}" alt="" width="28" height="28">
-      <span>턱없네</span>
+      <span>{% block header_brand %}턱없네{% endblock %}</span>
     </a>
     <nav class="nav" aria-label="주 메뉴">
       <a class="nav-wide" href="{% url 'places:map' %}">지도</a>
@@ -49,7 +48,7 @@
           <button type="submit" class="link-button">로그아웃</button>
         </form>
       {% else %}
-        <a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">로그인</a>
+        {% if request.resolver_match.url_name != 'account_login' %}<a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">로그인</a>{% endif %}
       {% endif %}
     </nav>
   </header>
@@ -67,12 +66,11 @@
   </main>
 
   {% block tabbar %}
-  {# 모바일 하단 탭 (와이어프레임: 지도 · 검색 · 제보). 데스크톱에서는 상단 메뉴를 씀 #}
+  {# Figma 모바일 하단 탭: 지도 · 제보하기 · 내 활동. 데스크톱에서는 상단 메뉴를 씀 #}
   <nav class="tabbar" aria-label="하단 메뉴">
     <a href="{% url 'places:map' %}" {% if request.resolver_match.url_name == 'map' %}aria-current="page"{% endif %}>지도</a>
-    <a href="{% url 'places:search' %}" {% if request.resolver_match.url_name == 'search' %}aria-current="page"{% endif %}>검색</a>
-    <a href="{% url 'reports:new' %}" {% if request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>제보</a>
-    {% if user.is_authenticated %}<a href="{% url 'accounts:me' %}" {% if request.resolver_match.url_name == 'me' %}aria-current="page"{% endif %}>내 활동</a>{% endif %}
+    <a href="{% url 'reports:new' %}" {% if request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>제보하기</a>
+    <a href="{% url 'accounts:me' %}" {% if request.resolver_match.url_name == 'me' %}aria-current="page"{% endif %}>내 활동</a>
   </nav>
   {% endblock %}
 

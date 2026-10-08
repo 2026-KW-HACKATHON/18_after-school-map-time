@@ -349,13 +349,14 @@
     text("warning", "내 조건으로 확인 중...");
     try {
       const options = root.dataset.placeId ? { place_ids: [root.dataset.placeId] } : { q: new URLSearchParams(location.search).get("q") || "" };
+      if (root.dataset.mode === "search") options.category = root.dataset.category || "";
       if (root.dataset.region) options.region = root.dataset.region;
       const data = await evaluate(options);
       if (request !== viewRequest) return;
       box.replaceChildren(create("strong", `${label()} · 내 이동 조건으로 보면`));
       const list = create("ul", null, { class: "result-list" });
       data.results.forEach((row) => {
-        const status = create("span", null, { class: "result-status" });
+        const status = create("span", null, { class: `result-status status-${row.judgment.code}` });
         status.appendChild(create("span", row.judgment.icon === "hand" ? "✋" : "", { class: `judge-dot judge-${row.judgment.code}`, "aria-hidden": "true" }));
         status.appendChild(create("strong", row.judgment.label));
         if (root.dataset.mode === "search") {
@@ -370,7 +371,14 @@
         }
       });
       if (root.dataset.mode === "search") box.appendChild(list);
-      if (!data.results.length) box.appendChild(create("p", "해당하는 장소가 없어요."));
+      if (!data.results.length && root.dataset.mode === "search") {
+        box.appendChild(create("h2", "아직 일치하는 장소를 찾지 못했어요."));
+        box.appendChild(create("p", "장소 이름이나 주소를 바꿔 검색하거나 새 장소로 제안해 주세요.", { class: "muted" }));
+        const actions = create("div", null, { class: "screen-actions" });
+        actions.appendChild(create("a", "다시 검색하기", { class: "btn btn-primary", href: "/search/" }));
+        actions.appendChild(create("a", "새 장소 제안하기", { class: "btn", href: "/report/new/" }));
+        box.appendChild(actions);
+      } else if (!data.results.length) box.appendChild(create("p", "해당하는 장소가 없어요."));
       box.appendChild(create("p", data.notice, { class: "muted small" }));
       box.hidden = false; text("warning", data.preferences.join(" "));
     } catch (e) { if (request === viewRequest) { box.hidden = true; text("warning", e.message); } }

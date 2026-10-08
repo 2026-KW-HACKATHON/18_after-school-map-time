@@ -111,7 +111,7 @@ class ReportFormTests(TempMediaMixin, TestCase):
         self.assertEqual(report.suggested_name, "월계시장 입구 카페")
 
     def test_done_page(self):
-        self.assertContains(self.client.get(reverse("reports:done")), "제보가 접수되었습니다")
+        self.assertContains(self.client.get(reverse("reports:done")), "제보가 접수됐어요.")
 
     def test_new_place_details_remain_pending_until_review(self):
         res = self.post(suggested_name="새 약국", suggested_category="PHARMACY",

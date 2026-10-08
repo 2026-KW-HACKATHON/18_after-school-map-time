@@ -71,4 +71,4 @@ class ActivityTests(TestCase):
         self.client.force_login(self.user)
         res = self.client.get(reverse("places:map"))
         self.assertContains(res, f'href="{self.url}"', count=2)                  # 상단 이름 + 하단 탭
-        self.assertContains(self.client.get(reverse("reports:done")), "내 제보 현황 보기")
+        self.assertContains(self.client.get(reverse("reports:done")), "내 제보 상태 보기")

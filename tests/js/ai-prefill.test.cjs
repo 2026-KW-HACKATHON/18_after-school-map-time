@@ -262,3 +262,21 @@ test("주민이 이미 적은 칸에는 '설명 필요' 안내를 붙이지 않�
   assert.equal(p.elements.step_height_cm.inserted.length, 0);
   assert.doesNotMatch(p.status.textContent, /사진만으로는 알 수 없어요/);
 });
+
+test("분석 중 사진을 바꾸면 이전 사진 결과와 서명 표를 사용하지 않는다", async () => {
+  const { init, run } = load();
+  const p = page();
+  let resolve;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => new Promise((done) => { resolve = done; }) };
+  init(p.doc, d);
+  p.token.value = "previous-token";
+  const running = run(p.form, p.box, d);
+  p.elements.photo.files = [{ name: "new-door.jpg" }];
+  p.elements.photo.handlers.change();
+  resolve({ json: async () => ok });
+  await running;
+  assert.equal(p.elements.step_height_cm.value, "");
+  assert.equal(p.token.value, "");
+  assert.match(p.status.textContent, /사진이 바뀌어/);
+});
