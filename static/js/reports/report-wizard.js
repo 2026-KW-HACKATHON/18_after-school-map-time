@@ -26,7 +26,7 @@
     const submit = doc.getElementById("report-submit");
     const message = doc.getElementById("report-step-error");
     const summary = doc.getElementById("report-summary");
-    let current = 1, previewUrl = null, advancing = false, reviewingAI = false;
+    let current = 1, advancing = false, reviewingAI = false;
 
     function reviewAI(active) {
       reviewingAI = active;
@@ -180,15 +180,6 @@
         if (!validateStep(step)) { event.preventDefault(); show(step); validateStep(step); return; }
       }
     });
-    const photo = form.elements.photo;
-    photo.addEventListener("change", () => {
-      const img = doc.getElementById("report-preview-image"), file = photo.files[0];
-      if (previewUrl) root.URL.revokeObjectURL(previewUrl);
-      previewUrl = file ? root.URL.createObjectURL(file) : null;
-      img.hidden = !previewUrl;
-      if (previewUrl) img.src = previewUrl;
-    });
-    doc.getElementById("report-preview-image").addEventListener("error", (event) => { event.target.hidden = true; });
     const invalidPanel = panels.find((panel) => panel.querySelector(".has-error"));
     wizard.classList.add("is-enhanced");
     show(invalidPanel ? Number(invalidPanel.dataset.reportStep) : doc.getElementById("report-errors") ? 5 : 1, false);
