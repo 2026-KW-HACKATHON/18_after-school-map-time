@@ -1,5 +1,7 @@
 from django.shortcuts import get_object_or_404, render
 from django.db.models import Q
+from django.core.paginator import Paginator
+from urllib.parse import urlencode
 from django.utils import timezone
 
 from judgments.models import ConditionProfile, Judgment
@@ -19,6 +21,11 @@ def search_places(region, query, category=""):
     elif category:
         places = places.filter(category=category)
     return places.order_by("name", "pk")
+
+
+def paginated_search(region, query, category="", page=1):
+    """공용 검색 범위/정렬 유지. 빈 검색어도 30곳씩 전부 탐색할 수 있게 한다."""
+    return Paginator(search_places(region, query, category), SEARCH_LIMIT).get_page(page)
 
 
 def _region():
@@ -44,10 +51,11 @@ def search_page(request):
         category = ""
 
     results = []
-    if q and region:
-        places = list(
-            search_places(region, q, category)[:SEARCH_LIMIT]
-        )
+    page_obj = None
+    if region:
+        from core.validation import parse_pk
+        page_obj = paginated_search(region, q, category, parse_pk(request.GET.get("page", "1")) or 1)
+        places = list(page_obj.object_list)
         judgments = {}
         if profile:
             judgments = {
@@ -62,9 +70,11 @@ def search_page(request):
             })
 
     return render(request, "places/search.html", {
-        "q": q, "results": results, "profiles": profiles, "profile": profile, "searched": bool(q),
+        "q": q, "results": results, "profiles": profiles, "profile": profile, "searched": region is not None,
         "region": region,
         "category": category, "categories": SEARCH_CATEGORIES,
+        "page_obj": page_obj,
+        "pagination_query": urlencode({"q": q, "category": category, "profile": profile.key if profile else ""}),
     })
 
 

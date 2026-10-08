@@ -6,6 +6,7 @@
      data-places-url="{% url 'api:place-list' %}" data-reference-url="{% url 'api:mobility-reference' 0 %}"
      data-place-id="{{ place.pk|default:'' }}" data-mode="{{ mobility_mode|default:'map' }}"
      data-category="{{ category|default:'' }}"
+     data-page="{{ page_obj.number|default:'1' }}"
      data-region="{% if place %}{{ place.region.code }}{% elif region %}{{ region.code }}{% endif %}">
   <div class="mobility-toolbar">
     <label class="sr-only" for="mobility-more">다른 이동 조건 선택</label>

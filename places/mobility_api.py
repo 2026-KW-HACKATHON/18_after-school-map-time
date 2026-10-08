@@ -67,7 +67,7 @@ def evaluate(request):
             response["Retry-After"] = str(int(wait) + 1)
         return response
     try:
-        if not isinstance(request.data, dict) or set(request.data) - {"settings", "region", "all", "q", "place_ids", "category"}:
+        if not isinstance(request.data, dict) or set(request.data) - {"settings", "region", "all", "q", "place_ids", "category", "page"}:
             raise DjangoValidationError("장소 판정의 입력 형식을 확인해 주세요.")
         settings = normalize_settings(request.data.get("settings"))
         region_code = request.data.get("region")
@@ -80,7 +80,7 @@ def evaluate(request):
         query = request.data.get("q")
         if query is not None and (not isinstance(query, str) or len(query) > 200 or "\x00" in query):
             raise DjangoValidationError("검색어를 확인해 주세요.")
-        from .views import SEARCH_CATEGORIES, SEARCH_LIMIT, search_places
+        from .views import SEARCH_CATEGORIES, paginated_search
         category = request.data.get("category", "")
         if not isinstance(category, str) or category not in dict(SEARCH_CATEGORIES) or (category and query is None):
             raise DjangoValidationError("검색 업종을 확인해 주세요.")
@@ -88,8 +88,16 @@ def evaluate(request):
         if type(show_all) is not bool:
             raise DjangoValidationError("표시 조건을 확인해 주세요.")
         places = Place.objects.in_region(region).filter(is_closed=False).select_related("building").prefetch_related("entrances", "building__entrances").order_by("name")
+        page_obj = None
+        if "page" in request.data and query is None:
+            raise DjangoValidationError("검색 페이지를 확인해 주세요.")
         if query is not None:
-            places = search_places(region, query.strip(), category).select_related("building").prefetch_related("entrances", "building__entrances")[:SEARCH_LIMIT] if query.strip() else places.none()
+            raw_page = request.data.get("page", 1)
+            page = parse_pk(str(raw_page) if type(raw_page) is int else raw_page)
+            if page is None:
+                raise DjangoValidationError("검색 페이지는 ASCII 양의 정수로 입력해 주세요.")
+            page_obj = paginated_search(region, query.strip(), category, page)
+            places = page_obj.object_list.select_related("building").prefetch_related("entrances", "building__entrances")
         ids = request.data.get("place_ids")
         if ids is not None:
             if query is not None or not isinstance(ids, list) or not ids:
@@ -120,7 +128,10 @@ def evaluate(request):
                 summary = place_summary(place)
                 row.update(facts=summary["facts"], last_checked=summary["last_checked"].isoformat() if summary["last_checked"] else None)
             results.append(row)
-    response = Response({"region": region.code, "count": len(results), "results": results,
+    pagination = ({"total_count": page_obj.paginator.count, "page": page_obj.number,
+                   "num_pages": page_obj.paginator.num_pages, "has_previous": page_obj.has_previous(),
+                   "has_next": page_obj.has_next()} if page_obj is not None else {})
+    response = Response({"region": region.code, "count": len(results), "results": results, **pagination,
                          "constraints": merged_constraints(settings), "notice": NOTICE,
                          "preferences": ["휴식 좌석 데이터 수집이 필요해요."] if any(settings["overrides"].get(k, {}).get("prefers_rest_seat") for k in settings["selected"]) else []})
     response["Cache-Control"] = "private, no-store"

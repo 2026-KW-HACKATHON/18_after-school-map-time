@@ -349,7 +349,10 @@
     text("warning", "내 조건으로 확인 중...");
     try {
       const options = root.dataset.placeId ? { place_ids: [root.dataset.placeId] } : { q: new URLSearchParams(location.search).get("q") || "" };
-      if (root.dataset.mode === "search") options.category = root.dataset.category || "";
+      if (root.dataset.mode === "search") {
+        options.category = root.dataset.category || "";
+        options.page = root.dataset.page || "1";
+      }
       if (root.dataset.region) options.region = root.dataset.region;
       const data = await evaluate(options);
       if (request !== viewRequest) return;
@@ -370,10 +373,24 @@
           box.appendChild(create("p", row.judgment.explanation, { class: "small" }));
         }
       });
-      if (root.dataset.mode === "search") box.appendChild(list);
+      if (root.dataset.mode === "search") {
+        box.appendChild(create("p", `전체 ${data.total_count ?? data.count ?? data.results.length}곳`, { class: "small muted" }));
+        box.appendChild(list);
+        if (data.num_pages > 1) {
+          const pagination = create("nav", null, { class: "screen-actions", "aria-label": "장소 목록 페이지" });
+          pagination.appendChild(create("p", `${data.page} / ${data.num_pages} 페이지`, { class: "small muted" }));
+          for (const [show, page, title] of [[data.has_previous, data.page - 1, "이전 장소"], [data.has_next, data.page + 1, "다음 장소"]]) {
+            if (!show) continue;
+            const params = new URLSearchParams(location.search); params.set("page", page);
+            pagination.appendChild(create("a", title, { class: "btn", href: `?${params}` }));
+          }
+          box.appendChild(pagination);
+        }
+      }
       if (!data.results.length && root.dataset.mode === "search") {
-        box.appendChild(create("h2", "아직 일치하는 장소를 찾지 못했어요."));
-        box.appendChild(create("p", "장소 이름이나 주소를 바꿔 검색하거나 새 장소로 제안해 주세요.", { class: "muted" }));
+        const hasQuery = options.q?.trim();
+        box.appendChild(create("h2", hasQuery ? "아직 일치하는 장소를 찾지 못했어요." : "아직 등록된 장소가 없어요."));
+        box.appendChild(create("p", hasQuery ? "장소 이름이나 주소를 바꿔 검색하거나 새 장소로 제안해 주세요." : "다른 업종을 선택하거나 새 장소로 제안해 주세요.", { class: "muted" }));
         const actions = create("div", null, { class: "screen-actions" });
         actions.appendChild(create("a", "다시 검색하기", { class: "btn btn-primary", href: "/search/" }));
         actions.appendChild(create("a", "새 장소 제안하기", { class: "btn", href: "/report/new/" }));
