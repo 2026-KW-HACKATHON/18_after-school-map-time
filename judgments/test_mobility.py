@@ -41,7 +41,7 @@ class MobilityTests(JudgmentTestBase):
 
     def test_new_presets_are_recommendations_not_demographic_rules(self):
         meta = catalogue()
-        for preset in meta["presets"][-3:]:
+        for preset in (p for p in meta["presets"] if p["key"] in ("LIMITED_WALKING", "WITH_CHILD", "ASSISTED_COMPANION")):
             self.assertIn("recommendation", preset)
             self.assertEqual(preset["defaults"]["max_step_height_cm"], "2")
         self.assertEqual(profile_key("WITH_CHILD", {"WITH_CHILD": "CRUTCH"}), "CRUTCH")
@@ -53,6 +53,52 @@ class MobilityTests(JudgmentTestBase):
         self.assertEqual(self.personal(self.settings(max_step_height_cm=4)).outcome, Outcome.ACCESSIBLE)
         self.assertEqual(judge(self.place, self.wheelchair).outcome, Outcome.DIFFICULT)
         self.assertEqual(Judgment.objects.filter(place=self.place).count(), 0)
+
+    def test_unified_companion_has_no_forced_profile_or_numeric_defaults(self):
+        p = next(p for p in catalogue()["presets"] if p["key"] == "COMPANION")
+        self.assertEqual(p["label"], "동반자/보호자")
+        self.assertIsNone(p["profile"])
+        self.assertEqual(p["fields"], [])
+        self.assertTrue(all(v is None for v in p["defaults"].values()))
+        raw=default_settings(); raw["selected"]=["COMPANION"]
+        with self.assertRaisesMessage(ValidationError,"동반자의 실제 이동 조건"):
+            normalize_settings(raw)
+
+    def test_unified_companion_can_choose_each_actual_condition_without_changing_rules(self):
+        self.values(self.door, step_height_cm=7, step_count=2, has_ramp=False, door_width_cm=90)
+        for key in ("WHEELCHAIR","STROLLER","WALKER","CRUTCH","LIMITED_WALKING"):
+            raw=default_settings(); raw["selected"]=["COMPANION"]; raw["companions"]={"COMPANION":key}
+            data=normalize_settings(raw)
+            actual=ConditionProfile.objects.get(key="WALKER" if key=="LIMITED_WALKING" else key)
+            self.assertEqual(self.personal(data).outcome,judge(self.place,actual).outcome)
+
+    def test_legacy_companion_settings_and_two_people_keep_original_values(self):
+        raw=default_settings(); raw["selected"]=["WITH_CHILD","ASSISTED_COMPANION"]
+        raw["companions"]={"WITH_CHILD":"STROLLER","ASSISTED_COMPANION":"CRUTCH"}
+        raw["overrides"]={"WITH_CHILD":{"max_step_height_cm":"5","min_door_width_cm":"80"},
+                          "ASSISTED_COMPANION":{"max_step_height_cm":"1","can_use_stairs":False}}
+        before=deepcopy(raw); clean=normalize_settings(raw)
+        self.assertEqual(clean,raw); self.assertEqual(raw,before)
+        self.assertEqual(len(requirements(clean)),2)
+        self.assertEqual(merged_constraints(clean)["max_step_height_cm"],"1")
+        self.assertFalse(merged_constraints(clean)["can_use_stairs"])
+
+    def test_legacy_missing_actual_choice_keeps_historical_profile(self):
+        for key,actual in (("WITH_CHILD","STROLLER"),("ASSISTED_COMPANION","WHEELCHAIR")):
+            data=self.settings(key,max_step_height_cm=4)
+            self.assertEqual(requirements(data)[0][0].key,actual)
+            self.assertEqual(data["overrides"][key]["max_step_height_cm"],"4")
+
+    def test_unified_companion_override_and_multiple_merge_use_same_domain(self):
+        raw=default_settings();raw["selected"]=["WHEELCHAIR","COMPANION"]
+        raw["companions"]={"COMPANION":"CRUTCH"}
+        raw["overrides"]={"WHEELCHAIR":{"max_step_height_cm":"4","min_door_width_cm":"90"},
+                          "COMPANION":{"max_step_height_cm":"1","can_use_stairs":False}}
+        clean=normalize_settings(raw);before=deepcopy(clean)
+        self.values(self.door,step_height_cm=3,step_count=0,door_width_cm=95,has_ramp=False)
+        self.assertEqual(self.personal(clean).outcome,Outcome.DIFFICULT)
+        self.assertEqual(merged_constraints(clean)["max_step_height_cm"],"1")
+        self.assertEqual(clean,before)
 
     def test_threshold_4_does_not_allow_7_but_other_entrance_can(self):
         self.values(self.door, step_height_cm=7, door_width_cm=90, has_ramp=False)

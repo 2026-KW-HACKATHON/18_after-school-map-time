@@ -229,6 +229,22 @@ html.large-text .map-condition-tools .btn { padding: 10px 8px; }
 .search-page .search-bar select { flex: 1; background: var(--color-bg); border-radius: 12px; border-color: var(--color-border); }
 .search-page:has([data-mobility-open]:not(:disabled)) #search-profile { display: none; }
 .search-page [data-mobility-baseline] { display: grid; gap: 14px; }
+/* 세부 설정이 길어져도 본문만 스크롤하고 적용/취소 버튼은 계속 보이게 한다. */
+.mobility-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.mobility-dialog form { display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: calc(100dvh - 80px); width: 100%; }
+.mobility-dialog h2, .mobility-actions { flex-shrink: 0; }
+.mobility-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; align-content: start; }
+.mobility-dialog-body > .field { margin: 0; padding: 12px; }
+.mobility-dialog-body > .mobility-multiple, .mobility-dialog-body > .mobility-consent { margin: 0; }
+.mobility-dialog [data-mobility-custom] { display: grid; gap: 12px; }
+.mobility-dialog .mobility-help { justify-self: start; font: inherit; font-size: 12px; color: var(--color-primary); border: 0; background: transparent; min-height: 36px; padding: 4px 8px; cursor: pointer; }
+.mobility-actions { padding-top: 12px; border-top: 1px solid var(--color-border); margin: 0; }
+.mobility-actions .btn { min-width: 0; flex: 1; min-height: 52px; white-space: normal; }
+.mobility-dialog [data-mobility-error]:empty { display: none; }
+@media (max-width: 360px) {
+  html.large-text .mobility-dialog form, html.large-text .mobility-dialog-body { gap: 8px; }
+  html.large-text .mobility-dialog-body > .field { padding: 10px; }
+}
 @media (max-width: 768px) {
   .map-layout { padding: 8px 24px 24px; }
   #map-app { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-height: auto; }
@@ -247,4 +263,6 @@ html.large-text .map-condition-tools .btn { padding: 10px 8px; }
   .popup { bottom: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; }
   .map-options { margin-top: -8px; }
   .mobility-dialog { border-radius: 0; padding: 24px 24px 32px; }
+  .mobility-dialog form { max-height: calc(100dvh - 56px); height: 100%; }
+  .mobility-dialog-body { flex: 1; }
 }
