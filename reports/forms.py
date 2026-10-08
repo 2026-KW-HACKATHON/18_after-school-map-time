@@ -53,8 +53,11 @@ class ReportForm(KeepPhotoMixin, forms.Form):
     door_width_cm = forms.DecimalField(label="출입문 폭 (cm)", required=False, **numeric_form_options("door_width_cm"), decimal_places=1)
     door_type = forms.ChoiceField(label="출입문 형태", required=False)
 
-    note = forms.CharField(label="추가 설명 (선택)", max_length=500, required=False,
-                           widget=forms.Textarea(attrs={"rows": 3, "placeholder": "직접 경험한 내용을 적어 주세요."}))
+    note = forms.CharField(
+        label="추가 설명 (선택)", max_length=500, required=False,
+        # 이용 가능 여부·연결 층·cm 수치는 사진만으로는 알 수 없다 (AI도 설명에 적힌 것만 채움, reports/ai.py TEXT_ONLY_KEYS)
+        help_text="사진만으로는 알 수 없는 것을 한 줄 적어 주세요. 직접 잰 수치, 지금 쓸 수 있는지, 몇 층과 이어지는지 같은 것이요.",
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "예: 줄자로 재보니 문턱 3cm / 지금 문이 잠겨 있어요 / 2층까지 계단 30칸"}))
     profiles = forms.MultipleChoiceField(label="이동 조건 (선택)", required=False, widget=forms.CheckboxSelectMultiple)
     facility_kind = forms.ChoiceField(label="무엇을 확인했나요?", required=False,
                                      choices=[(ENTRANCE, "출입구")] + list(AccessFacility.Kind.choices))
