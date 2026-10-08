@@ -61,3 +61,24 @@ class NeedsTextScreenTests(AIBase):
         self.assertIn("설명 필요", page)
         self.assertIn("사진만으로는 알 수 없는 항목이에요", page)
         self.assertIn("모름", page)  # 사진으로 볼 수 있는데 비어 있는 항목(경사로 등)은 그대로 '모름'
+
+
+class PhotoTipTests(AIBase):
+    """사진 찍는 요령: 제보 종류별 구도 안내 (reports/forms.py PHOTO_TIPS)"""
+
+    def test_entrance_and_facility_tips(self):
+        from .forms import ReportForm
+
+        entrance = ReportForm(place=self.place).fields["photo"].help_text
+        self.assertIn("첫 칸부터 끝까지", entrance)
+        self.assertIn("얼굴·차 번호판", entrance)
+        self.assertIn("직접 찍은 사진만", entrance)  # 저작권 안내는 그대로 붙음
+        stairs = ReportForm(place=self.place, kind="STAIRS").fields["photo"].help_text
+        self.assertIn("난간이 보이게", stairs)
+        self.assertIn("얼굴·차 번호판", stairs)
+
+    def test_switching_facility_kind_sends_matching_tip(self):
+        self.client.force_login(self.neighbor)
+        data = self.client.get(reverse("reports:new"), {"place": self.place.pk, "facility_kind": "TOILET",
+                                                        "partial": "facility-fields"}).json()
+        self.assertIn("휠체어 표시", data["photo_help"])
