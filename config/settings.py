@@ -216,6 +216,10 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
+    # 요청 횟수 제한(throttle)에서 사용자 IP를 구할 때 nginx 한 단계를 거친다고 알려 준다.
+    # nginx가 X-Forwarded-For 끝에 실제 접속 IP를 붙이므로 그 값을 쓴다 (사용자가 헤더를 꾸며도 끝 값은 못 바꿈).
+    # nginx 없이 runserver로 띄우면 X-Forwarded-For가 없어 접속 주소(REMOTE_ADDR)를 그대로 쓴다.
+    "NUM_PROXIES": 1,
 }
 
 

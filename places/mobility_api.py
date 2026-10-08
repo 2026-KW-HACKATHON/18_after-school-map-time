@@ -4,12 +4,13 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import SimpleRateThrottle
 
 from accounts.mobility_api import restored_settings
 from core.validation import parse_pk
 from judgments.constants import display
-from judgments.engine import judge_profiles
-from judgments.mobility import catalogue, merged_constraints, normalize_settings, requirements
+from judgments.engine import judge_profiles, load_rules
+from judgments.mobility import NOTICE, catalogue, merged_constraints, normalize_settings, requirements
 from judgments.models import RuleSet
 from .api import _place_brief
 from .models import Place, Region
@@ -39,10 +40,32 @@ def reference(request, pk):
     return response
 
 
+class EvaluateThrottle(SimpleRateThrottle):
+    """
+    개인화 판정은 요청마다 지역의 모든 장소를 다시 계산하므로(공용 판정 캐시를 쓰지 않음) 반복 요청을 제한한다.
+      - 기준: 로그인 회원은 회원별, 비로그인은 IP별
+      - 넉넉하게 잡은 이유: 전시장처럼 여러 사람이 같은 와이파이(같은 IP)로 접속할 수 있음
+      - 기록은 Django 기본 캐시(gunicorn 프로세스별 메모리)에 남는다 → 프로세스가 여럿이면 실제 허용량은 그만큼 늘어남
+    """
+    scope = "mobility_evaluate"
+    rate = "120/min"
+
+    def get_cache_key(self, request, view):
+        ident = f"user-{request.user.pk}" if request.user.is_authenticated else self.get_ident(request)
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def evaluate(request):
     # 설정값을 URL·공용 판정 캐시에 남기지 않는다. POST는 계산만 하고 DB에는 저장하지 않는다.
+    throttle = EvaluateThrottle()
+    if not throttle.allow_request(request, None):
+        wait = throttle.wait()
+        response = Response({"detail": "요청이 너무 많아요. 잠시 후 다시 시도해 주세요."}, status=429)
+        if wait:
+            response["Retry-After"] = str(int(wait) + 1)
+        return response
     try:
         if not isinstance(request.data, dict) or set(request.data) - {"settings", "region", "all", "q", "place_ids"}:
             raise DjangoValidationError("장소 판정의 입력 형식을 확인해 주세요.")
@@ -79,9 +102,10 @@ def evaluate(request):
 
     people = requirements(settings)
     rule_set = RuleSet.active()
+    all_rules = load_rules(rule_set) if rule_set else None  # 장소마다 규칙을 다시 읽지 않도록 한 번만
     results = []
     for place in places:
-        result = judge_profiles(place, people, rule_set=rule_set)
+        result = judge_profiles(place, people, rule_set=rule_set, all_rules=all_rules)
         payload = {**display(result.outcome), "reason": result.reason, "improved": False,
                    "rule_version": rule_set.version if rule_set else None, "basis": "PERSONAL",
                    "basis_label": "내 이동 조건", "explanation": result.reason or "입력한 조건과 검증된 장소 정보로 안내해요.",
@@ -94,7 +118,7 @@ def evaluate(request):
                 row.update(facts=summary["facts"], last_checked=summary["last_checked"].isoformat() if summary["last_checked"] else None)
             results.append(row)
     response = Response({"region": region.code, "count": len(results), "results": results,
-                         "constraints": merged_constraints(settings), "notice": catalogue()["notice"],
+                         "constraints": merged_constraints(settings), "notice": NOTICE,
                          "preferences": ["휴식 좌석 데이터 수집이 필요해요."] if any(settings["overrides"].get(k, {}).get("prefers_rest_seat") for k in settings["selected"]) else []})
     response["Cache-Control"] = "private, no-store"
     return response

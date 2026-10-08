@@ -2,12 +2,18 @@ import json
 from copy import deepcopy
 from io import StringIO
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import connection
 from django.test import Client, TestCase
+from django.test.utils import CaptureQueriesContext
 
 from judgments.mobility import default_settings
+from places.mobility_api import EvaluateThrottle
 from places.tests import make_place, make_region
 from .models import MobilityPreference
 
@@ -23,6 +29,7 @@ class MobilityAPITests(TestCase):
         cls.place = make_place(cls.region, "개인화 테스트 장소")
 
     def setUp(self):
+        cache.clear()  # 요청 횟수 제한 기록이 다른 테스트로 넘어가지 않게
         self.data = default_settings()
         self.data["overrides"] = {"WHEELCHAIR": {"max_step_height_cm": "4"}}
 
@@ -134,3 +141,26 @@ class MobilityAPITests(TestCase):
         self.assertIn("last_checked", response["results"][0])
         self.data["selected"] = ["LIMITED_WALKING"]
         self.assertTrue(self.evaluate().json()["preferences"])
+
+    def test_evaluation_is_rate_limited_per_client(self):
+        with mock.patch.object(EvaluateThrottle, "rate", "2/min"):
+            self.assertEqual(self.evaluate().status_code, 200)
+            self.assertEqual(self.evaluate().status_code, 200)
+            response = self.evaluate()
+            self.assertEqual(response.status_code, 429)
+            self.assertIn("잠시 후", response.json()["detail"])
+            self.assertTrue(int(response.headers["Retry-After"]) > 0)
+            # 다른 회원은 따로 센다
+            self.client.force_login(self.user)
+            self.assertEqual(self.evaluate().status_code, 200)
+
+    def test_evaluation_reads_rules_once_not_per_place(self):
+        def rule_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(self.evaluate().status_code, 200)
+            return sum('FROM "judgments_rule"' in q["sql"] for q in queries.captured_queries)
+
+        one = rule_queries()
+        for i in range(4):
+            make_place(self.region, f"규칙 조회 확인 장소 {i}")
+        self.assertEqual(rule_queries(), one)

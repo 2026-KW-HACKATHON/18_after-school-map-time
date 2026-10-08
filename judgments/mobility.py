@@ -13,6 +13,7 @@ VERSION = 1
 PRESETS = json.loads((Path(__file__).parent / "data" / "mobility_presets.json").read_text(encoding="utf8"))
 PRESET_BY_KEY = {p["key"]: p for p in PRESETS}
 COMPANIONS = {p["key"] for p in PRESETS if p.get("companion")}
+NOTICE = "입력값은 자신의 이동 능력에 대한 자기평가이며 안전이나 실제 이용을 보장하지 않아요. 방문 전 현장과 도움 방법을 확인해 주세요."
 FIELD_SPECS = {
     "max_step_height_cm": {"label": "통과 가능한 최대 턱 높이", "type": "number", "field": "step_height_cm", "unit": "cm", "help": "기존 제보의 입구 전체 단차 높이와 비교해요. 경사로·도움 경로는 따로 확인해요."},
     "min_door_width_cm": {"label": "필요한 최소 출입문 폭", "type": "number", "field": "door_width_cm", "unit": "cm"},
@@ -91,7 +92,7 @@ def catalogue():
     return {"version": VERSION, "rule_version": ruleset.version if ruleset else None,
             "presets": [{**p, "fields": list(field_keys(p["key"])), "defaults": rule_defaults(p["profile"])} for p in presets],
             "companion_options": options, "fields": fields,
-            "notice": "입력값은 자신의 이동 능력에 대한 자기평가이며 안전이나 실제 이용을 보장하지 않아요. 방문 전 현장과 도움 방법을 확인해 주세요."}
+            "notice": NOTICE}
 
 
 def default_settings():

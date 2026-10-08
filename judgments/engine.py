@@ -268,14 +268,20 @@ def judge(place, profile, rule_set=None, overrides=None):
     return judge_profiles(place, [(profile, {})], rule_set=rule_set, overrides=overrides)
 
 
-def judge_profiles(place, requirements, rule_set=None, overrides=None):
+def load_rules(rule_set):
+    """규칙 버전의 규칙 전체 (조건·필드까지). 여러 장소를 판정할 땐 한 번만 읽어 judge_profiles에 넘긴다"""
+    return list(
+        rule_set.rules.prefetch_related("conditions__field", "conditions__ref_field").order_by("priority", "id")
+    )
+
+
+def judge_profiles(place, requirements, rule_set=None, overrides=None, all_rules=None):
     """개인별 규칙을 동일 경로에 적용한다. 서로 다른 사람의 가장 좋은 입구를 섞지 않는다."""
     rule_set = rule_set or RuleSet.active()
     if rule_set is None or not requirements:
         return Result(Outcome.UNKNOWN)
-    all_rules = list(
-        rule_set.rules.prefetch_related("conditions__field", "conditions__ref_field").order_by("priority", "id")
-    )
+    if all_rules is None:
+        all_rules = load_rules(rule_set)
     rule_groups = [[r for r in all_rules if r.profile_id == profile.pk] for profile, _ in requirements]
     with_floor = any(r.stage == Rule.Stage.FLOOR for rules in rule_groups for r in rules) or any(
         c.get("needs_elevator") is True or c.get("can_use_stairs") is False for _, c in requirements)
