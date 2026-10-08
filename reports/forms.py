@@ -24,6 +24,24 @@ ENTRANCE_FIELDS = ["step_height_cm", "step_count", "has_ramp", "door_width_cm", 
 
 REPORT_LIMIT_HOURS = 24  # 같은 사람이 같은 장소를 다시 제보할 수 있는 간격 (기획 v2 7장)
 
+# 사진 찍는 요령 (제보 종류별). 운영진·AI가 계단 칸 수·문 형태·난간을 사진에서 알아보려면 구도가 가장 중요하다
+# (2026-10-08 AI 설정 비교 실험: 같은 사진에서도 계단 칸 수가 설정마다 갈림 → 첫 칸부터 끝까지 나오게 안내)
+# 시설 종류를 바꾸면 facility-switcher.js가 이 문구로 바꿔 끼운다 (reports/views.py photo_help)
+PHOTO_TIPS = {
+    ENTRANCE: "입구 정면에서 두세 걸음 떨어져, 문 전체와 문 앞 계단·턱·경사로가 한 장에 나오게 찍어 주세요. 계단은 첫 칸부터 끝까지 보이게요.",
+    "STAIRS": "계단 아래에서 첫 칸부터 끝까지, 난간이 보이게 찍어 주세요. 몇 층으로 이어지는지 안내판이 있으면 같이 나오게요.",
+    "ELEVATOR": "엘리베이터 문 앞 전체와 버튼·층 안내판이 보이게 찍어 주세요.",
+    "ESCALATOR": "에스컬레이터 전체와 방향·층 안내판이 보이게 찍어 주세요.",
+    "RAMP": "경사로 시작부터 끝까지, 난간이 보이게 옆에서 찍어 주세요.",
+    "TOILET": "화장실 문과 안내 표지(휠체어 표시 등)가 보이게 문 앞에서 찍어 주세요. 안쪽은 사람이 없을 때만 찍어 주세요.",
+}
+PHOTO_TIP_DEFAULT = "시설의 모습과 가는 길이 한 장에 나오게 찍어 주세요."
+PHOTO_TIP_COMMON = "밝은 곳에서 흔들리지 않게, 사람 얼굴·차 번호판은 나오지 않게 해 주세요."
+
+
+def photo_tip(kind):
+    return f"{PHOTO_TIPS.get(kind, PHOTO_TIP_DEFAULT)} {PHOTO_TIP_COMMON}"
+
 
 class ReportForm(KeepPhotoMixin, forms.Form):
     # 새 장소 제안 (장소를 고르지 않고 들어왔을 때만 사용)
@@ -44,7 +62,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
     suggested_phone = forms.CharField(label="전화번호 (선택)", max_length=20, required=False,
                                       widget=forms.TextInput(attrs={"inputmode": "tel", "autocomplete": "tel"}))
 
-    photo = forms.ImageField(label="입구 사진", help_text="입구, 계단, 경사로가 잘 보이게 찍어 주세요. 사람 얼굴·차 번호판은 나오지 않게 해 주세요.")
+    photo = forms.ImageField(label="입구 사진", help_text=photo_tip(ENTRANCE))
 
     step_height_cm = forms.DecimalField(label="입구 단차 (cm)", required=False, **numeric_form_options("step_height_cm"), decimal_places=1)
     step_count = forms.IntegerField(label="계단 수 (칸)", required=False, **numeric_form_options("step_count"))
@@ -110,7 +128,7 @@ class ReportForm(KeepPhotoMixin, forms.Form):
         else:
             extra_keys = self.observation_keys
             self.fields["photo"].label = "시설 사진"
-            self.fields["photo"].help_text = "시설의 모습과 접근 경로가 보이게 찍어 주세요. 얼굴·차 번호판은 피해 주세요."
+            self.fields["photo"].help_text = photo_tip(self.kind)
         for key in extra_keys:
             label, value_type, unit, choices, _ = FIELD_SPECS[key]
             label = f"{label} ({unit}, 선택)" if unit else label
