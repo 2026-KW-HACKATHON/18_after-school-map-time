@@ -3,7 +3,7 @@
 > **턱없네는 가게를 평가하지 않습니다. 들어가는 방법을 알려주고, 문턱을 없앨 수 있게 연결합니다.**
 > 휠체어·유아차·보행 보조기 등 **이동 조건별로** 월계1동 가게에 들어가는 방법을 알려주는 접근성 지도 웹서비스.
 
-🌐 **서비스:** https://teokeopne.duckdns.org
+🌐 **서비스:** https://teokeopne.help (www.teokeopne.help·이전 주소 teokeopne.duckdns.org는 이 주소로 자동 이동)
 
 2026 광운대학교 해커톤 · 18조 **방과 후 지도타임** · 카테고리: 배리어프리 및 생활 편의
 
@@ -172,7 +172,9 @@ docker compose exec web python manage.py createsuperuser
 | `AI_DAILY_LIMIT` | 서울 시간 하루 외부 분석 시도 한도 (운영자 분석 + 주민 채우기 합산, 0이면 호출 안 함) | `100` (권장 50) |
 | `AI_NOTICE_SINCE` | 제보 화면 AI 안내를 붙인 시각 (시간대 포함 ISO 8601). 이전 제보는 보내지 않음 | |
 | `AI_NOTICE_VERSION` | 제보 화면 AI 안내 문구 버전. 제보에 기록된 버전과 같아야 보냄 (문구를 바꾸면 SINCE와 함께 올림) | |
-| `DOMAIN` | 배포 도메인 (배포 서버에서만, `https://` 없이) | `teokeopne.duckdns.org` |
+| `DOMAIN` | 대표 주소 (배포 서버에서만, `https://` 없이) | `teokeopne.help` |
+| `REDIRECT_DOMAINS` | 대표 주소로 301 이동시킬 다른 주소 (공백 구분, 비우면 이동 없음) | `www.teokeopne.help teokeopne.duckdns.org` |
+| `CERT_NAME` | 인증서 폴더 이름 (비우면 `DOMAIN`). 인증서 하나에 모든 주소 포함 | `teokeopne.duckdns.org` |
 | `NGINX_CONF` | nginx 설정 선택: 인증서 발급 전 `http` → 발급 후 `https` | `http` |
 | `IMAGE_TAG` | 배포 이미지 태그. 롤백할 때만 이전 커밋 SHA로 변경 | `latest` |
 
@@ -378,7 +380,7 @@ python manage.py runserver
 | [Pretendard](https://github.com/orioncactus/pretendard) | 웹폰트 | SIL OFL 1.1 |
 | [카카오맵 API](https://apis.map.kakao.com/) · 카카오 로그인 | 지도 · 장소 정보 · 로그인 | [카카오 API 이용약관](https://developers.kakao.com/terms/latest/ko/site-policies) |
 | [Google Gemini API](https://ai.google.dev/) (유료 등급) | 제보 사진·설명에서 접근성 항목 후보 추출 | [Gemini API 추가 약관](https://ai.google.dev/gemini-api/terms) (유료 등급: 입력을 제품 개선에 쓰지 않음) |
-| [DuckDNS](https://www.duckdns.org/) · [Let's Encrypt](https://letsencrypt.org/) | 도메인 · HTTPS 인증서 | 각 서비스 약관 |
+| [Let's Encrypt](https://letsencrypt.org/) · [DuckDNS](https://www.duckdns.org/) | HTTPS 인증서 · 이전 주소(새 주소로 이동) | 각 서비스 약관 |
 | [한국사회보장정보원_장애인편의시설 현황](https://www.data.go.kr/data/15092317/openapi.do) (공공데이터포털) | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 |
 
 ### 📄 라이선스와 저작권

@@ -466,7 +466,7 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 
 | 서비스 | 내용 |
 | --- | --- |
-| `nginx` | 80·443 포트를 여는 유일한 서비스. `NGINX_CONF`(http/https)에 따라 `nginx/http` 또는 `nginx/https` 템플릿을 사용하고, 템플릿의 `${DOMAIN}`을 `.env` 값으로 치환. static·media 볼륨과 서버의 인증서(`/etc/letsencrypt`)를 읽기 전용으로 연결 |
+| `nginx` | 80·443 포트를 여는 유일한 서비스. `NGINX_CONF`(http/https)에 따라 `nginx/http` 또는 `nginx/https` 템플릿을 사용하고, 템플릿의 `${DOMAIN}`·`${REDIRECT_DOMAINS}`·`${CERT_NAME}`을 `.env` 값으로 치환(비어 있으면 이동 없음·인증서 이름은 `DOMAIN`). static·media 볼륨과 서버의 인증서(`/etc/letsencrypt`)를 읽기 전용으로 연결 |
 | `web` | Docker Hub 이미지 `cjs1004ounds/teokeopne:${IMAGE_TAG}` (기본 `latest`). `.env` 값과 상관없이 **항상 `DEBUG=False`**. 포트를 외부에 열지 않음 |
 | `db` | `postgres:16`. **포트 노출 없음**. `POSTGRES_PASSWORD`가 비어 있으면 시작 자체를 거부 |
 | 공통 | 전 서비스 `restart: unless-stopped` → 서버 재부팅·에러 시 자동 복구 |
@@ -480,7 +480,7 @@ Django 관리자(`/admin/`)는 데이터 전체를 다루는 도구로 남겨 �
 | 파일 | 역할 |
 | --- | --- |
 | `http/default.conf.template` | 80번만 사용. 인증서 발급용 경로(`/.well-known/acme-challenge/`) 응답 + 서비스. 인증서 발급 전 서버, 로컬 검증에서 사용 |
-| `https/default.conf.template` | 80번은 인증서 갱신 경로만 응답하고 나머지는 https로 301 리다이렉트. 443번에서 TLS 1.2/1.3로 서비스. 인증서 경로에 `${DOMAIN}` 사용 |
+| `https/default.conf.template` | 80번은 모든 주소의 인증서 갱신 경로만 응답하고 나머지는 같은 주소의 https로 301. 443번은 `REDIRECT_DOMAINS`(www·이전 주소)를 대표 주소 `DOMAIN`으로 301, 대표 주소에서 TLS 1.2/1.3로 서비스. 인증서 경로는 `${CERT_NAME}` |
 | `snippets/app.conf` | 두 설정이 공통으로 `include`: 업로드 10MB(`client_max_body_size`), `/static/`(캐시 7일)·`/media/` 직접 서빙, 나머지는 `web:8000`으로 프록시(원래 Host·IP·https 여부 헤더 전달, 타임아웃 60초) |
 
 gzip 압축은 두 템플릿 맨 위에서 켭니다 (CSS·JS·JSON).
@@ -498,7 +498,7 @@ gzip 압축은 두 템플릿 맨 위에서 켭니다 (CSS·JS·JSON).
 | `.env.example` | O | 어떤 변수가 필요한지 보여주는 **템플릿**. 값은 비워 두거나 개발용 기본값만 |
 | `.env` | **X** | 실제 값(시크릿 키, API 키). 각자 `cp .env.example .env`로 만들어서 채움 |
 
-구역: `Django` / `Database` / `카카오맵` / `AI 사진 판별` / `배포`(`DOMAIN`, `NGINX_CONF`, `IMAGE_TAG`). 변수별 설명은 README 환경 변수 표 참고.
+구역: `Django` / `Database` / `카카오맵` / `AI 사진 판별` / `배포`(`DOMAIN`, `REDIRECT_DOMAINS`, `CERT_NAME`, `NGINX_CONF`, `IMAGE_TAG`). 변수별 설명은 README 환경 변수 표 참고.
 
 ---
 
