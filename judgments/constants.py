@@ -3,9 +3,9 @@
 
 - 빨간색 금지 (가게 낙인 방지). 색은 static/css/common.css 의 --judge-* 변수와 같은 이름을 쓴다.
 - 색만으로 구분하지 않고 모양·아이콘을 같이 쓴다 (색약 대응).
-- hidden_by_default: 지도에서 기본으로 숨김 ("모든 장소 보기"를 켜야 보임, 기획 v2 3.2)
-  · 어려움만 숨긴다 (가게 낙인 방지). 미확인은 점선으로 보여 준다 — 숨기면 정보가 부족한
-    지역(예: 문 폭이 없는 공공데이터)에서 지도가 거의 비고, "알려주세요"로 제보를 받을 기회도 사라진다 (2026-10-09)
+- hidden_by_default: API 기본 필터/지도 "모든 장소 보기" OFF에서 숨기는 항목.
+  · 지도 토글은 기본 ON(전체 표시), OFF이면 가능·조건부만 표시한다.
+  · 어려움은 공개 화면에서 정보 없음으로 통합한다. 내부 판정·확인된 사실은 보존한다 (2026-10-09).
 """
 
 from .models import Outcome
@@ -26,9 +26,9 @@ DISPLAY = {
         "hidden_by_default": False,
     },
     Outcome.DIFFICULT: {
-        "label": "혼자 들어가기 어려워요",
-        "css_var": "--judge-difficult",
-        "shape": "circle",
+        "label": "아직 정보가 없어요 · 알려주세요",
+        "css_var": "--judge-unknown",
+        "shape": "dashed-circle",
         "icon": "",
         "hidden_by_default": True,
     },
@@ -37,7 +37,7 @@ DISPLAY = {
         "css_var": "--judge-unknown",
         "shape": "dashed-circle",
         "icon": "",
-        "hidden_by_default": False,
+        "hidden_by_default": True,
     },
 }
 
@@ -49,5 +49,11 @@ BEST_ROUTE_ORDER = [Outcome.ACCESSIBLE, Outcome.CONDITIONAL, Outcome.UNKNOWN, Ou
 IMPROVEMENT_RANK = {Outcome.DIFFICULT: 1, Outcome.CONDITIONAL: 2, Outcome.ACCESSIBLE: 3}
 
 
-def display(outcome):
-    return {"code": outcome, **DISPLAY[Outcome(outcome)]}
+def display(outcome, *, internal=False):
+    # 기존 API code 및 owners의 수요 신호는 유지하고 공개 표시 분류만 통합한다.
+    payload = {"code": outcome, "display_code": Outcome.UNKNOWN if outcome == Outcome.DIFFICULT else outcome,
+               **DISPLAY[Outcome(outcome)]}
+    if internal and outcome == Outcome.DIFFICULT:
+        # 운영자 검토에서는 판정 변화와 원본 의미를 정확히 구분해야 한다.
+        payload.update(label="혼자 들어가기 어려워요", css_var="--judge-difficult", shape="circle", display_code=outcome)
+    return payload
