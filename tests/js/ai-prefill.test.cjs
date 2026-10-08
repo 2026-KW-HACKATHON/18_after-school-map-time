@@ -31,6 +31,7 @@ function page({ values = {}, file = { name: "door.jpg" }, note = "턱 3cm" } = {
     has_ramp: select(["", "true", "false"]), door_type: select(["", "미닫이", "여닫이"]),
     photo: element({ files: file ? [file] : [] }), photo_token: element(),
     note: element({ value: note }), facility_kind: element({ value: "ENTRANCE" }),
+    ownership: element({ value: "PLACE" }),
     csrfmiddlewaretoken: element({ value: "csrf" }),
   };
   Object.entries(values).forEach(([k, v]) => { elements[k].value = v; });
@@ -122,4 +123,119 @@ test("시설 종류를 바꾸면 이전 결과 표를 비운다", async () => {
   p.token.value = "signed-token";
   p.selector.handlers.change();
   assert.equal(p.token.value, "");
+});
+
+test("시설 종류가 같아도 소속을 바꾸면 늦은 결과와 토큰을 적용하지 않는다", async () => {
+  const { init, run } = load();
+  const p = page({ values: { has_ramp: "true" } });
+  let resolve;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => new Promise((done) => { resolve = done; }) };
+  init(p.doc, d);
+  const running = run(p.form, p.box, d);
+  p.selector.handlers.change();
+  p.elements.ownership.value = "BUILDING";
+  resolve({ json: async () => ok });
+  await running;
+  assert.equal(p.elements.step_height_cm.value, "");
+  assert.equal(p.elements.has_ramp.value, "true");
+  assert.equal(p.token.value, "");
+  assert.equal(p.button.disabled, false);
+});
+
+test("시설 변경 뒤 이전 서버 오류도 현재 안내를 덮어쓰지 않는다", async () => {
+  const { init, run } = load();
+  const p = page();
+  let resolve;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => new Promise((done) => { resolve = done; }) };
+  init(p.doc, d);
+  const running = run(p.form, p.box, d);
+  p.selector.handlers.change();
+  resolve({ json: async () => ({ ok: false, message: "이전 분석 오류" }) });
+  await running;
+  assert.doesNotMatch(p.status.textContent, /이전 분석 오류/);
+  assert.equal(p.button.disabled, false);
+});
+
+test("분석 중 시설을 바꾸면 늦게 온 이전 시설의 결과를 적용하지 않는다", async () => {
+  const { init, run } = load();
+  const p = page();
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  const d = { document: p.doc, FormData: FakeFormData, fetch: () => pending };
+  init(p.doc, d);
+  const running = run(p.form, p.box, d);
+  p.elements.facility_kind.value = "RESTROOM";
+  p.selector.handlers.change();
+  resolve({ json: async () => ok });
+  await running;
+  assert.equal(p.elements.step_height_cm.value, "");
+  assert.equal(p.elements.has_ramp.value, "");
+  assert.equal(p.token.value, "");
+  assert.equal(p.button.disabled, false);
+});
+
+test("시설을 바꿨다가 돌아와도 이전 분석 결과를 적용하지 않는다", async () => {
+  const { init, run } = load();
+  const p = page();
+  let resolve;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => new Promise((done) => { resolve = done; }) };
+  init(p.doc, d);
+  const running = run(p.form, p.box, d);
+  p.elements.facility_kind.value = "RESTROOM";
+  p.selector.handlers.change();
+  p.elements.facility_kind.value = "ENTRANCE";
+  p.selector.handlers.change();
+  resolve({ json: async () => ok });
+  await running;
+  assert.equal(p.elements.step_height_cm.value, "");
+  assert.equal(p.token.value, "");
+});
+
+test("시설 변경 후 이전 분석의 실패 안내를 표시하지 않는다", async () => {
+  const { init, run } = load();
+  const p = page();
+  let reject;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => new Promise((_, fail) => { reject = fail; }) };
+  init(p.doc, d);
+  const running = run(p.form, p.box, d);
+  p.elements.facility_kind.value = "RESTROOM";
+  p.selector.handlers.change();
+  reject(new Error("old request"));
+  await running;
+  assert.doesNotMatch(p.status.textContent, /연결이 불안정해요/);
+  assert.equal(p.button.disabled, false);
+});
+
+test("시설 입력 항목을 전환하는 중에는 이전 시설로 분석을 시작하지 않는다", async () => {
+  const { run } = load();
+  const p = page();
+  const originalGet = p.doc.getElementById;
+  p.doc.getElementById = (id) => id === "facility-observations"
+    ? { getAttribute: () => "true" } : originalGet(id);
+  const sent = [];
+  await run(p.form, p.box, deps(p.doc, ok, sent));
+  assert.equal(sent.length, 0);
+  assert.equal(p.token.value, "");
+  assert.match(p.status.textContent, /전환이 끝난 뒤/);
+  assert.equal(p.button.disabled, false);
+});
+
+test("분석 중 다시 실행해도 중복 요청을 보내거나 버튼을 풀지 않는다", async () => {
+  const { run } = load();
+  const p = page();
+  let resolve;
+  let calls = 0;
+  const d = { document: p.doc, FormData: FakeFormData,
+    fetch: () => { calls += 1; return new Promise((done) => { resolve = done; }); } };
+  const running = run(p.form, p.box, d);
+  await run(p.form, p.box, d);
+  assert.equal(calls, 1);
+  assert.equal(p.button.disabled, true);
+  resolve({ json: async () => ok });
+  await running;
+  assert.equal(p.button.disabled, false);
 });
