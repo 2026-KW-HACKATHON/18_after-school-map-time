@@ -8,7 +8,7 @@
 2026 광운대학교 해커톤 · 18조 **방과 후 지도타임** · 카테고리: 배리어프리 및 생활 편의
 
 > **현재 상태 (2026-10-08):** 본선 무박 2일 진행 중. 서비스는 실제 도메인에서 운영 중이며 AI 기능(Google Gemini)도 켜져 있습니다.
-> 본선 중 작업: Figma 디자인 적용 · 판정 기준표 반영 · 개인화 기능. 테스트 Django 382개 + 화면 JS 31개 통과.
+> 본선 중 작업: Figma 디자인 적용 · 판정 기준표 반영 · 개인화 기능. 테스트 Django 383개 + 화면 JS 31개 통과. 코드는 [MIT License](LICENSE).
 
 ---
 
@@ -196,7 +196,7 @@ docker compose exec web python manage.py createsuperuser
 docker compose exec web python manage.py test
 ```
 
-2026-10-08 기준 Django 테스트 382개. AI 테스트는 가짜 AI 클라이언트를 써서 키·네트워크·비용 없이 돌아갑니다.
+2026-10-08 기준 Django 테스트 383개. AI 테스트는 가짜 AI 클라이언트를 써서 키·네트워크·비용 없이 돌아갑니다.
 
 화면 JS 테스트(장소 선택의 검색·핀·좌표 동기화, 제보 시설 종류 전환, 사진 줄이기, AI로 항목 채우기)는 Node.js 18 이상에서 추가 패키지 없이 실행합니다. CI에서도 같이 돌아갑니다.
 
@@ -279,6 +279,7 @@ python manage.py runserver
 ├── manage.py
 ├── CLAUDE.md               # Claude Code 작업 안내서
 ├── CONTRIBUTING.md         # 협업 규칙
+├── LICENSE                 # MIT License (팀 작성 코드·문서)
 ├── THIRD_PARTY_NOTICES.md  # 사용한 오픈소스·외부 서비스와 라이선스 준수 방법
 └── README.md
 ```
@@ -379,6 +380,20 @@ python manage.py runserver
 | [Google Gemini API](https://ai.google.dev/) (유료 등급) | 제보 사진·설명에서 접근성 항목 후보 추출 | [Gemini API 추가 약관](https://ai.google.dev/gemini-api/terms) (유료 등급: 입력을 제품 개선에 쓰지 않음) |
 | [DuckDNS](https://www.duckdns.org/) · [Let's Encrypt](https://letsencrypt.org/) | 도메인 · HTTPS 인증서 | 각 서비스 약관 |
 | [한국사회보장정보원_장애인편의시설 현황](https://www.data.go.kr/data/15092317/openapi.do) (공공데이터포털) | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 |
+
+### 📄 라이선스와 저작권
+
+- 이 레포의 코드와 문서는 **[MIT License](LICENSE)** 입니다 (Copyright (c) 2026 18조 방과 후 지도타임).
+- MIT는 **팀이 작성한 코드·문서에만** 적용됩니다. 다음은 각자의 라이선스·이용 조건을 따릅니다.
+  - 사용한 오픈소스·폰트·외부 서비스 → [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+  - `places/data/public/` 공공데이터 스냅숏 → 공공데이터포털 이용 조건 (출처: 한국사회보장정보원)
+  - 서비스에 주민이 올린 사진·글 → 레포에 들어 있지 않음
+- **저작권 문제를 막기 위해 하는 일**
+  - 다른 프로젝트의 소스 코드를 복사하지 않았습니다. 레포 규칙을 참고한 Dopamine-Ledger도 규칙만 참고했습니다.
+  - 아이콘·로고(`static/img/`)는 팀이 AI 도구(Claude)로 새로 만든 그림입니다. 파일 안에 출처 정보(C2PA)가 들어 있습니다.
+  - `docs/screenshots/`는 우리 서비스 화면만 찍었습니다(지도 화면 없음). 뉴스 기사는 링크로만 인용합니다.
+  - 사진 칸마다 "직접 찍은 사진만, 인터넷·지도 로드뷰 캡처 금지, 올린 사진은 공개됨"을 안내합니다. 운영자는 남이 찍은 사진이 보이면 반려합니다.
+  - 판정 참고 기준인 법령(편의증진법 시행규칙)은 저작권 보호 대상이 아니며, 출처를 밝혀 인용합니다.
 
 ### 참고 자료
 
