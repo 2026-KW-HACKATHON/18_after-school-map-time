@@ -153,8 +153,8 @@ nano .env
 ```ini
 SECRET_KEY=<생성한 값>
 DEBUG=False
-ALLOWED_HOSTS=<도메인>
-CSRF_TRUSTED_ORIGINS=https://<도메인>
+ALLOWED_HOSTS=<도메인>            # 주소가 여러 개면 콤마로 모두 (예: teokeopne.help,www.teokeopne.help,teokeopne.duckdns.org)
+CSRF_TRUSTED_ORIGINS=https://<도메인>   # 여러 개면 https:// 붙여 콤마로 모두
 
 POSTGRES_PASSWORD=<생성한 DB 비밀번호>
 DATABASE_URL=postgres://teokeopne:<생성한 DB 비밀번호>@db:5432/teokeopne
@@ -162,7 +162,9 @@ DATABASE_URL=postgres://teokeopne:<생성한 DB 비밀번호>@db:5432/teokeopne
 KAKAO_JAVASCRIPT_KEY=<JS 키>
 KAKAO_REST_API_KEY=<REST 키>
 
-DOMAIN=<도메인>          # 예: teokeopne.duckdns.org (https:// 없이)
+DOMAIN=<도메인>          # 대표 주소, 예: teokeopne.help (https:// 없이)
+REDIRECT_DOMAINS=        # 대표 주소로 이동시킬 다른 주소 (공백 구분, 없으면 비움). 예: www.teokeopne.help teokeopne.duckdns.org
+CERT_NAME=               # 인증서 폴더 이름 (비우면 DOMAIN). 3-1 참고
 NGINX_CONF=http          # 4단계에서 https로 바꿈
 IMAGE_TAG=latest
 ```
@@ -178,13 +180,51 @@ IMAGE_TAG=latest
 2. `current ip` 칸에 `<EIP>` 입력 → **update ip**
 3. 도메인 = `teokeopne.duckdns.org`
 
-**유료 도메인**: 도메인 업체 DNS 설정에서 **A 레코드** `@` (또는 `www`) → `<EIP>`
+**유료 도메인** (턱없네: `teokeopne.help`): 도메인 업체 DNS 설정에서 **A 레코드** `@` → `<EIP>`, `www` → `<EIP>` (또는 `www`를 CNAME으로 `@`)
 
 확인 (몇 분 걸릴 수 있음):
 
 ```bash
 nslookup <도메인>   # Address가 <EIP>면 OK
 ```
+
+---
+
+### 3-1. 주소를 추가하거나 바꿀 때 (예: DuckDNS → teokeopne.help)
+
+턱없네는 `teokeopne.help`를 대표 주소로 쓰고, `www.teokeopne.help`와 이전 주소 `teokeopne.duckdns.org`는 대표 주소로 301 이동시킵니다.
+이렇게 하면 로그인 쿠키·카카오 로그인 Redirect URI·QR 주소가 한 주소로 모이고, 예전 주소로 인쇄한 QR도 계속 동작합니다.
+
+1. 새 주소들의 A 레코드가 `<EIP>`를 가리키는지 확인합니다 (`nslookup teokeopne.help`, `nslookup www.teokeopne.help`).
+2. 인증서 하나에 모든 주소를 넣습니다. 이미 있는 인증서에 추가할 때는 그 인증서 이름을 그대로 씁니다 (`sudo certbot certificates`로 이름 확인).
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot --cert-name teokeopne.duckdns.org --expand \
+  -d teokeopne.duckdns.org -d teokeopne.help -d www.teokeopne.help
+```
+
+3. 서버 `.env`를 고칩니다.
+
+```
+DOMAIN=teokeopne.help
+REDIRECT_DOMAINS=www.teokeopne.help teokeopne.duckdns.org
+CERT_NAME=teokeopne.duckdns.org
+ALLOWED_HOSTS=teokeopne.help,www.teokeopne.help,teokeopne.duckdns.org
+CSRF_TRUSTED_ORIGINS=https://teokeopne.help,https://www.teokeopne.help,https://teokeopne.duckdns.org
+```
+
+4. 다시 띄우고 확인합니다.
+
+```bash
+docker compose -f docker-compose.prod.yml up -d          # nginx·web이 바뀐 .env로 다시 생성됨
+curl -I https://teokeopne.help/health/                   # 200
+curl -I https://www.teokeopne.help/health/               # 301 → https://teokeopne.help/health/
+curl -I https://teokeopne.duckdns.org/health/            # 301 → https://teokeopne.help/health/
+```
+
+5. 카카오 개발자센터에 새 대표 주소를 추가합니다 (4-5). 이전 주소는 지우지 않아도 됩니다.
+
+> `REDIRECT_DOMAINS`·`CERT_NAME`을 비워 두면 예전 동작(들어온 주소 그대로 서비스, 인증서 이름 = `DOMAIN`)과 같습니다.
 
 ---
 
@@ -217,6 +257,7 @@ sudo ln -sf /snap/bin/certbot /usr/bin/certbot
 
 sudo certbot certonly --webroot -w /var/www/certbot \
   -d <도메인> --email <팀장 이메일> --agree-tos --no-eff-email
+# 주소가 여러 개면 -d 를 주소마다 붙임 (예: -d teokeopne.help -d www.teokeopne.help). 3-1 참고
 # "Successfully received certificate" 가 나오면 성공
 ```
 
@@ -249,7 +290,7 @@ sudo certbot renew --dry-run   # "Congratulations, all simulated renewals succee
 
 ### 4-5. 카카오 개발자센터에 배포 도메인 등록
 
-[카카오 개발자센터](https://developers.kakao.com) → 앱 선택 → **앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인**에 `https://<도메인>` 추가.
+[카카오 개발자센터](https://developers.kakao.com) → 앱 선택 → **앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인**에 `https://<도메인>` 추가 (대표 주소. 턱없네: `https://teokeopne.help`).
 개발용 `http://localhost:8000`은 그대로 둡니다. (등록하지 않으면 배포 사이트에서 지도가 안 뜸)
 
 **카카오 로그인 Redirect URI**: 카카오 로그인 설정의 Redirect URI에 아래 두 개를 등록합니다. (없으면 로그인 시 `KOE006` 에러)
@@ -258,6 +299,8 @@ sudo certbot renew --dry-run   # "Congratulations, all simulated renewals succee
 http://localhost:8000/accounts/kakao/login/callback/
 https://<도메인>/accounts/kakao/login/callback/
 ```
+
+다른 주소(www·이전 주소)는 대표 주소로 이동하므로 대표 주소만 등록하면 됩니다. 주소를 바꾸기 전에 쓰던 주소는 지우지 않아도 됩니다.
 
 동의 항목은 **닉네임**만 켭니다. (이메일·전화번호는 받지 않음) Client Secret을 '사용함'으로 켰다면 서버 `.env`의 `KAKAO_CLIENT_SECRET`에도 넣습니다.
 
