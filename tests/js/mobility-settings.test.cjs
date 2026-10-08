@@ -28,8 +28,9 @@ function element() {
     replaceChildren(...children) { this.children = children; },
     focus() { this.focused = true; }, showModal() { this.open = true; }, close() { this.open = false; }, reportValidity() { return true; } };
 }
-async function setup({ authenticated = false, storage = memoryStorage(), mode = "map", fetcher } = {}) {
+async function setup({ authenticated = false, storage = memoryStorage(), mode = "map", fetcher, search = "", settings } = {}) {
   const meta = metadata(authenticated), calls = [];
+  if (settings) meta.settings = clone(settings);
   const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice"].map((key) => [key, element()]));
   const baseline = element(); baseline.hidden = true;
   const searchProfile = element(); searchProfile.value = "WHEELCHAIR";
@@ -38,7 +39,7 @@ async function setup({ authenticated = false, storage = memoryStorage(), mode = 
   const document = { querySelector: () => root, getElementById: () => mode === "search" ? searchProfile : null,
     querySelectorAll: () => [baseline], createElement: () => element(), dispatchEvent() {} };
   const window = {};
-  vm.runInNewContext(source, { document, window, localStorage: storage, URLSearchParams, location: { search: "" }, CustomEvent: class {},
+  vm.runInNewContext(source, { document, window, localStorage: storage, URLSearchParams, location: { search }, CustomEvent: class {},
     api: async (url, options) => {
       calls.push({ url, options: clone(options || {}) });
       if (url === "/catalogue") return clone(meta);
@@ -53,6 +54,50 @@ async function setup({ authenticated = false, storage = memoryStorage(), mode = 
     field(key, value) { const container = nodes.fields.children.find((c) => c.children[1].id === `mobility-field-${key}`);
       const input = container.children[1]; input.value = value; (input.handlers.input || input.handlers.change)(); } };
 }
+
+test("상세 링크 조건은 익명 저장 조건보다 우선하고 저장된 개인 수치를 보존한다", async () => {
+  const settings = metadata().settings;
+  settings.overrides.STROLLER = { max_step_height_cm: "4" };
+  const storage = memoryStorage({ [helpers.GUEST_KEY]: JSON.stringify(settings) });
+  const before = { ...storage.saved };
+  const p = await setup({ storage, mode: "detail", search: "?profile=STROLLER" });
+  assert.equal(p.controller.primaryProfile(), "STROLLER");
+  assert.equal(p.controller.state().overrides.STROLLER.max_step_height_cm, "4");
+  assert.equal(p.controller.needsEvaluation(), true);
+  assert.deepEqual(storage.saved, before);
+  assert.equal(p.calls.filter((c) => c.url === "/preferences").length, 0);
+});
+
+test("회원의 상세 링크는 현재 화면에만 적용하며 저장 API를 호출하지 않는다", async () => {
+  const p = await setup({ authenticated: true, mode: "detail", search: "?profile=STROLLER" });
+  assert.equal(p.controller.primaryProfile(), "STROLLER");
+  assert.equal(p.meta.settings.selected[0], "WHEELCHAIR");
+  assert.equal(p.calls.filter((c) => c.url === "/preferences").length, 0);
+});
+
+test("상세 링크가 현재 주 조건과 같으면 복수 조건과 동반자 설정을 유지한다", async () => {
+  const settings = metadata().settings;
+  settings.selected.push("ASSISTED_COMPANION");
+  settings.companions.ASSISTED_COMPANION = "CRUTCH";
+  const p = await setup({ authenticated: true, settings, mode: "detail", search: "?profile=WHEELCHAIR" });
+  assert.deepEqual(clone(p.controller.state()), settings);
+  assert.equal(p.controller.needsEvaluation(), true);
+});
+
+test("잘못된 상세 링크는 저장된 조건을 유지하고 지도·검색 링크는 설정을 바꾸지 않는다", async () => {
+  for (const mode of ["map", "search", "detail"]) {
+    const search = mode === "detail" ? "?profile=invalid" : "?profile=STROLLER";
+    const p = await setup({ mode, search });
+    assert.equal(p.controller.primaryProfile(), "WHEELCHAIR");
+  }
+});
+
+test("상세 링크 조건은 저장소가 차단돼도 초기 발행 전에 적용한다", async () => {
+  const storage = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
+  const p = await setup({ storage, mode: "detail", search: "?profile=STROLLER" });
+  assert.equal(p.controller.primaryProfile(), "STROLLER");
+  assert.equal(p.controller.needsEvaluation(), false);
+});
 
 test("숫자 경계값·bool은 검증하고 손상된 설정은 거부한다", () => {
   const meta = metadata();

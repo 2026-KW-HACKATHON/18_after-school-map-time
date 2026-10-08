@@ -235,6 +235,11 @@
     meta = await api(root.dataset.catalogueUrl);
     const restored = meta.authenticated ? { settings: validateState(meta.settings, meta), warning: meta.warning } : restoreGuest(storage(), meta);
     settings = restored.settings;
+    const linked = root.dataset.mode === "detail" ? new URLSearchParams(location.search).get("profile") : null;
+    // Apply a valid linked profile for this page without overwriting saved preferences.
+    if (meta.presets.some((p) => p.key === linked && p.profile === linked && !p.companion) && primaryProfile() !== linked) {
+      settings = { ...settings, selected: [linked] };
+    }
     text("warning", restored.warning);
     meta.presets.forEach((p) => option($("preset"), p.key, p.label));
     meta.companion_options.forEach((p) => option($("companion"), p.key, p.label));
