@@ -247,13 +247,26 @@
     }
 
     const boundaryToggle = $("show-boundary"), boundaryStatus = $("boundary-status"), boundaryCredit = $("boundary-credit");
+    const boundaryLegend = $("boundary-legend");
     if (boundaryToggle && state.map?.setBoundary) {
       if (meta.region.boundary) {
         $("boundary-control").hidden = false;
-        const drawBoundary = () => {
-          const valid = state.map.setBoundary(boundaryToggle.checked ? meta.region.boundary : null);
+        const layered = meta.region.boundary_layers && state.map.setBoundaryLayers;
+        const boundaryFeedback = (mode) => {
+          const valid = mode !== "error";
           boundaryStatus.hidden = valid;
           boundaryStatus.textContent = valid ? "" : "지역 경계를 표시하지 못했어요. 지도와 장소 목록은 계속 이용할 수 있어요.";
+          boundaryLegend.hidden = !valid || !boundaryToggle.checked || !layered;
+          boundaryLegend.textContent = mode === "districts"
+            ? "월계1동: 빨강 · 월계2동: 파랑 · 월계3동: 초록 (점선)"
+            : "월계1·2·3동 전체 외곽 · 확대하면 동별 구역을 볼 수 있어요.";
+        };
+        const drawBoundary = () => {
+          const valid = layered
+            ? state.map.setBoundaryLayers(boundaryToggle.checked ? meta.region.boundary_layers : null, boundaryFeedback)
+            : state.map.setBoundary(boundaryToggle.checked ? meta.region.boundary : null);
+          if (!valid) boundaryFeedback("error");
+          else if (!boundaryToggle.checked || !layered) boundaryFeedback("hidden");
         };
         boundaryToggle.addEventListener("change", drawBoundary);
         drawBoundary();

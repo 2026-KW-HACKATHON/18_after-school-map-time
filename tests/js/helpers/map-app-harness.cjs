@@ -36,7 +36,7 @@ const detail = (name) => ({
   ],
 });
 
-async function page({ mapFails = false, personalized = false } = {}) {
+async function page({ mapFails = false, personalized = false, boundary = null, layers = null, boundaryFails = false } = {}) {
   const nodes = {};
   const handlers = {};
   const doc = {
@@ -53,6 +53,14 @@ async function page({ mapFails = false, personalized = false } = {}) {
   ["map-error", "popup", "empty-state"].forEach((id) => { doc.getElementById(id).hidden = true; });
   const requests = [];
   const map = { setMarkers(items, onClick) { this.items = items; this.onClick = onClick; } };
+  map.setBoundary = (data) => { map.boundary = data; return !boundaryFails; };
+  map.setBoundaryLayers = (data, callback) => {
+    map.layers = data; map.boundaryCallback = callback;
+    if (data && !boundaryFails) callback("districts");
+    return !boundaryFails;
+  };
+  doc.getElementById("show-boundary").checked = true;
+  ["boundary-control", "boundary-status", "boundary-credit", "boundary-legend"].forEach(id => doc.getElementById(id).hidden = true);
   let selected = "wheelchair";
   const evaluate = (options) => {
     const request = { options, ...deferred() };
@@ -74,7 +82,7 @@ async function page({ mapFails = false, personalized = false } = {}) {
     } } },
     api: (url) => {
       if (url.startsWith("/meta/")) return Promise.resolve({
-        region: { center: { lat: 37, lng: 127 }, map_level: 3 },
+        region: { center: { lat: 37, lng: 127 }, map_level: 3, boundary, boundary_layers: layers },
         profiles: [{ key: "wheelchair", label: "휠체어" }, { key: "stroller", label: "유모차" }],
       });
       const request = { url, ...deferred() };

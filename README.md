@@ -64,7 +64,7 @@
 | S-AI | 🤖 AI 사진 판별 | 제보 사진·설명에서 입구·시설 항목 **후보와 근거**를 뽑아 운영자 검토를 돕고, 주민은 제보 화면에서 'AI로 항목 채우기'로 빈 칸을 채움 (자동 승인 없음) | ✅ 운영 중 |
 | — | 🎨 Figma 디자인 | 지도·검색·상세·로그인·5단계 제보·운영자 화면 전체 적용 ([화면 대응표](docs/figma-integration.md)) | ✅ |
 | — | 👤 내 이동 조건 (개인화) | 휠체어·유아차·보행 보조기·목발·동반 조건 + 허용 턱 높이·문 폭·계단·엘리베이터 등 내 기준으로 다시 판정 ([아래](#-내-이동-조건-개인화)) | ✅ |
-| — | 🗺️ 서비스 지역 경계 | 지도에 월계1동 행정동 경계 점선 표시(켜기/끄기) ([출처](docs/region-boundary.md)) | ✅ |
+| — | 🗺️ 서비스 지역 경계 | 지도에 월계1·2·3동 경계(확대 시 동별 색상 / 축소 시 전체 외곽, 켜기/끄기) ([출처](docs/region-boundary.md)) | ✅ |
 | — | 🔎 전체 장소 보기 | 검색어 없이 검색하면 지역의 모든 장소를 30곳씩 페이지로 ([설명](docs/search-browse.md)) | ✅ |
 | — | 📏 판정 기준표 | 팀 판정 기준표로 규칙 수치 교체 | 🔧 진행 중 |
 
@@ -406,7 +406,7 @@ python manage.py runserver
 | [Google Gemini API](https://ai.google.dev/) (유료 등급) | 제보 사진·설명에서 접근성 항목 후보 추출 | [Gemini API 추가 약관](https://ai.google.dev/gemini-api/terms) (유료 등급: 입력을 제품 개선에 쓰지 않음) |
 | [Let's Encrypt](https://letsencrypt.org/) · [DuckDNS](https://www.duckdns.org/) | HTTPS 인증서 · 이전 주소(새 주소로 이동) | 각 서비스 약관 |
 | [한국사회보장정보원_장애인편의시설 현황](https://www.data.go.kr/data/15092317/openapi.do) (공공데이터포털) | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 |
-| 행정동 경계: 통계청 [SGIS](https://sgis.kostat.go.kr) 원자료 → [vuski/admdongkor](https://github.com/vuski/admdongkor) 가공 (2026-07-01) | 지도의 월계1동 경계 (`places/data/wolgye1.geojson`, 월계1동만 추출·좌표 변경 없음, [안내](docs/region-boundary.md)) | 공공누리 제1유형(출처표시) · CC BY 4.0 |
+| 행정동 경계: 통계청 [SGIS](https://sgis.kostat.go.kr) 원자료 → [vuski/admdongkor](https://github.com/vuski/admdongkor) 가공 (2026-07-01) | 지도의 월계1·2·3동 경계 (개별 동 원본 좌표 보존 및 전체 외곽 합집합, [안내](docs/region-boundary.md)) | 공공누리 제1유형(출처표시) · CC BY 4.0 |
 | [Porkbun](https://porkbun.com/) | 도메인 `teokeopne.help` 구입·DNS | Porkbun 약관 |
 
 ### 📄 라이선스와 저작권

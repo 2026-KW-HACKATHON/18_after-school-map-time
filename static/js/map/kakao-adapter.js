@@ -52,28 +52,59 @@
         let overlays = [];
         let myLocation = null;
         let boundaries = [];
-
-        resolve({
-          /** 경계는 검색/노출 정책을 바꾸지 않고, 마커와 별도의 레이어에 표시한다. */
-          setBoundary(geojson) {
-            boundaries.forEach((p) => p.setMap(null)); boundaries = [];
-            if (!geojson) return true;
-            const paths = boundaryPaths(geojson);
-            if (!paths.length || !kakao.maps.Polygon) return false;
-            const color = window.getComputedStyle?.(element).getPropertyValue("--color-primary").trim() || "#245ccc";
-            try {
+        let boundaryLayers = null, boundaryMode = null, boundaryChanged = null;
+        const primaryColor = () => window.getComputedStyle?.(element).getPropertyValue("--color-primary").trim() || "#245ccc";
+        const clearBoundary = () => { boundaries.forEach((p) => p.setMap(null)); boundaries = []; };
+        function drawBoundaries(features) {
+          clearBoundary();
+          if (!kakao.maps.Polygon) return false;
+          try {
+            for (const feature of features) {
+              const paths = boundaryPaths(feature);
+              if (!paths.length) throw new Error("Invalid boundary");
+              const requested = feature.properties?.display_color;
+              const color = /^#[0-9a-f]{6}$/i.test(requested || "") ? requested : primaryColor();
               paths.forEach((rings) => {
                 const polygon = new kakao.maps.Polygon({
                   path: rings.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))),
-                  strokeWeight: 2, strokeColor: color, strokeOpacity: 0.7, strokeStyle: "dash",
+                  strokeWeight: 2.6, strokeColor: color, strokeOpacity: 0.7, strokeStyle: "dash",
                   fillOpacity: 0, zIndex: -1,
                 });
                 boundaries.push(polygon); polygon.setMap(map);
               });
-              return true;
-            } catch (e) {
-              boundaries.forEach((p) => p.setMap(null)); boundaries = []; return false;
             }
+            return true;
+          } catch (e) { clearBoundary(); return false; }
+        }
+        function drawBoundaryLayers() {
+          if (!boundaryLayers) return true;
+          // 카카오 level은 값이 작을수록 확대. 축소에서는 공유 경계를 제거한 외곽만 그린다.
+          const mode = map.getLevel() <= boundaryLayers.detail_max_level ? "districts" : "overview";
+          if (boundaryMode === mode) return true;
+          const features = mode === "districts" ? boundaryLayers.districts.features : [boundaryLayers.overview];
+          const valid = drawBoundaries(features);
+          boundaryMode = valid ? mode : null;
+          boundaryChanged?.(valid ? mode : "error");
+          return valid;
+        }
+        kakao.maps.event.addListener(map, "zoom_changed", drawBoundaryLayers);
+
+        resolve({
+          /** 경계는 검색/노출 정책을 바꾸지 않고, 마커와 별도의 레이어에 표시한다. */
+          setBoundary(geojson) {
+            boundaryLayers = null; boundaryMode = null; boundaryChanged = null;
+            clearBoundary();
+            if (!geojson) return true;
+            return drawBoundaries([geojson]);
+          },
+          setBoundaryLayers(layers, onChange) {
+            this.setBoundary(null);
+            if (!layers) return true;
+            if (!Number.isInteger(layers.detail_max_level) || layers.detail_max_level < 1 ||
+                layers.detail_max_level > 14 || !boundaryPaths(layers.overview).length ||
+                layers.districts?.type !== "FeatureCollection" || !boundaryPaths(layers.districts).length) return false;
+            boundaryLayers = layers; boundaryChanged = onChange;
+            return drawBoundaryLayers();
           },
           /** 장소 검색 결과는 화면에서 textContent로 표시한다. */
           searchPlaces(query) {
