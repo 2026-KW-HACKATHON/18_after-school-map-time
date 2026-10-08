@@ -43,6 +43,8 @@
       <span class="toggle-label">모든 장소 보기</span> <span class="muted small">(정보가 없거나 혼자 들어가기 어려운 곳 포함)</span>
     </label>
 
+    {# 검색·이동 조건과 분리된 결과 영역. 키보드로도 목록을 스크롤할 수 있게 이름·포커스 제공 #}
+    <div class="map-results" role="region" aria-label="장소 목록" tabindex="0">
     {# 와이어프레임 2번: 조건에 맞는 장소가 없을 때 #}
     <div id="empty-state" class="card empty-state" hidden>
       <strong>현재 조건에 맞는 장소가 없어요</strong>
@@ -58,6 +60,7 @@
     <ul id="place-list" class="place-list"></ul>
 
     <p class="small"><a href="{% url 'reports:new' %}">지도에 없는 장소 제보하기 →</a></p>
+    </div>
   </aside>
 
   <div class="map-wrap">
