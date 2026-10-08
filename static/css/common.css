@@ -1,0 +1,363 @@
+/* ── 디자인 토큰 (색·간격은 여기서만 바꾸기) ── */
+:root {
+  --color-primary: #2855a4;
+  --color-primary-dark: #214789;
+  --color-text: #28384b;
+  --color-muted: #6e6b65;
+  --color-border: #e5dccb;
+  --color-bg: #fbf4e8;
+  --color-surface: #ffffff;
+  --color-error: #dc2626;
+  --color-success: #39705b;
+  --color-soft: #e9f0fa;
+  --color-green-soft: #e8f2ec;
+  --color-gray: #f0ece4;
+  --radius-control: 12px;
+  --radius: 16px;
+  --space-page: 24px;
+  --space-card: 16px;
+  --topbar-height: 56px;
+
+  /* ── 판정 4단계 색 (기획 v2 3.1) ──
+     빨간색은 "위험·금지"로 읽혀 가게에 낙인을 찍으므로 쓰지 않는다. DIFFICULT는 회색.
+     색만으로 구분하지 않고 모양·아이콘을 같이 쓴다 (색약 대응). 표시 문구는 판정 앱의 상수에서 관리 */
+  --judge-accessible: #39705b;   /* ACCESSIBLE  들어갈 수 있어요            초록 · 원 */
+  --judge-conditional: #2855a4;  /* CONDITIONAL 도움 받으면 들어갈 수 있어요 파랑 · 원 + 손 아이콘 */
+  --judge-difficult: #a3a09a;    /* DIFFICULT   혼자 들어가기 어려워요       회색 · 원 */
+  --judge-unknown: #ffffff;      /* UNKNOWN     아직 정보가 없어요           흰색 · 점선 테두리 */
+  --judge-unknown-border: #6e6b65;
+}
+
+* { box-sizing: border-box; }
+
+/* hidden 속성은 항상 숨김 (.empty-state 등에 display를 줘도 hidden이 이기도록) */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font-size: 16px; line-height: 1.5;
+}
+
+a { color: var(--color-primary); text-decoration: none; }
+
+/* ── 레이아웃 ── */
+.container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  height: var(--topbar-height); padding: 0 16px;
+  background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+}
+.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--color-text); }
+.nav { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.inline { display: inline; margin: 0; }
+
+/* 모바일 하단 탭: 작은 화면에서만 보이고, 상단의 지도·검색·제보 링크는 숨김 */
+.tabbar { display: none; }
+@media (max-width: 768px) {
+  .nav-wide { display: none; }
+  body { padding-bottom: 60px; }
+  .tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 56px;
+    background: var(--color-surface); border-top: 1px solid var(--color-border);
+  }
+  .tabbar a { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--color-muted); font-weight: 600; }
+  .tabbar a[aria-current="page"] { color: var(--color-primary); }
+}
+
+/* ── 공통 컴포넌트 ── */
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 24px; }
+.muted { color: var(--color-muted); }
+.hero { text-align: center; padding: 64px 0; }
+
+.btn {
+  display: inline-block; padding: 10px 18px; border: 1px solid var(--color-border);
+  border-radius: 8px; background: var(--color-surface); color: var(--color-text);
+  font: inherit; cursor: pointer;
+}
+.btn-primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.btn-primary:hover { background: var(--color-primary-dark); }
+.btn-block { width: 100%; }
+.link-button { border: 0; background: none; padding: 0; color: var(--color-primary); font: inherit; cursor: pointer; }
+
+input[type="text"], input[type="password"], input[type="email"], input[type="search"], input[type="tel"] {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit;
+}
+
+/* ── 키보드 사용 (스크린리더·키보드만 쓰는 분) ──
+   Tab 으로 이동할 때 지금 어디에 있는지 항상 보이게. 마우스 클릭에는 표시하지 않음(:focus-visible) */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+summary:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--color-primary); outline-offset: 2px;
+}
+main:focus { outline: none; }  /* 본문 바로가기로 온 main 자체에는 테두리 없이 */
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 100; padding: 8px 12px; border-radius: 8px;
+  background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-primary);
+}
+.skip-link:focus { top: 8px; }
+
+/* 화면에는 안 보이지만 스크린리더는 읽는 글 */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+/* ── 로그인 ── */
+.auth-card { max-width: 400px; margin: 40px auto; text-align: center; }
+.small { font-size: 13px; }
+/* 카카오 로그인 버튼: 카카오 디자인 가이드 색 (배경 #FEE500, 글자 85% 검정) */
+.btn-kakao { background: #fee500; border-color: #fee500; color: rgba(0, 0, 0, 0.85); font-weight: 600; margin: 8px 0; }
+
+/* Shared page and form components. */
+.page { display: grid; gap: 16px; }
+.narrow { max-width: 640px; margin: 0 auto; }
+.center { text-align: center; }
+.form-stack { display: grid; gap: 16px; }
+fieldset.card { margin: 0; }
+legend { font-weight: 700; padding: 0 4px; }
+.field { display: grid; gap: 4px; margin: 8px 0; }
+.field label { font-weight: 600; }
+.field input[type="number"], .field select, .field textarea, .field input[type="file"], .field input[type="date"] {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; background: var(--color-surface);
+}
+.field ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.field-error, .has-error label { color: var(--color-error); }
+.alert { padding: 12px 16px; border: 1px solid var(--color-error); border-radius: 8px; color: var(--color-error); background: #fff5f5; }
+.alert p { margin: 4px 0; }
+.notice { padding: 12px; border-radius: 8px; background: #eef2f7; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.done-mark { font-size: 48px; margin: 0; color: var(--color-success); }
+.steps { text-align: left; display: grid; gap: 8px; padding-left: 36px; }
+
+/* ── 배지 ── 주민 화면에는 긍정 배지만 (OP-5). badge-warn 은 운영자 화면 전용 */
+.badge-positive, .badge-neutral, .badge-warn {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+}
+.badge-positive { background: #dcfce7; color: #166534; }
+.badge-neutral  { background: #eef2f7; color: var(--color-muted); }
+.badge-warn     { background: #fef3c7; color: #92400e; }
+
+/* ── 운영자 화면 ── */
+.ops-nav { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.stat { display: grid; gap: 4px; color: var(--color-text); }
+.stat strong { font-size: 22px; }
+.plain-list { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 8px; }
+.diff-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.diff-table th, .diff-table td { padding: 8px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.diff-table tr.conflict { background: #fffbeb; }
+.table-scroll { overflow-x: auto; }  /* 칸이 많은 표는 휴대폰에서 표만 가로로 밀어 보기 */
+.ai-table th { white-space: nowrap; }
+.ai-filled { outline: 2px solid var(--color-primary); outline-offset: 1px; }  /* 주민 'AI로 항목 채우기'가 채운 칸 */
+.ai-filled-note { margin: 4px 0 0; font-size: 13px; color: var(--color-primary-dark); }  /* AI 후보 표 머리글이 세로로 꺾이지 않게 */
+.card blockquote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--color-border); background: var(--color-bg); white-space: pre-wrap; }  /* 외부로 보낼 설명 미리보기 */
+.picker-map { height: 280px; border-radius: 8px; background: #eef1f5; margin: 8px 0; }
+.picker-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* 위치 선택 표시: 파란 원 + 흰 테두리 (운영자 화면은 places.css를 안 불러오므로 여기서 완성) */
+.picker-marker {
+  width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: default;
+  background: var(--color-primary); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--color-primary), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* 칩 버튼 (이동 조건 선택, 운영자 상태 탭 공용) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); font: inherit; cursor: pointer; min-height: 40px;
+}
+.chip[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+/* 카드 목록 (주민 검색 결과, 운영자 제보·장소 목록 공용) */
+.result-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.result-card { display: grid; gap: 4px; color: var(--color-text); padding: 16px; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.place-result { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.field input[type="text"], .field input[type="tel"] { width: 100%; }
+
+/* ── 폼 에러 ── */
+.errorlist { color: var(--color-error); font-size: 13px; padding-left: 16px; }
+
+/* ── 메시지 (django messages) ── */
+.messages { list-style: none; margin: 0; padding: 0 16px; }
+.message { margin-top: 12px; padding: 12px 16px; border-radius: 8px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.message.error { border-color: var(--color-error); color: var(--color-error); }
+.message.success { border-color: var(--color-success); color: var(--color-success); }
+
+/* ── 큰 글씨 모드 (어르신 친화, 상단 "큰 글씨" 버튼) ──
+   <html class="large-text"> 일 때만 적용. 글자 크기가 px로 정해진 곳을 여기서 한 번에 키운다.
+   (Figma 디자인 CSS로 바꿀 때도 이 블록만 옮기면 됨. 지도 화면 크기는 places.css 끝) */
+.text-size-toggle { border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); padding: 4px 8px; font: inherit; cursor: pointer; }
+.text-size-toggle[aria-pressed="true"] { border-color: var(--color-primary); color: var(--color-primary); font-weight: 700; }
+html.large-text body { font-size: 20px; line-height: 1.6; }
+html.large-text .nav,
+html.large-text .ops-nav,
+html.large-text .diff-table { font-size: 18px; }
+html.large-text .small,
+html.large-text .errorlist { font-size: 17px; }
+html.large-text .badge-positive,
+html.large-text .badge-neutral,
+html.large-text .badge-warn { font-size: 15px; }
+html.large-text .btn { padding: 14px 22px; }
+html.large-text .tabbar a { font-size: 18px; }
+
+/* 폼 오류로 다시 보여 줄 때 보관 중인 사진 미리 보기 (core/uploads.py) */
+.kept-photo { display: flex; gap: 12px; align-items: center; padding: 8px; border: 1px dashed var(--color-border); border-radius: 8px; }
+.kept-photo img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; }
+
+/* 운영자: 사진 수정·교체 요청 검토 때 지금 사진과 새 사진 나란히 */
+.photo-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.photo-compare figure { margin: 0; display: grid; gap: 4px; }
+
+/* 운영자 제보 목록: 체크박스 + 카드 한 줄 */
+.select-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.selectable-row { display: flex; gap: 8px; align-items: flex-start; }
+.selectable-row .row-check { margin-top: 20px; flex-shrink: 0; width: 18px; height: 18px; }
+.selectable-row > .card { flex: 1; min-width: 0; }
+
+/* 휴대폰 상단 바: 메뉴가 많아도(알림·내 가게·운영자 등) 화면 밖으로 넘치지 않고 메뉴 줄만 옆으로 밀어 보기 */
+@media (max-width: 768px) {
+  .topbar { gap: 8px; }
+  .logo { flex-shrink: 0; }
+  .nav { min-width: 0; overflow-x: auto; white-space: nowrap; gap: 10px; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav > * { flex-shrink: 0; }
+}
+@media (max-width: 360px) {
+  .logo span { display: none; }  /* 아주 좁은 화면은 아이콘만 */
+}
+
+/* 사진을 불러오지 못했을 때 자리 (static/js/common.js) */
+.photo-missing { padding: 24px 12px; text-align: center; border: 1px dashed var(--color-border); border-radius: 8px; }
+
+
+/* Figma: UXLrlxcF0LV0ag6bqVk1RS, frames 01–25. */
+h1 { font-size: 24px; line-height: 1.5; margin: 0; }
+h2 { font-size: 18px; line-height: 1.5; margin: 0; }
+h3 { font-size: 16px; line-height: 1.5; }
+p { margin: 0; }
+button, input, select, textarea { font-family: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+input, select, textarea { color: var(--color-text); max-width: 100%; }
+input::placeholder, textarea::placeholder { color: var(--color-muted); opacity: 1; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary); width: 18px; height: 18px; flex-shrink: 0; }
+input[type="file"]::file-selector-button { min-height: 44px; border: 0; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font: inherit; padding: 8px 12px; margin-right: 12px; }
+.container { padding: 24px 32px; }
+.topbar { padding: 12px 32px; min-height: var(--topbar-height); height: auto; border: 0; gap: 24px; }
+.logo { color: var(--color-primary); font-size: 18px; }
+.nav { font-weight: 600; }
+.card { padding: var(--space-card); border: 0; background: var(--color-bg); }
+.card > p + p, .card > h2 + p { margin-top: 6px; }
+.page, .form-stack { gap: 14px; }
+.page.narrow, .place-detail { max-width: 640px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 12px 16px; border: 0; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font-weight: 700; line-height: 1.5; text-align: center; }
+.btn-primary { background: var(--color-primary); color: var(--color-surface); }
+.btn-kakao { background: #fee500; color: rgba(0, 0, 0, 0.85); }
+.btn:disabled { background: var(--color-gray); color: var(--color-muted); cursor: not-allowed; }
+.btn:hover:not(:disabled) { filter: brightness(.97); }
+.btn-primary:hover { background: var(--color-primary-dark); }
+.field { gap: 8px; margin: 8px 0; min-width: 0; }
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .field select, .field textarea,
+input[type="search"], input[type="text"], input[type="password"], input[type="email"], input[type="tel"] {
+  min-height: 54px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-bg);
+}
+.field input[type="file"] { padding: 8px; }
+.field ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.field ul label, .choice-card { display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 52px; background: var(--color-bg); border-radius: var(--radius-control); }
+.field ul label:has(input:checked), .choice-card:has(input:checked) { background: var(--color-soft); color: var(--color-primary); }
+.small, .errorlist { font-size: 12px; line-height: 1.5; }
+.notice { background: var(--color-soft); padding: 16px; border: 0; border-radius: var(--radius); }
+.chip { border: 0; border-radius: var(--radius-control); background: var(--color-bg); padding: 10px; min-height: 40px; }
+.chip[aria-pressed="true"], .chip[aria-current="page"] { background: var(--color-soft); color: var(--color-primary); }
+.result-list { gap: 14px; }
+.result-card { gap: 6px; overflow-wrap: anywhere; }
+.result-card strong { font-size: 16px; }
+.badge-positive { background: var(--color-green-soft); color: var(--judge-accessible); }
+.badge-neutral { background: var(--color-gray); }
+.text-size-toggle { border: 0; background: var(--color-soft); color: var(--color-primary); border-radius: var(--radius-control); min-height: 40px; }
+.screen-page { min-height: calc(100dvh - var(--topbar-height) - 48px); align-content: start; }
+.screen-page > .screen-actions { margin-top: auto; }
+.screen-actions { display: grid; gap: 8px; padding: 12px 0 20px; }
+.screen-page { display: flex; flex-direction: column; gap: 14px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.photo-slot { display: grid; align-content: center; gap: 10px; min-height: 150px; padding: 16px; background: var(--color-gray); color: var(--color-muted); }
+.photo-slot img { width: 100%; max-height: 240px; object-fit: contain; }
+.photo-fix-page #id_reason { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.photo-fix-page #id_reason label { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 14px; background: var(--color-bg); border-radius: var(--radius-control); }
+.photo-fix-page #id_reason label:has(input:checked) { background: var(--color-soft); }
+.photo-fix-page form.card { background: transparent; padding: 0; }
+.report-photo { min-height: 220px; }
+.report-progress { color: var(--color-primary); font-size: 12px; }
+.report-step { display: grid; gap: 14px; }
+.report-wizard > #report-form { flex: 1; display: flex; flex-direction: column; }
+.report-wizard .report-navigation { margin-top: auto; }
+#report-heading { scroll-margin-top: 76px; }
+.report-wizard { scroll-margin-top: 67px; }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.choice-grid .chip { white-space: normal; text-align: left; }
+.report-step > fieldset { min-width: 0; }
+.report-step > fieldset.card, #facility-selector.card { background: transparent; padding: 0; }
+.report-step legend { padding: 0; margin-bottom: 12px; }
+.report-summary { display: grid; gap: 14px; }
+.report-summary dl { margin: 0; }
+.report-summary dt { font-weight: 700; }
+.report-summary dd { margin: 4px 0 0; color: var(--color-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.report-place-finder { display: grid; gap: 14px; }
+.report-place-finder .picker-tools { flex-wrap: nowrap; }
+.report-place-finder input { flex: 1; width: 0; min-width: 0; }
+.report-place-finder .btn { flex-shrink: 0; white-space: nowrap; }
+#report-new-place > summary { padding: 14px; border-radius: var(--radius-control); background: var(--color-soft); color: var(--color-primary); font-weight: 700; cursor: pointer; }
+#report-new-place > fieldset { margin-top: 16px; }
+.ai-review-mode, .ai-review-mode .topbar { background: var(--color-bg); }
+.ai-review-mode #ai-report-review .card { background: var(--color-surface); }
+.ai-review-mode .report-navigation, .ai-review-mode #ai-prefill-button { display: none; }
+.ai-review-mode #ai-prefill { background: transparent; padding: 0; }
+#ai-report-facts { display: grid; gap: 8px; margin: 24px 0; }
+.report-navigation { display: grid; gap: 8px; }
+.report-wizard.is-enhanced .report-navigation { position: sticky; bottom: 0; z-index: 8; padding: 12px 0 max(20px, env(safe-area-inset-bottom)); background: var(--color-surface); }
+.report-wizard.is-enhanced { padding-bottom: 0; }
+.wizard-back { justify-self: start; min-height: 40px; }
+.report-retry { display: grid; gap: 6px; }
+.ops-shell { background: var(--color-bg); }
+.ops-shell .topbar { background: var(--color-bg); }
+.ops-shell .card { background: var(--color-surface); border-radius: 18px; }
+.ops-shell .btn { border-radius: 18px; min-height: 56px; }
+.ops-shell .ops-nav { border: 0; padding: 8px 0; }
+.ops-shell .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ops-shell .stat { padding: 12px; }
+.ops-reject-panel { display: grid; gap: 14px; }
+.activity-summary { background: var(--color-soft); }
+.activity-filters { display: flex; gap: 8px; }
+.activity-filters .chip { flex: 1; justify-content: center; }
+.activity-list > li { padding: 16px; background: var(--color-bg); border-radius: var(--radius); }
+.notification-new { background: var(--color-soft); }
+.auth-page .auth-actions { margin-top: auto; }
+.auth-page { text-align: left; }
+.auth-page form { margin: 0; }
+html.large-text h1 { font-size: 30px; }
+html.large-text h2 { font-size: 23px; }
+html.large-text h3, html.large-text .result-card strong { font-size: 20px; }
+html.large-text .report-progress { font-size: 16px; }
+html.large-text .btn { min-height: 60px; }
+@media (max-width: 768px) {
+  .container { padding: 16px var(--space-page); }
+  html { scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  .topbar { padding: 8px 20px; min-height: 51px; gap: 12px; }
+  body { padding-bottom: 80px; }
+  body.flow-shell, body.ops-shell { padding-bottom: 0; }
+  .tabbar { height: auto; min-height: 80px; padding: 12px 24px max(20px, env(safe-area-inset-bottom)); border: 0; }
+  .tabbar a { min-height: 48px; font-size: 16px; }
+  .logo { font-size: 18px; }
+  .screen-page { min-height: calc(100dvh - 179px); }
+  .flow-shell .screen-page { min-height: calc(100dvh - 99px); }
+  .nav { font-size: 12px; }
+  .text-size-toggle { padding: 4px 10px; min-height: 35px; }
+  .report-wizard .card { border-radius: 16px; }
+  .ops-shell .container { padding: 24px 20px; }
+  .ops-shell .screen-page { min-height: calc(100dvh - 104px); }
+  .ops-shell .topbar .logo { font-size: 24px; }
+}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% comment %}서비스 안 알림 (외부 발송 없음). 제보·요청 처리 결과, 인증 결과, 가고 싶어요 가게 소식{% endcomment %}
+
+{% block title %}알림 | 턱없네{% endblock %}
+
+{% block header_brand %}알림{% endblock %}
+{% block content %}
+<section class="page narrow screen-page" data-figma-node="1:420">
+  <h1>새 소식을 확인해요</h1>
+  <ul class="result-list">
+    {% for item in items %}
+      <li class="card result-card{% if item.new %} notification-new{% endif %}">
+        <span class="muted small">{{ item.n.get_kind_display }} · {{ item.n.created_at|date:"n월 j일 H:i" }}{% if item.new %} <span class="badge-positive">새</span>{% endif %}</span>
+        {% if item.n.url %}<a href="{{ item.n.url }}">{{ item.n.message }}</a>{% else %}<span>{{ item.n.message }}</span>{% endif %}
+      </li>
+    {% empty %}
+      <li class="muted">아직 알림이 없어요. 제보나 사장님 요청이 처리되면 여기에 알려 드려요.</li>
+    {% endfor %}
+  </ul>
+  <p class="muted small">최근 50개까지 보여요. 내 제보 전체 현황은 <a href="{% url 'accounts:me' %}">내 활동</a>에서 볼 수 있어요.</p>
+<div class="screen-actions"><a class="btn btn-primary" href="{% url 'accounts:me' %}">내 활동으로 이동</a></div>
+</section>
+{% endblock %}

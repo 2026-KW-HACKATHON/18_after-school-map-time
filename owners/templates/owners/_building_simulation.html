@@ -1,0 +1,27 @@
+{% comment %}
+  건물 개선 시뮬레이션 (기획 v2 5.2). owners.services.simulate: 건물 공용 입구에 가상 값을 넣고 판정 엔진으로 다시 계산.
+  숫자 = "들어갈 수 있어요" 가게 수, 나아지는 가게 = 한 단계라도 좋아지는 곳 (도움 받으면 → 들어갈 수 있어요 포함)
+{% endcomment %}
+{% for sim in simulations %}
+<section class="card">
+  <h2>{{ sim.title }}</h2>
+  {% if sim.rows %}
+    <table class="diff-table">
+      <thead><tr><th>이동 조건</th><th>"들어갈 수 있어요" 지금</th><th>개선 후</th></tr></thead>
+      <tbody>
+        {% for row in sim.rows %}
+          <tr>
+            <th scope="row">{{ row.profile.label }}</th>
+            <td>{{ row.before }}곳</td>
+            <td>{% if row.after > row.before %}<strong>{{ row.after }}곳</strong>{% else %}{{ row.after }}곳{% endif %}</td>
+          </tr>
+          {% if row.improved %}<tr><td colspan="3" class="small muted">나아지는 가게: {{ row.improved|join:", " }}</td></tr>{% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">건물 안 가게 {{ places|length }}곳 중 "들어갈 수 있어요" 가게 수예요. 가게 입구 정보는 그대로 두고 건물 공용 입구·엘리베이터만 바꿔서 턱없네 판정 기준으로 다시 계산했어요.</p>
+  {% else %}
+    <p class="muted">건물 공용 입구 정보나 건물 안 가게가 아직 없어서 계산할 수 없어요.</p>
+  {% endif %}
+</section>
+{% endfor %}

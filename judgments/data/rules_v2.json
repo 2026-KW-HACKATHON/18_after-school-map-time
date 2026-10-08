@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "note": "초안 v2 — v1 출입구 규칙 + 2층 이상·지하 가게의 층 이동(엘리베이터) 규칙. 박현웅 판정 기준표 확정 전 임시 기준",
+  "activate": true,
+  "profiles": [
+    {"key": "WHEELCHAIR", "label": "휠체어", "order": 10},
+    {"key": "STROLLER", "label": "유아차", "order": 20},
+    {"key": "WALKER", "label": "보행 보조기", "order": 30},
+    {"key": "CRUTCH", "label": "목발", "order": 40}
+  ],
+  "rules": [
+    {"profile": "WHEELCHAIR", "priority": 10, "outcome": "DIFFICULT", "basis": "TEAM",
+     "note": "회전문은 휠체어가 통과할 수 없음",
+     "conditions": [{"field": "door_type", "operator": "EQ", "threshold_text": "회전문", "if_missing": "FAIL"}]},
+    {"profile": "WHEELCHAIR", "priority": 20, "outcome": "ACCESSIBLE", "basis": "LAW",
+     "note": "편의증진법 시행규칙 [별표 1] 출입구 턱 2cm 이하 (조문 확인 필요). 문 폭 80cm는 팀 기준(휠체어 폭 약 70cm + 여유)",
+     "conditions": [
+       {"field": "step_height_cm", "operator": "LTE", "threshold": "2"},
+       {"field": "door_width_cm", "operator": "GTE", "threshold": "80"}
+     ]},
+    {"profile": "WHEELCHAIR", "priority": 30, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "고정 경사로가 있고 문 폭이 충분하면 가능 (경사로 기울기는 아직 측정하지 않음)",
+     "conditions": [
+       {"field": "has_ramp", "operator": "IS_TRUE"},
+       {"field": "door_width_cm", "operator": "GTE", "threshold": "80"}
+     ]},
+    {"profile": "WHEELCHAIR", "priority": 40, "outcome": "CONDITIONAL", "basis": "APPLIED",
+     "note": "별표 1 12호 경사로 완화(기존시설·1m 이하·상시보조 시 기울기 1/8) 준용: 단차 ≤ 이동식 경사로 길이 ÷ 8 + 직원 도움",
+     "conditions": [
+       {"field": "portable_ramp", "operator": "IS_TRUE", "if_missing": "FAIL"},
+       {"field": "assistance_offered", "operator": "IS_TRUE", "if_missing": "FAIL"},
+       {"field": "step_height_cm", "operator": "LTE", "ref_field": "portable_ramp_length_cm", "ref_factor": "0.125", "if_missing": "FAIL"},
+       {"field": "door_width_cm", "operator": "GTE", "threshold": "80"}
+     ]},
+
+    {"profile": "STROLLER", "priority": 10, "outcome": "ACCESSIBLE", "basis": "APPLIED",
+     "note": "휠체어 턱 기준(2cm) 준용",
+     "conditions": [{"field": "step_height_cm", "operator": "LTE", "threshold": "2"}]},
+    {"profile": "STROLLER", "priority": 20, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "고정 경사로가 있으면 가능",
+     "conditions": [{"field": "has_ramp", "operator": "IS_TRUE"}]},
+    {"profile": "STROLLER", "priority": 30, "outcome": "CONDITIONAL", "basis": "APPLIED",
+     "note": "이동식 경사로 1/8 완화 준용 + 직원 도움",
+     "conditions": [
+       {"field": "portable_ramp", "operator": "IS_TRUE", "if_missing": "FAIL"},
+       {"field": "assistance_offered", "operator": "IS_TRUE", "if_missing": "FAIL"},
+       {"field": "step_height_cm", "operator": "LTE", "ref_field": "portable_ramp_length_cm", "ref_factor": "0.125", "if_missing": "FAIL"}
+     ]},
+    {"profile": "STROLLER", "priority": 40, "outcome": "CONDITIONAL", "basis": "TEAM",
+     "note": "계단 한 칸(20cm 이하)은 유아차를 들어 올리면 통과 가능",
+     "conditions": [
+       {"field": "step_count", "operator": "LTE", "threshold": "1"},
+       {"field": "step_height_cm", "operator": "LTE", "threshold": "20"}
+     ]},
+
+    {"profile": "WALKER", "priority": 10, "outcome": "ACCESSIBLE", "basis": "APPLIED",
+     "note": "휠체어 턱 기준(2cm) 준용",
+     "conditions": [{"field": "step_height_cm", "operator": "LTE", "threshold": "2"}]},
+    {"profile": "WALKER", "priority": 20, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "고정 경사로가 있으면 가능",
+     "conditions": [{"field": "has_ramp", "operator": "IS_TRUE"}]},
+    {"profile": "WALKER", "priority": 30, "outcome": "CONDITIONAL", "basis": "TEAM",
+     "note": "계단 한 칸(18cm 이하)은 부축을 받으면 통과 가능",
+     "conditions": [
+       {"field": "step_count", "operator": "LTE", "threshold": "1"},
+       {"field": "step_height_cm", "operator": "LTE", "threshold": "18"}
+     ]},
+
+    {"profile": "CRUTCH", "priority": 10, "outcome": "ACCESSIBLE", "basis": "APPLIED",
+     "note": "휠체어 턱 기준(2cm) 준용",
+     "conditions": [{"field": "step_height_cm", "operator": "LTE", "threshold": "2"}]},
+    {"profile": "CRUTCH", "priority": 20, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "고정 경사로가 있으면 가능",
+     "conditions": [{"field": "has_ramp", "operator": "IS_TRUE"}]},
+    {"profile": "CRUTCH", "priority": 30, "outcome": "CONDITIONAL", "basis": "TEAM",
+     "note": "계단 3칸 이하는 난간·부축이 있으면 통과 가능",
+     "conditions": [{"field": "step_count", "operator": "LTE", "threshold": "3"}]},
+
+    {"profile": "WHEELCHAIR", "stage": "FLOOR", "priority": 10, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "2층 이상·지하 가게는 건물 엘리베이터가 있어야 층 이동 가능. 없으면 어려움, 모르면 미확인",
+     "conditions": [{"field": "elevator", "operator": "IS_TRUE"}]},
+    {"profile": "STROLLER", "stage": "FLOOR", "priority": 10, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "유아차로 한 층 계단을 오르는 것은 안전 문제로 판정에 넣지 않음. 엘리베이터가 있어야 가능",
+     "conditions": [{"field": "elevator", "operator": "IS_TRUE"}]},
+    {"profile": "WALKER", "stage": "FLOOR", "priority": 10, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "보행 보조기는 한 층 계단을 오르기 어려움. 엘리베이터가 있어야 가능",
+     "conditions": [{"field": "elevator", "operator": "IS_TRUE"}]},
+    {"profile": "CRUTCH", "stage": "FLOOR", "priority": 10, "outcome": "ACCESSIBLE", "basis": "TEAM",
+     "note": "엘리베이터가 있으면 층 이동 가능",
+     "conditions": [{"field": "elevator", "operator": "IS_TRUE"}]},
+    {"profile": "CRUTCH", "stage": "FLOOR", "priority": 20, "outcome": "CONDITIONAL", "basis": "TEAM",
+     "note": "엘리베이터가 없어도 난간·부축이 있으면 계단으로 층 이동 가능",
+     "conditions": [{"field": "elevator", "operator": "IS_FALSE"}]}
+  ]
+}

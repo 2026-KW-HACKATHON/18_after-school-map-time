@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}건물주 화면 (기획 v2 5장): 건물 공용 정보(가게 책임과 분리), 건물 안 가게, 개선 시뮬레이션, 정정 요청{% endcomment %}
+
+{% block title %}{{ building }} 건물주 화면 | 턱없네{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <p class="muted small"><a href="{% url 'owners:home' %}">← 내 건물</a></p>
+  <h1>{{ building }}</h1>
+  <p class="muted">이 화면은 건물주님께만 보여요. 건물 공용 입구·시설은 가게 정보와 나눠서 보여 드려요 — 건물 구조 때문에 들어가기 어려운 경우가 세입자 가게의 책임처럼 보이지 않게요.</p>
+
+  <section class="card section-building">
+    <h2>건물 공용 입구 · 시설</h2>
+    {% for entrance in common.entrances %}
+      {% include "places/_entrance.html" %}
+    {% empty %}
+      <p class="muted">건물 공용 입구 정보가 아직 없어요.</p>
+    {% endfor %}
+    {% include "places/_fields.html" with fields=common.fields %}
+    <a class="btn" href="{% url 'owners:building-correction' building.pk %}">잘못된 정보 정정 요청</a>
+  </section>
+
+  <section class="card">
+    <h2>건물 안 가게</h2>
+    <ul class="plain-list">
+      {% for row in places %}
+        <li>
+          <a href="{% url 'places:detail' row.place.pk %}"><strong>{{ row.place.name }}</strong></a>
+          <span class="muted small">{% if row.place.floor == 1 %}1층{% elif row.place.floor < 0 %}지하{% else %}{{ row.place.floor }}층{% endif %}</span>
+          <ul class="small">{% for j in row.judgments %}<li>{{ j.profile.label }}: {{ j.display.label }}</li>{% endfor %}</ul>
+        </li>
+      {% empty %}
+        <li class="muted">등록된 가게가 없어요.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% include "owners/_building_simulation.html" %}
+
+  <section class="card">
+    <h2>공유하기</h2>
+    <p class="small">세입자 사장님, 구청 담당자와 개선 효과를 나눌 수 있는 페이지예요 (로그인 없이 볼 수 있음).</p>
+    <p><a href="{{ share_url }}">{{ share_url }}</a></p>
+  </section>
+
+  <section class="card">
+    <h2>경사로 설치 지원사업</h2>
+    {% for p in programs %}
+      <p><strong>{{ p.title }}</strong>{% if p.contact %} · 문의: {{ p.contact }}{% endif %}{% if p.url %} · <a href="{{ p.url }}" target="_blank" rel="noopener">자세히 보기</a>{% endif %}</p>
+    {% empty %}
+      <p class="muted">현재 안내 중인 지원사업이 없어요. <a href="{% url 'owners:support' %}">지원사업 안내</a>를 확인하거나 구청에 문의해 보세요.</p>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>보낸 요청</h2>
+    <ul class="plain-list">
+      {% for item in my_reports %}
+        {% with r=item.report %}
+        <li class="small">{{ r.created_at|date:"n월 j일" }} · {% for v in r.values.all %}{{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}
+          · <strong>{{ r.get_status_display }}</strong>{% if r.reject_reason %} — 반려 사유: {{ r.reject_reason }}{% endif %}</li>
+        {% endwith %}
+      {% empty %}
+        <li class="muted small">아직 보낸 요청이 없어요.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <p class="notice small muted">
+    턱없네의 안내는 편의증진법 시행규칙의 수치를 <strong>참고한 기준</strong>이며, 법 위반 여부를 판단한 것이 아니에요.
+    소규모 기존 건물은 경사로 등 설치 의무가 없는 경우가 많아요.
+  </p>
+</section>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% load l10n %}
+{% comment %}
+  origin/develop의 주민·운영자 공용 위치 선택 UI. 장소 검색은 새 장소 제보에서만 켠다.
+  사용: {% include "includes/location_picker.html" %} + {% include "includes/location_picker_js.html" %}
+  지도 중심: 입력된 좌표 → 지역(region) 중심 → 월계1동 기본 중심.
+{% endcomment %}
+<div class="location-picker">
+  {% if search_enabled %}
+    <div class="field">
+      <label for="place-search">카카오맵 장소 검색</label>
+      <div class="coord-row">
+        <input id="place-search" type="search" placeholder="예: 월계역 카페" aria-describedby="picker-help">
+        <button type="button" class="btn" id="search-place" disabled>장소 검색</button>
+      </div>
+    </div>
+    <ul id="place-results" class="plain-list" aria-label="장소 검색 결과"></ul>
+  {% endif %}
+  <p id="picker-help" class="small"><strong>지도를 눌러 위치를 표시해 주세요.</strong> 지도를 움직이고 확대해서 정확한 {{ location_label|default:"입구" }} 위치를 누르면 돼요.</p>
+  <div id="picker-map" class="picker-map"
+       {% if region %}data-lat="{{ region.center_lat|unlocalize }}" data-lng="{{ region.center_lng|unlocalize }}"{% endif %}
+       role="region" aria-label="위치 선택 지도"></div>
+  <div class="picker-tools">
+    <button type="button" class="btn" id="picker-locate">내 위치로</button>
+    <span id="picker-status" class="muted small" role="status" aria-live="polite">아직 위치를 표시하지 않았어요.</span>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+# ── 환경변수·시크릿 (절대 커밋 금지) ──
+.env
+.env.*
+!.env.example
+*.pem
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── Django ──
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+
+# ── DB 백업 (scripts/backup_db.sh 결과물) ──
+backups/
+
+# ── 답사 사진 원본 (용량이 크고 사람·번호판이 찍힐 수 있어 레포에 넣지 않음. docs/survey-guide.md) ──
+survey_photos/
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── AI 도구 (개인 설정) ──
+# .claude/ 안의 개인 설정은 제외하되, 팀이 같이 쓰는 커맨드(.claude/commands/)는 커밋합니다.
+.claude/*
+!.claude/commands/
+CLAUDE.local.md
+
+# ── IDE / OS ──
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── 마이그레이션은 커밋합니다 (제외하지 않음) ──
+# migrations/ 는 팀이 공유해야 하므로 gitignore 하지 않습니다.

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 10번 "운영자 로그인". 관리자 계정(createsuperuser)으로 로그인. 주민은 카카오 로그인{% endcomment %}
+
+{% block title %}운영자 로그인 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="card auth-card">
+  <h1>운영자 관리</h1>
+  <p class="muted small">턱없네 운영진 전용입니다. 주민은 <a href="{% url 'account_login' %}">카카오로 로그인</a>해 주세요.</p>
+  {% if form.errors %}<div class="alert" role="alert"><p>아이디 또는 비밀번호가 맞지 않거나, 운영자 권한이 없는 계정이에요.</p></div>{% endif %}
+  <form method="post" class="form-stack" style="text-align:left">
+    {% csrf_token %}
+    <div class="field"><label for="id_username">아이디</label>{{ form.username }}</div>
+    <div class="field"><label for="id_password">비밀번호</label>{{ form.password }}</div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary btn-block">로그인</button>
+  </form>
+  <p class="muted small">로그인 문제가 있으면 팀장(PM)에게 연락해 주세요.</p>
+</section>
+{% endblock %}

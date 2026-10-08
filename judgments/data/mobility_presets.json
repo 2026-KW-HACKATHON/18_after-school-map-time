@@ -1,0 +1,10 @@
+[
+  {"key": "WHEELCHAIR", "label": "휠체어", "profile": "WHEELCHAIR"},
+  {"key": "STROLLER", "label": "유아차", "profile": "STROLLER"},
+  {"key": "WALKER", "label": "보행 보조기", "profile": "WALKER"},
+  {"key": "CRUTCH", "label": "목발", "profile": "CRUTCH"},
+  {"key": "LIMITED_WALKING", "label": "보행이 불편해요", "profile": "WALKER", "recommendation": "노약자 등 보행이 불편할 때 시작할 수 있는 추천 설정입니다. 나이로 이동 능력을 판단하지 않으며 자신의 능력에 맞게 수정할 수 있어요."},
+  {"key": "COMPANION", "label": "동반자/보호자", "profile": null, "companion": true, "required_selection": true},
+  {"key": "WITH_CHILD", "label": "어린이 동반", "profile": "STROLLER", "companion": true, "legacy": true, "recommendation": "유아차는 초기 추천일 뿐입니다. 동반하는 어린이가 실제로 사용하는 이동 조건을 선택해 주세요."},
+  {"key": "ASSISTED_COMPANION", "label": "이동 보조가 필요한 사람 동반", "profile": "WHEELCHAIR", "companion": true, "legacy": true, "recommendation": "휠체어는 초기 추천일 뿐입니다. 동반자의 실제 이동 조건을 선택하고 수정해 주세요."}
+]

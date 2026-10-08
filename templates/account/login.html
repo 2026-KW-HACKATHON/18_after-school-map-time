@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load socialaccount %}
+{% block title %}로그인 | 턱없네{% endblock %}
+{% block header_brand %}로그인{% endblock %}
+{% block body_class %}flow-shell{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<section class="page narrow screen-page auth-page" data-figma-node="1:197">
+  <h1>한 번의 제보가<br>누군가의 외출을 바꿔요.</h1>
+  <div class="notice"><h2>함께 채우는 우리 동네 지도</h2><p class="muted">제보 처리 상태를 확인하고, 가고 싶은 장소가 개선되면 알림을 받아요.</p></div>
+  <p class="muted">지도와 장소 정보는 로그인 없이 볼 수 있어요.</p>
+  <div class="screen-actions auth-actions">
+    <form method="post" action="{% provider_login_url 'kakao' process='login' %}">
+      {% csrf_token %}
+      {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
+      <button type="submit" class="btn btn-kakao btn-block">카카오로 계속하기</button>
+    </form>
+    <p class="muted small">카카오 계정의 닉네임만 받아요. 이메일·전화번호는 받지 않아요.</p>
+    <a class="btn btn-block" href="{% url 'places:map' %}">로그인 없이 지도 보기</a>
+  </div>
+</section>
+{% endblock %}

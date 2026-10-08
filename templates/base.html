@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}턱없네{% endblock %}</title>
+  <!-- 아이콘: 브라우저 탭(SVG), iPhone 홈 화면(PNG 180), 안드로이드 홈 화면(manifest) -->
+  <link rel="icon" href="{% static 'img/teokeopne-icon.svg' %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <link rel="manifest" href="{% static 'site.webmanifest' %}">
+  <meta name="theme-color" content="#2855a4">
+  {# 큰 글씨 모드: 저장된 선택을 화면이 그려지기 전에 적용 (static/js/common.js 와 같은 키) #}
+  <script>try { if (localStorage.getItem("teokeopne-large-text") === "1") document.documentElement.classList.add("large-text"); } catch (e) {}</script>
+  <!-- Pretendard 웹폰트 (SIL OFL 1.1, README 오픈소스 / 출처 참고) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="{% static 'css/common.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="{% if request.resolver_match.app_name == 'ops' %}ops-shell {% endif %}{% block body_class %}{% endblock %}">
+  {# 키보드·스크린리더: 메뉴를 건너뛰고 본문으로 (Tab 을 처음 누르면 보임) #}
+  <a class="skip-link" href="#main">본문 바로가기</a>
+  <header class="topbar">
+    <a class="logo" href="{% url 'core:home' %}">
+      <span>{% block header_brand %}턱없네{% endblock %}</span>
+    </a>
+    <nav class="nav" aria-label="주 메뉴">
+      <a class="nav-wide" href="{% url 'places:map' %}">지도</a>
+      <a class="nav-wide" href="{% url 'places:search' %}">검색</a>
+      <a class="nav-wide" href="{% url 'reports:new' %}">제보하기</a>
+      {% block nav %}{% endblock %}
+      <button type="button" id="text-size-toggle" class="text-size-toggle" aria-pressed="false" title="글씨를 크게 보기">큰 글씨</button>
+      {% if user.is_authenticated %}
+        {# 알림: 안 읽은 게 있으면 휴대폰에서도 보이게 #}
+        <a href="{% url 'accounts:notifications' %}"{% if not notif_unread %} class="nav-wide"{% endif %}>알림{% if notif_unread %} <span class="badge-positive" aria-label="안 읽은 알림 {{ notif_unread }}개">{{ notif_unread }}</span>{% endif %}</a>
+      {% endif %}
+      {% if wish_nav is not None %}
+        {# 가고 싶어요 누른 가게가 좋아지면 모바일에서도 보이게 (평소엔 넓은 화면에서만) #}
+        <a href="{% url 'owners:wishes' %}"{% if not wish_nav %} class="nav-wide"{% endif %}>가고 싶어요{% if wish_nav %} <span class="badge-positive">좋아진 곳 {{ wish_nav }}</span>{% endif %}</a>
+      {% endif %}
+      {% if owner_nav %}<a href="{{ owner_nav.url }}">{{ owner_nav.label }}{% if owner_nav.pending %} <span class="muted small">(확인 중)</span>{% endif %}</a>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'ops:dashboard' %}">운영자</a>{% endif %}
+      {% if user.is_authenticated %}
+        <a class="nav-wide" href="{% url 'accounts:me' %}" title="내 활동">{{ user.display_name }}님</a>{# 휴대폰에서는 하단 탭의 '내 활동' #}
+        {# 로그아웃은 POST로만 (링크 클릭만으로 로그아웃되는 것 방지). 휴대폰에서는 하단 탭 '내 활동' 화면에 있음 #}
+        <form method="post" action="{% url 'account_logout' %}" class="inline nav-wide">
+          {% csrf_token %}
+          <button type="submit" class="link-button">로그아웃</button>
+        </form>
+      {% else %}
+        {% if request.resolver_match.url_name != 'account_login' %}<a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">로그인</a>{% endif %}
+      {% endif %}
+    </nav>
+  </header>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li class="message {{ message.tags }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <main id="main" tabindex="-1" class="{% block main_class %}container{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block tabbar %}
+  {# Figma 모바일 하단 탭: 지도 · 제보하기 · 내 활동. 데스크톱에서는 상단 메뉴를 씀 #}
+  <nav class="tabbar" aria-label="하단 메뉴">
+    <a href="{% url 'places:map' %}" {% if request.resolver_match.url_name == 'map' %}aria-current="page"{% endif %}>지도</a>
+    <a href="{% url 'reports:new' %}" {% if request.resolver_match.url_name == 'new' %}aria-current="page"{% endif %}>제보하기</a>
+    <a href="{% url 'accounts:me' %}" {% if request.resolver_match.url_name == 'me' %}aria-current="page"{% endif %}>내 활동</a>
+  </nav>
+  {% endblock %}
+
+  <script src="{% static 'js/common.js' %}"></script>
+  {# 사진 올리기 전에 브라우저에서 줄이기 (사진 업로드 폼에만 동작) #}
+  <script src="{% static 'js/photo-resize.js' %}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}제보 접수 완료 | 턱없네{% endblock %}
+{% block header_brand %}제보 완료{% endblock %}
+{% block body_class %}flow-shell{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<section class="page narrow screen-page" data-figma-node="1:367">
+  <p class="done-mark" aria-hidden="true">✓</p>
+  <h1>제보가 접수됐어요.<br>함께 채워주셔서 고마워요.</h1>
+  <div class="notice"><strong>현재 상태 · 확인 중</strong><p class="muted">아직 지도에는 반영되지 않았어요.</p></div>
+  <div class="card"><strong>다음에는 이렇게 진행돼요</strong><p class="muted">접수 → 내용 확인 → 반영 또는 반려 안내</p></div>
+  <p class="muted">처리 결과는 내 활동과 알림에서 확인할 수 있어요.</p>
+  <div class="screen-actions">
+    <a class="btn btn-primary" href="{% url 'accounts:me' %}">내 제보 상태 보기</a>
+    <a class="btn" href="{% url 'places:map' %}">지도로 돌아가기</a>
+    <a class="small" href="{% url 'reports:new' %}">다른 장소 제보하기</a>
+  </div>
+</section>
+{% endblock %}

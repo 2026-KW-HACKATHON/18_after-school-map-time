@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+  장소 상세 (와이어프레임 7번 + 기획 v2)
+  - OP-1 평가하지 않고 사실만: 점수·순위 없음, 수치·출처·확인일
+  - OP-2 방법 먼저: 판단 근거 → 입구(대체 출입구 포함) → 건물 공용 → 가게 안
+  - OP-4 건물 공용 입구와 가게 입구를 섹션으로 나눔
+  - OP-3 사장님 코멘트 영역 / OP-6 확인 중 제보 / OP-8 법 위반 판정이 아니라는 안내
+{% endcomment %}
+
+{% block title %}{{ place.name }} | 턱없네{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block header_brand %}장소 상세{% endblock %}
+{% block content %}
+<article class="place-detail" data-figma-node="1:147 1:170">
+  <header class="detail-header">
+    <p class="muted small"><a href="{% url 'places:map' %}">← 지도</a></p>
+    <h1>{{ place.name }}{% if assistance_badge %} <span class="badge-positive">도움 제공 가게</span>{% endif %}</h1>
+    <p class="muted">
+      {% if place.address %}{{ place.address }} · {% endif %}{{ place.get_category_display }}
+      {% if place.floor != 1 %} · {% if place.floor < 0 %}지하 {{ place.floor|stringformat:"d"|slice:"1:" }}층{% else %}{{ place.floor }}층{% endif %}{% endif %}
+    </p>
+    {% with main_entrance=place_section.entrances.0 %}
+    <div class="photo-slot detail-photo">
+      {% if main_entrance.photo %}<img src="{{ main_entrance.photo.url }}" alt="{{ main_entrance.name }} 사진">{% else %}<p>아직 확인된 입구 사진이 없어요.</p>{% endif %}
+    </div>
+    {% endwith %}
+    <p class="muted small">{% if last_checked %}최근 확인 {{ last_checked|date:"Y.m.d" }}{% else %}확인 정보가 필요해요{% endif %}</p>
+  </header>
+
+  {# 이동 조건 선택 → 판단 근거 (JS 없이도 전부 보이고, JS가 있으면 고른 조건만 보여줌) #}
+  <section class="card" aria-labelledby="judge-title">
+    <h2 id="judge-title">내 이동 조건으로 보면</h2>
+    <div class="chips" role="group" aria-label="이동 조건 선택" id="detail-chips">
+      {% for row in judgments %}
+        <button type="button" class="chip" data-profile="{{ row.profile.key }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}">{{ row.profile.label }}</button>
+      {% endfor %}
+    </div>
+    {% include "includes/mobility_settings.html" with mobility_mode="detail" %}
+    {% for row in judgments %}
+      <div class="judge-panel" data-profile="{{ row.profile.key }}" data-mobility-baseline>
+        <p class="judge-status status-{{ row.judgment.code }}">
+          <span class="judge-dot judge-{{ row.judgment.code }}" aria-hidden="true">{% if row.judgment.icon == "hand" %}✋{% endif %}</span>
+          <strong>{{ row.judgment.label }}</strong>
+          <span class="muted small">{{ row.profile.label }} 기준</span>
+          {% if row.judgment.improved %}<span class="badge-positive">개선 완료</span>{% endif %}
+        </p>
+        <p class="small">{{ row.judgment.explanation }}</p>
+        {% if row.judgment.code == "DIFFICULT" %}
+          {# 가고 싶어요: 어려운 가게에만. 사장님 대시보드의 수요 신호 (기획 v2 4.5·6.2) #}
+          {% if user.is_authenticated %}
+            <form method="post" action="{% url 'owners:wish' place.pk %}" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="profile" value="{{ row.profile.key }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn" aria-pressed="{% if row.profile.key in wished %}true{% else %}false{% endif %}">
+                {% if row.profile.key in wished %}가고 싶어요 ✓ (취소){% else %}가고 싶어요{% endif %}
+              </button>
+            </form>
+          {% else %}
+            <a class="btn" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">가고 싶어요</a>
+          {% endif %}
+          <p class="muted small">"{{ row.profile.label }}로 가고 싶은 손님이 있어요"라고 사장님께 전해져요. 사장님은 무료 경사로 지원사업 안내를 함께 받아요.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+
+  {% if conflicts %}
+  {# 사장님 정보와 주민 제보가 다를 때 (기획 v2 7장): 운영진 판단 전까지 방문 전 확인을 권함 #}
+  <section class="notice" role="note">
+    <p><strong>정보가 서로 달라요</strong> — {{ conflicts|join:", " }}</p>
+    <p class="small">사장님이 알려준 정보와 주민 제보가 달라 운영진이 확인하고 있어요. 방문 전에 전화로 확인해 보세요.{% if place.phone %} <a href="tel:{{ place.phone }}">{{ place.phone }}</a>{% endif %}</p>
+  </section>
+  {% endif %}
+
+  <section class="card" aria-labelledby="trust-title">
+    <h2 id="trust-title">정보 신뢰도</h2>
+    <p class="small">출처: {% if sources %}{{ sources|join:", " }}{% else %}아직 없음{% endif %}</p>
+    {% if "공공데이터" in sources %}<p class="muted small">공공데이터: 공공데이터포털 「한국사회보장정보원_장애인편의시설 현황」 (data.go.kr)</p>{% endif %}
+    <p class="small">최근 확인: {% if last_checked %}{{ last_checked|date:"Y년 n월 j일" }}{% else %}아직 확인된 정보가 없어요{% endif %}</p>
+    {% if verified_user_reports %}<p class="small">💬 주민 제보 {{ verified_user_reports }}건이 반영됐어요.</p>{% endif %}
+    {% if reconfirm_count %}<p class="small">👍 최근 30일 동안 주민 {{ reconfirm_count }}명이 "지금도 맞아요"라고 확인했어요.</p>{% endif %}
+    {% if can_reconfirm %}
+      {# 지금도 맞아요 (Should): 판정은 그대로, 최근 확인일만 갱신. 다르면 제보로 #}
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'reports:reconfirm' place.pk %}" class="inline">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn">지금도 맞아요</button>
+        </form>
+      {% else %}
+        <a class="btn" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">지금도 맞아요</a>
+      {% endif %}
+      <p class="muted small">가게에 다녀오셨나요? 위 정보가 지금도 같다면 눌러 주세요. 다르면 아래 "접근성 정보 제보하기"로 알려 주세요.</p>
+    {% endif %}
+  </section>
+
+  {% if owner_response.assistance_contact or owner_response.assistance_hours or owner_response.alt_entrance %}
+  {# 방법 먼저 (OP-2): 사장님이 알려준 도움 요청 방법·다른 출입구 #}
+  <section class="card" aria-labelledby="help-title">
+    <h2 id="help-title">사장님이 알려준 들어가는 방법</h2>
+    {% if owner_response.alt_entrance %}<p>🚪 {{ owner_response.alt_entrance }}</p>{% endif %}
+    {% if owner_response.assistance_contact %}<p>🙋 도움 요청: {{ owner_response.assistance_contact }}{% if owner_response.assistance_hours %} ({{ owner_response.assistance_hours }}){% endif %}</p>{% endif %}
+    <p class="muted small">{{ owner_response.updated_at|date:"Y년 n월 j일" }} 사장님 작성</p>
+  </section>
+  {% endif %}
+
+  <nav class="facility-links" aria-label="출입구 및 시설 정보">
+    <a class="chip" href="#place-facilities">가게 전용</a>{% if building %}<a class="chip" href="#building-facilities">건물 공용</a>{% endif %}
+  </nav>
+  <section class="card facility-section" id="place-facilities" aria-labelledby="entrance-title">
+    <h2 id="entrance-title">가게 입구</h2>
+    {% for entrance in place_section.entrances %}
+      {% include "places/_entrance.html" %}
+    {% empty %}
+      <p class="muted">아직 입구 정보가 없어요. 알고 계시면 알려주세요.</p>
+    {% endfor %}
+  </section>
+
+  {% if building %}
+  <section class="card section-building facility-section" id="building-facilities" aria-labelledby="building-title">
+    <h2 id="building-title">건물 공용 입구 · 시설</h2>
+    <p class="muted small">{{ building.building }} — 건물 공용 공간 정보예요. 가게가 아닌 건물의 구조입니다.</p>
+    {% for entrance in building.entrances %}
+      {% include "places/_entrance.html" %}
+    {% endfor %}
+    {% include "places/_fields.html" with fields=building.fields %}
+    {% include "places/_facilities.html" with section=building %}
+    <a class="btn" href="{% url 'reports:new' %}?building={{ building.building.pk }}&ownership=BUILDING">건물 공용 시설 제보</a>
+  </section>
+  {% endif %}
+
+  <section class="card facility-section" id="inside-facilities" aria-labelledby="inside-title">
+    <h2 id="inside-title">가게 안 · 편의시설</h2>
+    {% include "places/_fields.html" with fields=place_section.fields %}
+    {% include "places/_facilities.html" with section=place_section %}
+  </section>
+
+  {% if pending_reports %}
+  <section class="card" aria-labelledby="pending-title">
+    <h2 id="pending-title">확인 중인 제보</h2>
+    <p class="muted small">주민이 알려준 새 정보예요. 확인되기 전까지 위의 판정에는 반영되지 않아요. 직접 보셨다면 확인해 주세요.</p>
+    {% for item in pending_reports %}
+      <div class="pending-report">
+        {# 확인 전 사진은 운영진 검수 전이라(기획 v2 4.4) 확인에 참여할 수 있는 로그인 주민에게만 보여 줌 #}
+        {% if item.report.photo %}
+          {% if user.is_authenticated %}<img class="entrance-photo" src="{{ item.report.photo.url }}" alt="제보 사진" loading="lazy">
+          {% else %}<p class="muted small">📷 제보 사진은 로그인하면 볼 수 있어요.</p>{% endif %}
+        {% endif %}
+        <p class="small">{% for v in item.values %}{{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+        {% if item.report.note %}<p class="small">"{{ item.report.note }}"</p>{% endif %}
+        <p class="muted small">{{ item.report.created_at|date:"n월 j일" }} 제보 · 확인 {{ item.confirmations }}/{{ item.required }}명</p>
+        {% if user.is_authenticated %}
+          {% if user.pk != item.report.created_by_id %}
+            <form method="post" action="{% url 'reports:confirm' item.report.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn">맞아요, 저도 확인했어요</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <a class="small" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">로그인하고 확인하기</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section class="card owner-comment" aria-labelledby="owner-title">
+    <h2 id="owner-title">사장님 한마디</h2>
+    {% if owner_response.owner_comment %}
+      <p>"{{ owner_response.owner_comment }}"</p>
+    {% else %}
+      <p class="muted">아직 사장님이 남긴 말이 없어요.</p>
+    {% endif %}
+    {% if is_owner %}
+      <a class="btn" href="{% url 'owners:dashboard' place.pk %}">사장님 화면으로</a>
+    {% else %}
+      <p class="small">사장님이신가요? 도움 제공 여부, 다른 출입구, 이동식 경사로 같은 정보를 직접 보완할 수 있어요.
+        <a href="{% url 'owners:claim' %}">사장님 인증하기 →</a></p>
+    {% endif %}
+  </section>
+
+  <a class="btn btn-primary btn-block" href="{% url 'reports:new' %}?place={{ place.pk }}">접근성 정보 제보하기</a>
+
+  <footer class="notice small muted">
+    이 안내는 「장애인·노인·임산부 등의 편의증진 보장에 관한 법률」 시행규칙의 수치를 <strong>참고한 기준</strong>이며,
+    법 위반 여부를 판단한 것이 아니에요. 소규모 기존 건물은 경사로 등 설치 의무가 없는 경우가 많아요.
+  </footer>
+</article>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/mobility-settings.js' %}"></script>
+<script>
+  // Prefer the link's condition, then the saved condition.
+  (function () {
+    const chips = document.querySelectorAll("#detail-chips .chip");
+    const panels = document.querySelectorAll(".judge-panel");
+    function select(key) {
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.profile === key)));
+      panels.forEach((p) => { p.hidden = p.dataset.profile !== key; });
+    }
+    let saved = null;
+    try { saved = localStorage.getItem("teokeopne.profile"); } catch (e) {}
+    const keys = [...chips].map((c) => c.dataset.profile);
+    const linked = new URLSearchParams(window.location.search).get("profile");
+    select(keys.includes(linked) ? linked : keys.includes(saved) ? saved : keys[0]);
+    function syncMobility() {
+      if (!window.TeokMobility?.state()) return;
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.profile === window.TeokMobility.primaryProfile())));
+      if (window.TeokMobility.needsEvaluation()) panels.forEach((p) => { p.hidden = true; });
+      else select(window.TeokMobility.primaryProfile());
+    }
+    document.addEventListener("mobility:change", syncMobility);
+    window.TeokMobility?.ready().then(syncMobility).catch(() => {});
+    chips.forEach((c) => c.addEventListener("click", () => {
+      if (window.TeokMobility?.state()) { window.TeokMobility.selectPreset(c.dataset.profile); return; }
+      select(c.dataset.profile);
+      try { localStorage.setItem("teokeopne.profile", c.dataset.profile); } catch (e) {}
+    }));
+  })();
+</script>
+{% endblock %}

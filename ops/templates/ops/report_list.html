@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load ops_tags %}
+{% comment %}와이어프레임 15번 "제보 검토 목록"{% endcomment %}
+
+{% block title %}제보 검토 목록 | 턱없네{% endblock %}
+
+{% block extra_js %}
+<script>
+  // 모두 선택: 지금 목록에 보이는 기록 전체 체크·해제
+  (function () {
+    const all = document.getElementById("select-all");
+    if (!all) return;
+    all.addEventListener("change", () => {
+      document.querySelectorAll(".row-check").forEach((box) => { box.checked = all.checked; });
+    });
+  })();
+</script>
+{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page" data-figma-node="1:617">
+  {% include "ops/_nav.html" %}
+  <h1>지역 정보를 함께 지켜요</h1>
+  <p class="muted">새 제보 {{ counts.PENDING }}건 · 오래된 순</p>
+
+  <div class="stat-grid">
+    <div class="card stat"><span class="muted small">대기 중</span><strong>{{ counts.PENDING }}건</strong></div>
+    <div class="card stat"><span class="muted small">승인됨</span><strong>{{ counts.VERIFIED }}건</strong></div>
+    <div class="card stat"><span class="muted small">반려됨</span><strong>{{ counts.REJECTED }}건</strong></div>
+  </div>
+
+  <nav class="chips" aria-label="상태로 거르기">
+    {% for key, label in tabs %}
+      <a class="chip" href="?status={{ key }}" aria-pressed="{% if key == status %}true{% else %}false{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {# 기록 정리: 체크한 제보를 확인 화면을 거쳐 삭제 #}
+  <form method="post" action="{% url 'ops:reports-delete' %}" id="report-select-form" class="select-bar">
+    {% csrf_token %}
+    <input type="hidden" name="back" value="{{ status }}">
+    {% if rows %}
+      <label class="small"><input type="checkbox" id="select-all"> 모두 선택</label>
+      <button type="submit" class="btn">선택한 기록 삭제</button>
+    {% endif %}
+  </form>
+
+  <ul class="result-list">
+    {% for row in rows %}
+      {% with r=row.report %}
+      <li class="selectable-row">
+        <input type="checkbox" name="ids" value="{{ r.pk }}" form="report-select-form" class="row-check"
+               aria-label="{{ r.target_label }} 선택">
+        <a class="card result-card" href="{% url 'ops:report-review' r.pk %}">
+          <span class="muted small">{{ r.created_at|date:"Y.m.d H:i" }} · {{ r|ops_status }}{% if r.created_by %} · {{ r.created_by }}{% endif %}</span>
+          <strong>{{ r.target_label }}</strong>
+          <span class="small">
+            {% for v in r.values.all %}{{ v }}{% if not forloop.last %} · {% endif %}{% empty %}값 없음{% endfor %}
+            {% if r.photo %} · 사진 포함{% endif %}{% if r.note %} · 설명 포함{% endif %}
+          </span>
+          <span class="result-meta">
+            {% if row.downgrade %}<span class="badge-warn">판정 하향 제보</span>{% endif %}
+            {% if r.is_new_place %}<span class="badge-neutral">새 장소</span>{% endif %}
+            {% if row.owner_kind %}<span class="badge-neutral">{{ row.owner_kind }}</span>{% endif %}
+            {% if row.new_account %}<span class="badge-warn">가입 7일 미만</span>{% endif %}
+            {% if row.ai %}<span class="badge-neutral">{{ row.ai }}</span>{% endif %}
+            {% if r.status == "REJECTED" and r.reject_reason %}<span class="muted small">반려: {{ r.reject_reason }}</span>{% endif %}
+          </span>
+        </a>
+      </li>
+      {% endwith %}
+    {% empty %}
+      <li class="muted">해당하는 제보가 없어요.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

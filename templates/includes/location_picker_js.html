@@ -1,0 +1,7 @@
+{% load static %}
+{# 공용 위치 선택 UI. 장소 검색에 필요한 services 라이브러리도 함께 로드한다. #}
+{% if KAKAO_JAVASCRIPT_KEY %}
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{ KAKAO_JAVASCRIPT_KEY }}&autoload=false&libraries=services"></script>
+{% endif %}
+<script src="{% static 'js/map/kakao-adapter.js' %}"></script>
+<script src="{% static 'js/map/location-picker.js' %}"></script>

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 12번 "장소 등록·수정" + 13번 "필수 항목 누락 안내"(화면 위 안내 상자){% endcomment %}
+
+{% block title %}{% if place %}{{ place.name }} 수정{% else %}장소 등록{% endif %} | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  {% include "ops/_nav.html" %}
+  <h1>{% if place %}장소 수정: {{ place.name }}{% else %}장소 등록{% endif %}</h1>
+
+  {% if missing %}
+    <div class="alert" role="alert">
+      <p><strong>필수 항목이 누락되었습니다.</strong> 아래 항목을 입력해 주세요.</p>
+      <ul>{% for m in missing %}<li>{{ m }}</li>{% endfor %}</ul>
+    </div>
+  {% elif form.errors %}
+    <div class="alert" role="alert"><p>입력 값을 다시 확인해 주세요.</p></div>
+  {% endif %}
+
+  {% if place %}
+  <section class="card" aria-labelledby="facility-inventory-title">
+    <h2 id="facility-inventory-title">접근 시설 현황</h2>
+    <p class="small muted">시설 종류와 소속을 확인할 수 있어요. 확인 중인 새 시설은 제보 검토에서 승인하면 등록돼요.</p>
+    {% for section in facility_sections %}
+      <h3>{{ section.label }} · {{ section.parent }}</h3>
+      <ul class="plain-list">
+      {% for item in section.rows %}
+        <li>
+          <strong>{{ item.kind_label }}</strong> · {{ item.name }}
+          {% if item.report %}
+            <span class="badge-neutral">{{ item.report.get_status_display }}</span>
+            <span class="muted small">{{ item.report.observed_at|date:"Y년 n월 j일" }} 확인</span>
+            <a href="{% url 'ops:report-review' item.report.pk %}">제보 내용 확인</a>
+          {% else %}<span class="muted small">제보 기록 없음</span>{% endif %}
+        </li>
+      {% empty %}<li class="muted small">등록된 접근 시설이 없어요.</li>{% endfor %}
+      {% for report in section.pending %}
+        <li><strong>{{ report.get_facility_kind_display }}</strong> · {{ report.facility_name|default:"새 시설" }}
+          <span class="badge-neutral">새 시설 확인 중</span>
+          <a href="{% url 'ops:report-review' report.pk %}">제보 검토</a></li>
+      {% endfor %}
+      </ul>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <form method="post" class="form-stack">
+    {% csrf_token %}
+    <fieldset class="card">
+      <legend>기본 정보</legend>
+      {% include "reports/_field.html" with field=form.name %}
+      {% include "reports/_field.html" with field=form.category %}
+      {% include "reports/_field.html" with field=form.address %}
+      {% include "reports/_field.html" with field=form.floor %}
+      {% include "reports/_field.html" with field=form.phone %}
+      {% include "includes/location_picker.html" %}
+      <div class="coord-row">
+        {% include "reports/_field.html" with field=form.lat %}
+        {% include "reports/_field.html" with field=form.lng %}
+      </div>
+      {% if place %}{% include "reports/_field.html" with field=form.is_closed %}{% endif %}
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>입구 정보 <span class="muted small">(주 출입구 · 모르면 비워 두기 — 기존 값 유지)</span></legend>
+      {% if place %}<p class="small muted">승인·확인된 최신 입구 정보가 표시돼요. 확인 중인 제보는 <a href="{% url 'ops:reports' %}">제보 검토</a>에서 승인하면 반영돼요.</p>{% endif %}
+      {% for field in entrance_fields %}{% include "reports/_field.html" %}{% endfor %}
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>제보 이동 조건</legend>
+      <input type="hidden" name="profiles_present" value="1">
+      {% include "reports/_field.html" with field=form.profiles %}
+      <p class="small muted">승인된 주 출입구 제보의 이동 조건을 수정할 수 있어요. 선택을 바꿔도 입구 정보에 따른 접근성 판정은 그대로예요.</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>가게 안 · 사장님 확인 정보</legend>
+      {% for field in place_fields %}{% include "reports/_field.html" %}{% endfor %}
+      <p class="muted small">건물 공용 정보(엘리베이터 등)와 다른 출입구는 <a href="{% url 'admin:index' %}">관리자 화면</a>에서 입력해요.</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>출처 및 확인일</legend>
+      {% include "reports/_field.html" with field=form.source_note %}
+      {% include "reports/_field.html" with field=form.observed_on %}
+      {% include "reports/_field.html" with field=form.memo %}
+    </fieldset>
+
+    {% if place %}
+    <fieldset class="card">
+      <legend>사장님 인증 코드</legend>
+      <p class="small muted">답사 때 사장님께 전달하는 1회용 6자리 코드예요. 사장님이 입력하면 '사장님 인증'에서 승인해 주세요.</p>
+      {% include "ops/_claim_codes.html" with codes=claim_codes %}
+      <button type="submit" class="btn" form="claim-code-form">새 코드 발급</button>
+    </fieldset>
+    {% if place.building %}
+    <fieldset class="card">
+      <legend>건물주 인증 코드 · {{ place.building }}</legend>
+      <p class="small muted">건물 공용 입구·엘리베이터는 건물주님이 관리해요. 건물주님이 인증하면 건물 정보 정정 요청과 개선 효과 시뮬레이션을 볼 수 있어요.</p>
+      {% include "ops/_claim_codes.html" with codes=building_claim_codes %}
+      <button type="submit" class="btn" form="building-claim-code-form">건물주 코드 발급</button>
+    </fieldset>
+    {% endif %}
+    {% endif %}
+
+    <p class="notice small">저장하면 입력한 값이 '팀 답사' 기록으로 바로 공개 지도에 반영되고 판정이 다시 계산돼요. 이전 값은 기록으로 남아요.</p>
+    <button type="submit" class="btn btn-primary btn-block">장소 저장</button>
+  </form>
+  {% if place %}
+    <section class="card">
+      <h2>장소 삭제</h2>
+      <p class="small muted">이 장소와 연결된 기록을 영구 삭제합니다. 삭제 전에 확인 화면이 열려요.</p>
+      <a class="btn" href="{% url 'ops:place-delete' place.pk %}">장소 삭제하기</a>
+    </section>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+{% if place %}<form id="claim-code-form" method="post" action="{% url 'ops:claim-code' place.pk %}">{% csrf_token %}</form>{% endif %}
+{% if place.building %}<form id="building-claim-code-form" method="post" action="{% url 'ops:building-claim-code' place.building.pk %}">{% csrf_token %}<input type="hidden" name="place" value="{{ place.pk }}"></form>{% endif %}{% include "includes/location_picker_js.html" %}{% endblock %}

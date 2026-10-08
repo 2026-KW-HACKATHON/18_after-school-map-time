@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% comment %}사장님 대시보드 (기획 v2 4.5): 가게가 얻는 것 — 잠재 손님 숫자, 개선 가이드, 지원사업{% endcomment %}
+
+{% block title %}{{ place.name }} 사장님 화면 | 턱없네{% endblock %}
+
+{% block content %}
+<section class="page narrow">
+  <p class="muted small"><a href="{% url 'owners:home' %}">← 내 가게</a></p>
+  <h1>{{ place.name }}</h1>
+  <p class="muted">이 화면은 사장님께만 보여요. <a href="{% url 'places:detail' place.pk %}">손님에게 보이는 상세 화면 →</a></p>
+
+  <section class="card">
+    <h2>지금 지도에 이렇게 보여요</h2>
+    <ul class="plain-list">
+      {% for j in judgments %}
+        <li><strong>{{ j.profile.label }}</strong>: {{ j.display.label }}{% if j.reason %} <span class="muted small">— {{ j.reason }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">점수나 순위가 아니라, 입구 수치로 이동 조건별 안내 문구를 정해요. 정보가 다르면 아래에서 정정을 요청해 주세요.</p>
+  </section>
+
+  <section class="card">
+    <h2>이번 달 우리 가게를 찾아본 손님</h2>
+    <p>이동 조건별 조회 {{ total_views }}번 · "가고 싶어요" {{ total_wishes }}명</p>
+    <table class="diff-table">
+      <thead><tr><th>이동 조건</th><th>이번 달 조회</th><th>가고 싶어요</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+          <tr><th scope="row">{{ row.profile.label }}</th><td>{{ row.views }}번</td><td>{{ row.wishes }}명</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">휠체어·유아차 등으로 이동하는 분들도 잠재 손님이에요. 입구가 편해지면 이 숫자가 실제 방문으로 이어질 수 있어요.</p>
+  </section>
+
+  <section class="card">
+    <h2>바로 할 수 있는 개선</h2>
+    {% if ramp %}
+      <p>입구 단차 <strong>{{ ramp.step_cm }}cm</strong> → 이동식 경사로 <strong>약 {{ ramp.ramp_cm }}cm 이상</strong>이면 휠체어·유아차가 오를 수 있어요.</p>
+      <p class="muted small">경사로 길이 = 단차 × 8 (완만한 기울기 1/8 기준). 경사로를 두고 직원이 도와드린다고 알려주시면, 사진 확인 후 "도움 받으면 들어갈 수 있어요"로 바뀌어요.</p>
+    {% else %}
+      <p class="muted">입구 단차 정보가 없거나 턱이 없어요.</p>
+    {% endif %}
+    <div class="actions" style="justify-content:flex-start">
+      <a class="btn btn-primary" href="{% url 'owners:declaration' place.pk %}">도움 제공·경사로 알리기</a>
+      <a class="btn" href="{% url 'owners:response' place.pk %}">사장님 한마디·도움 요청 방법</a>
+      <a class="btn" href="{% url 'owners:correction' place.pk %}">잘못된 정보 정정 요청</a>
+      {% if photo_pending %}
+        <span class="btn" aria-disabled="true">입구 사진 교체 확인 중</span>
+      {% else %}
+        <a class="btn" href="{% url 'owners:photo' place.pk %}">입구 사진 교체 요청</a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if place.building %}
+  <section class="card">
+    <h2>건물 공용 입구 개선</h2>
+    <p>우리 가게는 <strong>{{ place.building }}</strong> 건물에 있어요. 건물 공용 입구는 건물주님이 개선할 수 있어요.</p>
+    <p class="muted small">건물 입구가 좋아지면 건물 안 가게들이 어떻게 달라지는지 계산한 페이지예요. 건물주님께 보여 드리세요.</p>
+    <a class="btn" href="{% url 'owners:building-improve' place.building.pk %}">건물 개선 효과 보기 · 공유</a>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>경사로 설치 지원사업</h2>
+    {% for p in programs %}
+      <div class="entrance">
+        <h3>{{ p.title }}</h3>
+        <p class="small">{{ p.target_desc|linebreaksbr }}</p>
+        <p class="muted small">{% if p.period %}기간: {{ p.period }} · {% endif %}{% if p.contact %}문의: {{ p.contact }}{% endif %}</p>
+        {% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">자세히 보기 →</a>{% endif %}
+      </div>
+    {% empty %}
+      <p class="muted">현재 안내 중인 지원사업이 없어요. 구청에 경사로 설치 지원을 문의해 보세요.</p>
+    {% endfor %}
+    <p class="muted small">턱없네는 신청을 대신하지 않고 안내만 해요.</p>
+  </section>
+
+  <section class="card">
+    <h2>보낸 요청</h2>
+    <ul class="plain-list">
+      {% for item in my_reports %}
+        <li class="small">
+          {% with r=item.report %}
+          {{ r.created_at|date:"n월 j일" }} · {% if item.kind %}{{ item.kind }}{% else %}{% for v in r.values.all %}{{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+          · <strong>{{ r.get_status_display }}</strong>{% if r.reject_reason %} — 반려 사유: {{ r.reject_reason }}{% endif %}
+          {% endwith %}
+        </li>
+      {% empty %}
+        <li class="muted small">아직 보낸 요청이 없어요.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <p class="notice small muted">
+    턱없네의 안내는 「장애인·노인·임산부 등의 편의증진 보장에 관한 법률」 시행규칙의 수치를 <strong>참고한 기준</strong>이며, 법 위반 여부를 판단한 것이 아니에요.
+    소규모 기존 건물은 경사로 등 설치 의무가 없는 경우가 많아요. 가게에 과금하거나 돈을 받고 노출을 바꾸는 일은 없어요.
+  </p>
+</section>
+{% endblock %}

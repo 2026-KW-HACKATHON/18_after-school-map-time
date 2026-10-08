@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% load ops_tags %}
+{% load static %}
+{% comment %}
+  와이어프레임 16번 "제보 상세 검토" + 17번 "충돌 정보 확인" (한 화면).
+  승인·반려는 브라우저 확인 창을 한 번 더 거친다 (되돌릴 수 없는 작업)
+{% endcomment %}
+
+{% block title %}제보 검토 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page narrow ops-review" data-figma-node="1:626 1:646">
+  {% include "ops/_nav.html" %}
+  <p><a href="{% url 'ops:reports' %}">← 제보 검토 목록</a></p>
+  <h1>{{ report.target_label }}</h1><p class="muted">제보 내용과 기존 정보를 비교해요</p>
+
+  <section class="card">
+    <h2>{{ report.target_label }} <span class="badge-neutral">{{ report|ops_status }}</span>{% if owner_kind %} <span class="badge-neutral">{{ owner_kind }}</span>{% endif %}</h2>
+    {% if report.facility_kind %}<p>제안 시설: {{ report.get_facility_kind_display }} · {{ report.facility_name|default:"이름 미입력" }}</p>{% endif %}
+    {% if report.facility %}<p>시설: {{ report.facility.get_kind_display }} · {{ report.facility.name }}</p>{% endif %}
+    <p class="small">위치 설명: {{ report.location_text|default:"없음" }}</p>
+    {% if report.lat != None and report.lng != None %}<p class="small">제보 좌표: {{ report.lat }}, {{ report.lng }}</p>{% endif %}
+    <p class="small">현장 확인일: {{ report.observed_at|date:"Y년 n월 j일" }}</p>
+    <p class="small">제출자: {{ report.created_by|default:"알 수 없음" }} · 제출 {{ report.created_at|date:"Y년 n월 j일 H:i" }}</p>
+    {% if report.created_by and report.created_by.is_new_account %}<p><span class="badge-warn">가입 7일 미만 계정</span></p>{% endif %}
+    {% if downgrade_places >= abuse_threshold %}
+      <p class="alert small">이 제보자는 최근 7일 동안 서로 다른 장소 {{ downgrade_places }}곳에 판정을 내리는 제보를 했어요. 악의적인 제보인지 확인해 주세요. (기획 v2 7장)</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>제보 사진 및 주민 설명</h2>
+    {% if photo_request %}
+      <div class="photo-compare">
+        <figure><figcaption class="small muted">지금 공개된 사진</figcaption>
+          {% if current_photo %}<img class="entrance-photo" src="{{ current_photo.url }}" alt="지금 공개된 입구 사진">{% else %}<p class="muted">공개된 사진 없음</p>{% endif %}</figure>
+        <figure><figcaption class="small muted">요청과 함께 온 새 사진</figcaption>
+          {% if report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="새 사진">{% else %}<p class="muted">새 사진 없음 — 지금 사진만 내려 달라는 요청일 수 있어요</p>{% endif %}</figure>
+      </div>
+    {% elif report.photo %}<img class="entrance-photo" src="{{ report.photo.url }}" alt="제보 사진">{% else %}<p class="muted">사진 없음</p>{% endif %}
+    <p>{{ report.note|default:"설명 없음" }}</p>
+    {% if report.profiles %}<p class="muted small">제보자가 고른 이동 조건: {{ report.profiles|join:", " }}</p>{% endif %}
+    <p class="muted small">정면 얼굴은 올릴 때 자동으로 흐리게 처리돼요. 옆모습·뒷모습으로 알아볼 수 있는 사람이나 차량 번호판이 보이면 반려하고 다시 찍어 달라고 안내해 주세요. (기획 v2 4.4)</p>
+    <p class="muted small">인터넷·지도 로드뷰 캡처나 워터마크가 있는 사진처럼 제보자가 직접 찍지 않은 사진은 저작권 문제로 공개하지 말고 반려해 주세요.</p>
+  </section>
+
+  <section class="card">
+    <h2>기존 공개 정보와 차이</h2>
+    <table class="diff-table">
+      <thead><tr><th>항목</th><th>현재 공개 정보</th><th>제보 내용</th></tr></thead>
+      <tbody>
+        {% for row in diff %}
+          <tr{% if row.conflict %} class="conflict"{% endif %}>
+            <th scope="row">{{ row.label }}</th>
+            <td>{% if row.current %}{{ row.current }}<br><span class="muted small">{{ row.current_at|date:"Y년 n월" }} 확인</span>{% else %}<span class="muted">정보 없음</span>{% endif %}</td>
+            <td>{{ row.proposed }}{% if row.conflict %}<br><span class="badge-warn">값이 달라요</span>{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="muted">관측값 없이 설명만 있는 제보예요.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% if ai.enabled or ai.latest %}
+  {# 운영자 AI 검토 보조 (reports/ai.py, AI 명세 v1.2 A안): 후보만 보여 주고 자동 승인은 없음 #}
+  <section class="card" id="ai">
+    <h2>AI 검토 보조 <span class="badge-neutral">후보만 보여 줘요</span></h2>
+    {% if ai.warnings %}<div class="alert small" role="alert"><strong>AI 설정 확인</strong><ul>{% for w in ai.warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% endif %}
+    <p class="muted small">AI는 사진·설명에서 출입구·시설 항목 후보를 뽑을 뿐이에요. 맞는 항목만 골라 저장하고, 승인은 아래에서 직접 해요. AI 후보를 저장한 제보는 운영자만 승인할 수 있어요.</p>
+
+    {% if ai.latest %}
+      {% if ai.status == "FAILED" %}
+        <p class="alert small">AI 분석을 완료하지 못했어요. 사진과 설명을 직접 검토해 주세요.{% if ai.error_message %} ({{ ai.error_message }}){% endif %}</p>
+      {% elif ai.status == "PROCESSING" %}
+        <p class="small">분석 중이에요. 잠시 뒤 새로고침해 주세요.</p>
+      {% elif ai.old_schema %}
+        <p class="alert small">이전 버전으로 분석한 결과라 후보를 쓸 수 없어요. 재분석이 필요합니다.</p>
+      {% else %}
+        <p><strong>요약</strong> {{ ai.summary|default:"없음" }}</p>
+        {% if ai.warnings %}<ul class="plain-list small">{% for w in ai.warnings %}<li><span class="badge-warn">확인</span> {{ w }}</li>{% endfor %}</ul>{% endif %}
+        {% if ai.manual_check_items %}<p class="small"><strong>직접 확인할 것</strong></p><ul class="small">{% for m in ai.manual_check_items %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+        {% if ai.input_changed %}<p class="alert small">분석한 뒤에 제보 내용이나 항목 설정이 바뀌었어요. 다시 분석해 주세요.</p>{% endif %}
+
+        {% if ai.selection_form %}
+          {% with f=ai.selection_form %}
+          <form method="post" class="form-stack" action="#ai">
+            {% csrf_token %}
+            {{ f.analysis_id }}
+            {% if f.non_field_errors %}<div class="alert">{{ f.non_field_errors }}</div>{% endif %}
+            {% for e in f.selected_keys.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
+            <div class="table-scroll">
+            <table class="diff-table ai-table">
+              <thead><tr><th>저장</th><th>항목</th><th>제보 값</th><th>AI 후보 (근거)</th><th>저장할 값</th></tr></thead>
+              <tbody>
+                {% for row in f.rows %}
+                  {% if row.excluded %}
+                  <tr class="muted"><td></td><th scope="row">{{ row.label }}</th><td colspan="3" class="small">분석 제외 (꺼진 항목)</td></tr>
+                  {% else %}
+                  <tr>
+                    <td><input type="checkbox" name="selected_keys" value="{{ row.key }}" id="ai-pick-{{ row.key }}" aria-label="{{ row.label }} 저장"{% if row.key in f.selected_keys.value %} checked{% endif %}></td>
+                    <th scope="row"><label for="ai-pick-{{ row.key }}">{{ row.label }}</label></th>
+                    <td>{% if row.current %}{{ row.current }}{{ row.unit }}{% else %}<span class="muted">-</span>{% endif %}</td>
+                    <td>{% if row.candidate != "" %}<strong>{{ row.candidate }}{{ row.unit }}</strong>{% elif row.needs_text %}<span class="muted">설명 필요</span><br><span class="muted small">사진만으로는 알 수 없는 항목이에요</span>{% else %}<span class="muted">모름</span>{% endif %}
+                      {% if row.evidence %}<br><span class="muted small">{{ row.certainty }} · {{ row.source }} — {{ row.evidence }}</span>{% endif %}</td>
+                    <td>{{ row.field }}{% for e in row.field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</td>
+                  </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+            </div>
+            <div class="field"><label><input type="checkbox" name="privacy_checked"{% if f.privacy_checked.value %} checked{% endif %}> {{ f.privacy_checked.label }}</label>
+              {% for e in f.privacy_checked.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}</div>
+            <button type="submit" name="action" value="ai_save" class="btn">고른 값 제보에 저장</button>
+            <p class="muted small">저장해도 제보는 '확인 중'이에요. 고르지 않은 항목은 그대로 두고, 분석 하나에 한 번만 저장할 수 있어요.</p>
+          </form>
+          {% endwith %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    {% if ai.history %}
+      <p class="small"><strong>AI 후보 저장 기록</strong></p>
+      <ul class="small">
+        {% for h in ai.history %}
+          {% if h.source == "resident_prefill" %}
+          <li>제보자 {{ h.by_name }}이(가) 'AI로 항목 채우기' 값을 그대로 제출 · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+          {% else %}
+          <li>{{ h.by_name }} · {{ h.at|date:"n월 j일 H:i" }} — {% for c in h.changes %}{{ c.label }} {{ c.before }} → {{ c.after }}{% if not forloop.last %}, {% endif %}{% endfor %}</li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if ai.blocked %}
+      <p class="muted small">{{ ai.blocked }}</p>
+    {% elif report.status == "PENDING" %}
+      <form method="post" class="form-stack" action="#ai">
+        {% csrf_token %}
+        <p class="small">분석을 누르면 이 제보의 사진 1장과 아래 설명(전화번호는 가림)이 <strong>{{ ai.recipient }}</strong>로 전송돼요. 이름·계정·좌표·이동 조건은 보내지 않아요.</p>
+        <blockquote class="small">{{ ai.masked_note|default:"(설명 없음)" }}</blockquote>
+        <div class="field"><label><input type="checkbox" name="privacy_checked"> {{ ai.analyze_form.privacy_checked.label }}</label></div>
+        <button type="submit" name="action" value="ai_analyze" class="btn">{% if ai.latest %}AI 후보 다시 불러오기{% else %}AI 후보 불러오기{% endif %}</button>
+        <p class="muted small">오늘 {{ ai.attempts }}/{{ ai.limit }}회 사용. 같은 내용은 다시 부르지 않고 이전 결과를 보여 줘요.</p>
+      </form>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if report.status == "PENDING" and not report.is_new_place %}
+  <section class="card">
+    <h2>승인하면 판정이 이렇게 바뀌어요</h2>
+    {% if changes %}
+      <ul class="plain-list">
+        {% for c in changes %}
+          <li>{{ c.profile }}: {{ c.before_label }} → <strong>{{ c.after_label }}</strong>{% if c.direction == "DOWN" %} <span class="badge-warn">하향</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% if direction == "DOWN" %}<p class="small muted">판정을 내리는 제보는 주민 2명 확인 또는 운영자 승인이 있어야 반영돼요. 사진으로 사실인지 꼭 확인해 주세요.</p>{% endif %}
+    {% else %}
+      <p class="muted">판정은 바뀌지 않아요. (값만 더 정확해짐)</p>
+    {% endif %}
+    {% if required %}
+      <p class="muted small">주민 확인 {{ confirmations|length }}/{{ required }}명{% for c in confirmations %}{% if forloop.first %}: {% endif %}{{ c.user }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    {% else %}
+      {% if ai.staff_only %}
+        <p class="muted small">AI 후보 값이 들어간 제보라(운영자 저장 또는 제보자의 'AI로 항목 채우기') 운영자만 승인해요.{% if ai.excluded_confirmations %} 고치기 전에 받은 주민 확인 {{ ai.excluded_confirmations }}건은 바뀐 값에 대한 확인이 아니라서 반영 조건에서 뺐어요.{% endif %}</p>
+      {% else %}
+        <p class="muted small">이 제보는 주민 확인 없이 운영자가 검토해요 (시설 제보, 사진 교체 요청, 또는 새 계정의 하향 제보).</p>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if report.status == "PENDING" %}
+  <form method="post" class="card form-stack" id="ops-review-form">
+    {% csrf_token %}
+    <h2>검토 의견 및 처리</h2>
+    {% if form.non_field_errors %}<div class="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+    {% if report.is_new_place %}
+      <fieldset>
+        <legend>새 장소로 등록</legend>
+        {% include "reports/_field.html" with field=form.place_name %}
+        {% include "reports/_field.html" with field=form.category %}
+        {% include "reports/_field.html" with field=form.address %}
+        {% include "reports/_field.html" with field=form.floor %}
+        {% include "reports/_field.html" with field=form.phone %}
+        {% if report.lat %}<p class="small muted">제보자가 표시한 위치가 먼저 찍혀 있어요. 사진과 위치 설명을 보고 맞는지 확인해 주세요.</p>
+        {% else %}<p class="small muted">제보자가 지도 위치를 표시하지 않았어요. 위치 설명: {{ report.location_text|default:"없음" }}</p>{% endif %}
+        {% include "includes/location_picker.html" %}
+        <div class="coord-row">
+          {% include "reports/_field.html" with field=form.lat %}
+          {% include "reports/_field.html" with field=form.lng %}
+        </div>
+      </fieldset>
+    {% endif %}
+
+    {% if photo_request %}
+      <div class="field"><label><input type="checkbox" name="{{ form.remove_current_photo.html_name }}" id="{{ form.remove_current_photo.id_for_label }}"{% if form.remove_current_photo.value %} checked{% endif %}> {{ form.remove_current_photo.label }}</label>
+        <p class="muted small">승인할 때 체크하면 지금 사진을 지워요 (되돌릴 수 없음). 새 사진이 있으면 승인 후 새 사진이 보여요.</p></div>
+    {% endif %}
+    {% include "reports/_field.html" with field=form.review_note %}
+    <details id="ops-reject-panel" class="ops-reject-panel" {% if form.reject_reason.errors %}open{% endif %}>
+      <summary>반려 사유 작성</summary>
+      <h2>제보자에게 확인이 필요한 내용을 알려주세요</h2>
+      <p class="muted">부드럽고 구체적인 안내를 보내 주세요. 이 제보는 반려 처리되며 사유가 알림으로 전달돼요.</p>
+      {% include "reports/_field.html" with field=form.reject_reason %}
+      <button type="submit" name="action" value="reject" class="btn btn-primary btn-block" onclick="return confirm('제보를 반려하시겠습니까? 반려 사유가 제출자에게 전달됩니다.')">반려 사유 보내기</button>
+    </details>
+
+    <div class="actions" style="justify-content:flex-start">
+      <button type="submit" name="action" value="approve" class="btn btn-primary"
+              onclick="return confirm('제보를 승인하시겠습니까? 승인하면 공개 지도에 바로 반영되고 판정이 다시 계산됩니다.')">
+        {% if report.is_new_place %}새 장소로 등록하고 승인{% else %}승인 및 공개 반영{% endif %}
+      </button>
+<a class="btn" href="#ops-reject-panel" data-ops-reject>반려 사유 작성</a>
+    </div>
+  </form>
+  {% else %}
+  <section class="card">
+    <h2>처리 기록</h2>
+    <p class="small">{{ report|ops_status }} · {{ report.reviewed_at|date:"Y년 n월 j일 H:i" }}{% if report.reviewed_by %} · {{ report.reviewed_by }}{% endif %}</p>
+    {% if report.review_note %}<p class="small">검토 의견: {{ report.review_note }}</p>{% endif %}
+    {% if report.reject_reason %}<p class="small">반려 사유: {{ report.reject_reason }}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {# 기록 정리: 이 제보 기록 삭제 (확인 화면을 거침) #}
+  <form method="post" action="{% url 'ops:reports-delete' %}" class="card">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ report.pk }}">
+    <input type="hidden" name="back" value="{{ report.status }}">
+    <p class="small muted">잘못 들어온 제보나 정리할 기록은 지울 수 있어요. 다음 화면에서 한 번 더 확인해요.</p>
+    <button type="submit" class="btn">이 기록 삭제</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/ops-review.js' %}"></script>
+{% if report.status == "PENDING" and report.is_new_place %}
+  {% include "includes/location_picker_js.html" %}
+{% endif %}
+{% endblock %}

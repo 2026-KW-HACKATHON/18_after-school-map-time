@@ -1,0 +1,74 @@
+{% load static %}<!doctype html>
+{% comment %}
+  전시·주민투표용 QR 포스터 (A4 세로 한 장). 10/11~13 전시장에 붙이거나 테이블에 세워 둔다.
+  QR은 qrcode-generator(MIT, cdnjs)로 브라우저에서 그린다. 불러오지 못해도 주소는 크게 보인다.
+{% endcomment %}
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>전시 포스터 | 턱없네</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  {# 판정 색(--judge-*)과 모양(.judge-dot)은 공통 CSS 그대로 #}
+  <link rel="stylesheet" href="{% static 'css/common.css' %}">
+  <link rel="stylesheet" href="{% static 'places/css/places.css' %}">
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body { font-family: Pretendard, system-ui, sans-serif; margin: 0; color: #1f2328; background: #fff; text-align: center; }
+    .toolbar { padding: 12px; }
+    .poster { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .logo { display: inline-flex; align-items: center; gap: 12px; font-size: 40px; font-weight: 800; }
+    .logo img { width: 56px; height: 56px; }
+    h1 { font-size: 34px; line-height: 1.35; margin: 24px 0 8px; }
+    .lead { font-size: 20px; color: #4b5563; margin: 0 0 24px; }
+    .qr { width: 320px; height: 320px; margin: 0 auto; }
+    .qr svg { width: 320px; height: 320px; }
+    .url { font-size: 18px; margin: 12px 0 28px; word-break: break-all; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; }
+    .step { border: 2px solid #e5e7eb; border-radius: 14px; padding: 14px; font-size: 17px; line-height: 1.5; }
+    .step strong { display: block; font-size: 22px; margin-bottom: 4px; }
+    .legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin: 24px 0 8px; font-size: 16px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .foot { font-size: 14px; color: #6b7280; margin-top: 20px; }
+    @media print { .toolbar { display: none; } }
+    @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .qr, .qr svg { width: 240px; height: 240px; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button type="button" onclick="window.print()">인쇄하기</button></div>
+
+  <main class="poster">
+    <div class="logo"><img src="{% static 'img/teokeopne-icon.svg' %}" alt=""> 턱없네</div>
+    <h1>이 가게, 휠체어·유아차로<br>들어갈 수 있을까?</h1>
+    <p class="lead">{{ region.name|default:"월계1동" }} 가게 입구 정보를 이동 조건별로 알려 드려요</p>
+
+    <div class="qr" data-qr="{{ site_url }}" aria-label="턱없네 지도 QR 코드"></div>
+    <p class="url">{{ site_url }}</p>
+
+    <div class="steps">
+      <div class="step"><strong>① 찍기</strong>휴대폰 카메라로 QR을 찍어요</div>
+      <div class="step"><strong>② 고르기</strong>휠체어·유아차·보행 보조기·목발 중 내 이동 조건을 골라요</div>
+      <div class="step"><strong>③ 확인·제보</strong>들어갈 수 있는 곳을 보고, 다른 정보가 있으면 알려 주세요</div>
+    </div>
+
+    <div class="legend" aria-label="지도 표시">
+      {% for item in legend %}
+        <span><span class="judge-dot judge-{{ item.code }}" aria-hidden="true">{% if item.icon == "hand" %}✋{% endif %}</span>{{ item.label }}</span>
+      {% endfor %}
+    </div>
+    <p class="foot">턱없네는 가게를 평가하지 않아요. 들어가는 방법을 알려주고, 문턱을 없앨 수 있게 연결해요.<br>
+      글씨가 작으면 화면 위쪽 <strong>큰 글씨</strong>를 눌러 주세요. · 2026 광운대학교 해커톤 18조 방과 후 지도타임</p>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script>
+    document.querySelectorAll("[data-qr]").forEach(function (el) {
+      if (typeof qrcode === "undefined") return;
+      var qr = qrcode(0, "M");
+      qr.addData(el.dataset.qr);
+      qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 0 });
+    });
+  </script>
+</body>
+</html>

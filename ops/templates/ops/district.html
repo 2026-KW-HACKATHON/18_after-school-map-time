@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% comment %}
+  구청용 지역 집계 (기획 v2 8장 '구청 대시보드', 6.1). 운영자만 본다.
+  공개 랭킹이 아니라 경사로 지원사업 대상 발굴·사후 관리용 내부 자료 (기획 v2 3.2, OP-7)
+{% endcomment %}
+
+{% block title %}지역 집계 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page">
+  {% include "ops/_nav.html" %}
+  <h1>{{ region.name }} 지역 집계</h1>
+  <p class="muted">구청과 함께 볼 내부 자료예요. 공개 화면에는 이런 목록·순위를 보여 주지 않아요.</p>
+
+  <section class="card">
+    <h2>한눈에</h2>
+    <ul class="plain-list">
+      <li>공개 장소 <strong>{{ summary.places }}곳</strong></li>
+      <li>"개선 완료" 가게 <strong>{{ summary.improved }}곳</strong></li>
+      <li>"가고 싶어요" <strong>{{ summary.wishes }}건</strong></li>
+      <li>인증된 사장님·건물주 <strong>{{ summary.owners }}명</strong></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>이동 조건별 판정 분포</h2>
+    <table class="diff-table">
+      <thead>
+        <tr><th>이동 조건</th>{% for cell in distribution.0.cells %}<th>{{ cell.label }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in distribution %}
+          <tr><th scope="row">{{ row.profile.label }}</th>{% for cell in row.cells %}<td>{{ cell.count }}곳</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>재답사가 필요한 가게</h2>
+    <p class="small">확인된 정보가 없는 가게 <strong>{{ recheck.never }}곳</strong> · {{ recheck.days }}일 넘게 확인이 없는 가게 <strong>{{ recheck.stale_count }}곳</strong></p>
+    <p class="muted small">최근 확인 = 팀 답사·반영된 제보·주민 "지금도 맞아요" 중 가장 최근. 오래된 순으로 최대 20곳.</p>
+    <ul class="plain-list">
+      {% for r in recheck.stale %}
+        <li class="small"><a href="{% url 'ops:place-edit' r.place.pk %}">{{ r.place.name }}</a> — {{ r.last|date:"Y년 n월 j일" }} ({{ r.days }}일 전)</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>경사로 지원사업 검토 목록</h2>
+    <p class="small muted">어떤 이동 조건으로든 "혼자 들어가기 어려워요"인 가게예요. 개선 의지(사장님·건물주 인증) → 가고 싶어요 → 이번 달 조회 순으로 놓았어요.</p>
+    <p><a class="btn" href="{% url 'ops:district-csv' %}">CSV 내려받기 (구청 전달용)</a></p>
+    <div class="table-scroll">
+    <table class="diff-table">
+      <thead>
+        <tr><th>가게</th><th>어려운 조건 · 사실</th><th>필요한 경사로</th><th>가고 싶어요</th><th>이번 달 조회</th><th>인증</th></tr>
+      </thead>
+      <tbody>
+        {% for r in candidates %}
+          <tr>
+            <th scope="row"><a href="{% url 'ops:place-edit' r.place.pk %}">{{ r.place.name }}</a>{% if r.place.floor != 1 %} <span class="muted small">({{ r.place.floor }}층)</span>{% endif %}</th>
+            <td class="small">{{ r.profiles|join:", " }}{% if r.reason %}<br><span class="muted">{{ r.reason }}</span>{% endif %}</td>
+            <td class="small">{% if r.ramp_cm %}약 {{ r.ramp_cm }}cm{% else %}-{% endif %}</td>
+            <td>{{ r.wishes }}</td>
+            <td>{{ r.views }}</td>
+            <td class="small">{% if r.owner %}사장님{% endif %}{% if r.owner and r.building_owner %} · {% endif %}{% if r.building_owner %}건물주{% endif %}{% if not r.owner and not r.building_owner %}-{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted">"혼자 들어가기 어려워요"인 가게가 없어요.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="muted small">필요한 경사로 = 입구 단차 × 8 (기울기 1/8 기준, 팀 기준). 실제 설치 가능 여부는 구청 현장 점검으로 정해져요.</p>
+  </section>
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 14번 "장소 저장 완료"{% endcomment %}
+
+{% block title %}저장 완료 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page narrow center">
+  <p class="done-mark" aria-hidden="true">✓</p>
+  <h1>저장 완료</h1>
+  <p>{{ place.name }} 정보가 저장되어 공개 지도에 반영됐어요.{% if last %} (최근 확인 {{ last|date:"Y년 n월 j일" }}){% endif %}</p>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'ops:dashboard' %}">대시보드로 돌아가기</a>
+    <a class="btn" href="{% url 'places:detail' place.pk %}">공개 화면에서 보기</a>
+    <a class="btn" href="{% url 'ops:place-edit' place.pk %}">이어서 수정</a>
+  </div>
+</section>
+{% endblock %}

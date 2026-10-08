@@ -1,0 +1,81 @@
+# ─────────────────────────────────────────────────────────
+# CD: EC2 자동 배포
+#
+# 흐름:
+#   Docker 이미지 빌드 → Docker Hub push (latest + 커밋 SHA 태그)
+#   → EC2 SSH 접속 → git pull (compose·nginx 설정 변경도 반영)
+#   → 이미지 pull → 새 이미지 collectstatic → 재시작 → migrate
+#   → 안 쓰는 이미지 정리 → /health/ 확인
+#
+# 필요한 GitHub Secrets (Settings → Secrets and variables → Actions):
+#   DOCKER_USERNAME  Docker Hub 아이디
+#   DOCKER_PASSWORD  Docker Hub 액세스 토큰 (비밀번호 대신 토큰 권장)
+#   EC2_HOST         EC2 탄력적 IP
+#   EC2_KEY          EC2 접속용 .pem 파일 내용 전체
+#
+# 트리거: develop에 push(=PR 머지)되면 자동 실행. Actions 탭 → Run workflow로 수동 실행도 가능.
+# ─────────────────────────────────────────────────────────
+
+name: Deploy to EC2
+
+on:
+  workflow_dispatch: # 수동 실행
+
+  push:
+    branches:
+      - develop
+
+# 배포가 동시에 두 개 돌지 않게 (먼저 시작한 배포가 끝날 때까지 대기)
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE: cjs1004ounds/teokeopne
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v7
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Docker 이미지 빌드 및 push (latest + 커밋 SHA)
+        # SHA 태그는 롤백용: 서버 .env 의 IMAGE_TAG를 이전 SHA로 바꾸면 그 버전으로 되돌릴 수 있음
+        run: |
+          docker build -t "$IMAGE:latest" -t "$IMAGE:${{ github.sha }}" .
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
+
+      - name: EC2에 배포
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd ~/teokeopne
+            git pull origin develop
+
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+            $COMPOSE pull web
+            # worker가 옛 manifest를 기억하지 않도록 새 정적 파일을 먼저 준비한다.
+            # --clear를 쓰지 않아 이전 페이지가 참조하는 해시 파일도 보존한다.
+            $COMPOSE run --rm --no-deps web python manage.py collectstatic --noinput
+            $COMPOSE up -d
+            $COMPOSE exec -T web python manage.py migrate --noinput
+
+            # 예전 이미지가 쌓여서 EC2 디스크가 차는 것 방지
+            docker image prune -f
+
+            # 배포 확인: 실제 도메인으로 /health/ 호출 (실패하면 이 단계가 빨간불)
+            DOMAIN=$(grep '^DOMAIN=' .env | cut -d= -f2)
+            curl -fsS --retry 10 --retry-delay 3 --retry-all-errors "https://$DOMAIN/health/"

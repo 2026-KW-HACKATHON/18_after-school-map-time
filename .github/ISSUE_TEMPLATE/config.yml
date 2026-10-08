@@ -1,0 +1,8 @@
+# 이슈는 반드시 템플릿(기능/버그/디자인/문서/잡무)으로만 만들게 함 → 이슈 형식 통일
+blank_issues_enabled: false
+
+# TODO: 디스코드 초대 링크가 정해지면 아래 주석을 풀고 url을 채우세요.
+# contact_links:
+#   - name: 💬 디스코드에서 물어보기
+#     url: https://discord.gg/<초대코드>
+#     about: 간단한 질문이나 막힌 부분은 이슈 대신 디스코드에서 빠르게 물어보세요.

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if q %}"{{ q }}" 검색{% else %}장소 검색{% endif %} | 턱없네{% endblock %}
+{% block header_brand %}장소 검색{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'places/css/places.css' %}">{% endblock %}
+{% block content %}
+<section class="page narrow search-page" data-figma-node="1:104 1:438">
+  <h1>장소 검색</h1>
+  <form method="get" class="search-bar" role="search">
+    <label for="q" class="sr-only">장소 이름이나 주소</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="장소 이름이나 주소 검색" autofocus>
+    <button type="submit" class="btn btn-primary">검색</button>
+    <label for="search-profile" class="sr-only">이동 조건</label>
+    <select name="profile" id="search-profile">{% for p in profiles %}<option value="{{ p.key }}" {% if p == profile %}selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
+    <input type="hidden" name="category" value="{{ category }}">
+  </form>
+  <nav class="category-filters" aria-label="장소 업종">
+    {% for key, label in categories %}<a class="chip" href="?q={{ q|urlencode }}&profile={{ profile.key }}&category={{ key }}" {% if key == category %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+  </nav>
+  {% include "includes/mobility_settings.html" with mobility_mode="search" %}
+  <div data-mobility-baseline>
+  {% if searched %}
+    {% if results %}
+      <h2>{{ region.name }} {% if q %}검색 결과{% else %}전체 장소{% endif %}</h2>
+      <p class="small muted">전체 {{ page_obj.paginator.count }}곳 · {{ profile.label }} 기준</p>
+      <ul class="result-list">
+        {% for r in results %}
+        <li><a class="card result-card" href="{% url 'places:detail' r.place.pk %}?profile={{ profile.key }}">
+          <strong>{{ r.place.name }}</strong>
+          <span class="muted">{% if r.facts %}{{ r.facts }}{% else %}입구 정보 확인이 필요해요{% endif %}</span>
+          <span class="result-status status-{{ r.judgment.code }}"><span class="judge-dot judge-{{ r.judgment.code }}" aria-hidden="true">{% if r.judgment.icon == "hand" %}✋{% endif %}</span>{{ r.judgment.label }}</span>
+          <span class="muted small">{% if r.last_checked %}확인 {{ r.last_checked|date:"Y.m" }}{% else %}확인 정보 없음{% endif %}</span>
+        </a></li>
+        {% endfor %}
+      </ul>
+      {% if page_obj.has_other_pages %}
+      <nav class="screen-actions" aria-label="장소 목록 페이지">
+        <p class="small muted">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 페이지</p>
+        {% if page_obj.has_previous %}<a class="btn" href="?{{ pagination_query }}&amp;page={{ page_obj.previous_page_number }}">이전 장소</a>{% endif %}
+        {% if page_obj.has_next %}<a class="btn" href="?{{ pagination_query }}&amp;page={{ page_obj.next_page_number }}">다음 장소</a>{% endif %}
+      </nav>
+      {% endif %}
+    {% else %}
+      <h2>{% if q %}아직 일치하는 장소를 찾지 못했어요.{% else %}아직 등록된 장소가 없어요.{% endif %}</h2>
+      <p class="muted">{% if q %}"{{ q }}"(으)로 등록된 장소가 없어요. 장소 이름이나 주소를 바꿔 검색해 보세요.{% else %}이 지역과 업종에 등록된 장소가 없어요. 다른 업종을 선택하거나 새 장소로 제안해 주세요.{% endif %}</p>
+      <div class="notice"><strong>지도를 함께 채워주세요</strong><p>알고 있는 장소라면 새 장소로 제안할 수 있어요.</p></div>
+      <div class="screen-actions"><a class="btn btn-primary" href="{% url 'places:search' %}">다시 검색하기</a><a class="btn" href="{% url 'reports:new' %}">새 장소 제안하기</a></div>
+    {% endif %}
+  {% else %}<p class="muted">아직 서비스 지역이 등록되지 않았어요.</p>{% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/mobility-settings.js' %}"></script>{% endblock %}

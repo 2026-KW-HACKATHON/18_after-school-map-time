@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+{% comment %}
+  내 활동 (Could "제보 포인트·배지"): 내 제보가 어떻게 처리됐는지, 기여 수, 긍정 배지만 (기획 v2 OP-5).
+  순위·다른 사람과의 비교는 보여 주지 않는다.
+{% endcomment %}
+
+{% block title %}내 활동 | 턱없네{% endblock %}
+
+{% block header_brand %}내 활동{% endblock %}
+{% block content %}
+<section class="page narrow" data-figma-node="1:385">
+  <h1>우리 동네의 변화를<br>함께 만들고 있어요.</h1>
+  <p class="small muted">{{ user.display_name }}님의 활동</p>
+  <p class="muted">알려 주신 정보 덕분에 이웃이 헛걸음을 덜 해요.</p>
+
+  <section class="card activity-summary">
+    <h2>제보 {{ counts.reports }}건 · 반영 {{ counts.verified_reports }}건</h2>
+    <ul class="plain-list">
+      <li>지도에 반영된 제보 <strong>{{ counts.verified_reports }}건</strong>{% if counts.pending_reports %} · 확인 중 {{ counts.pending_reports }}건{% endif %}</li>
+      <li>다른 주민의 제보 확인 <strong>{{ counts.confirmations }}번</strong></li>
+      <li>"지금도 맞아요" <strong>{{ counts.reconfirmations }}번</strong></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>배지</h2>
+    <ul class="plain-list">
+      {% for b in badges %}
+        <li>
+          {% if b.earned %}<span class="badge-positive">{{ b.name }}</span>{% else %}<span class="badge-neutral">{{ b.name }} {{ b.progress }}</span>{% endif %}
+          <span class="small muted">{{ b.description }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>내 제보</h2>
+    <div class="activity-filters" role="group" aria-label="내 제보 상태">
+      <button type="button" class="chip" data-activity-filter="ALL" aria-pressed="true">전체</button>
+      <button type="button" class="chip" data-activity-filter="PENDING" aria-pressed="false">확인 중</button>
+      <button type="button" class="chip" data-activity-filter="VERIFIED" aria-pressed="false">반영됨</button>
+    </div>
+    <ul class="plain-list activity-list">
+      {% for item in reports %}
+        {% with r=item.report %}
+        <li data-activity-status="{{ r.status }}">
+          <strong>{% if item.place and not item.place.is_closed %}<a href="{% url 'places:detail' item.place.pk %}">{{ item.place.name }}</a>{% else %}{{ r.target_label }}{% endif %}</strong>
+          · {{ r.created_at|date:"n월 j일" }}
+          {% if item.values %}· {% for v in item.values %}{{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+          <br>
+          {% if r.status == "VERIFIED" %}<span class="badge-positive">지도에 반영됐어요</span>
+          {% elif r.status == "REJECTED" %}<span class="badge-neutral">반영되지 않았어요</span>{% if r.reject_reason %} <span class="muted">— {{ r.reject_reason }}</span>{% endif %}
+          {% else %}<span class="badge-neutral">확인 중</span> <span class="muted">{{ item.progress }}</span>{% endif %}
+        </li>
+        {% endwith %}
+      {% empty %}
+        <li class="muted">아직 제보가 없어요. 가 본 가게의 입구 정보를 알려 주세요.</li>
+      {% endfor %}
+    </ul>
+    <p class="muted small" data-activity-empty hidden>이 상태의 제보가 없어요.</p>
+    <p class="small muted">최근 제보 30건을 보여요.</p>
+    <div class="actions" style="justify-content:flex-start">
+      <a class="btn btn-primary" href="{% url 'reports:new' %}">제보하기</a>
+      <a class="btn" href="{% url 'owners:wishes' %}">가고 싶어요 목록</a>
+    </div>
+  </section>
+
+  <a class="btn btn-block" href="{% url 'accounts:notifications' %}">알림 확인하기</a>
+  <form method="post" action="{% url 'account_logout' %}" class="center">
+    {% csrf_token %}
+    <button type="submit" class="btn">로그아웃</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/activity.js' %}"></script>{% endblock %}

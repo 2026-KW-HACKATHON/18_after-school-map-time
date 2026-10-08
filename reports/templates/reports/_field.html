@@ -1,0 +1,15 @@
+{% if field.is_hidden %}{{ field }}{% else %}
+<div class="field{% if field.errors %} has-error{% endif %}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {% if field.name == "photo" and form.kept_photo_url %}
+    {# 오류로 다시 보여 줄 때 올렸던 사진을 보관 중 (core/uploads.py) — 다시 고르지 않아도 됨 #}
+    <div class="kept-photo">
+      <img src="{{ form.kept_photo_url }}" alt="올리신 사진 미리 보기" loading="lazy">
+      <p class="small">올리신 사진을 그대로 쓸게요. 바꾸려면 아래에서 새로 골라 주세요.</p>
+    </div>
+  {% endif %}
+  {{ field }}
+  {% if field.help_text %}<p class="muted small" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+  {% for e in field.errors %}<p class="field-error" role="alert">{{ e }}</p>{% endfor %}
+</div>
+{% endif %}

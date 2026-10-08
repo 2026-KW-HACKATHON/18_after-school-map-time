@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}접근성 정보 제보 | 턱없네{% endblock %}
+{% block body_class %}flow-shell{% endblock %}
+{% block header_brand %}접근성 정보 제보{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<section class="page narrow screen-page report-wizard" id="report-wizard" data-figma-node="1:212 1:249 1:286 1:304 1:341 1:455 1:476 1:655">
+  <p class="report-progress" id="report-progress" role="status" aria-live="polite" hidden></p>
+  <h1 id="report-heading" tabindex="-1">직접 확인한 정보를 알려주세요.</h1>
+  {% if form.errors %}
+  <div class="notice report-retry" role="alert" id="report-errors">
+    <strong>입력 내용을 다시 확인해 주세요.</strong>
+    <p>작성 내용과 보관된 사진은 유지돼요. 표시된 항목을 고친 뒤 다시 제출해 주세요.</p>
+    {% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="get" class="card form-stack report-step" id="facility-selector" data-report-step="2">
+    {% if place %}<input type="hidden" name="place" value="{{ place.pk }}">{% endif %}
+    {% if building %}<input type="hidden" name="building" value="{{ building.pk }}">{% endif %}
+    {% include "reports/_field.html" with field=form.ownership %}
+    {% include "reports/_field.html" with field=form.facility_kind %}
+    <noscript><button type="submit" class="btn">이 시설의 입력 항목 보기</button><p class="small muted">작성 전에 시설을 선택해 주세요. JavaScript를 켜면 작성 내용이 유지되며 자동으로 바뀝니다.</p></noscript>
+    <p class="muted small" id="facility-switch-status" role="status" aria-live="polite">시설을 바꿔도 사진과 위치는 유지돼요.</p>
+  </form>
+
+  <form method="post" enctype="multipart/form-data" class="form-stack" id="report-form">
+    {% csrf_token %}
+    <input type="hidden" name="facility_kind" value="{{ form.kind }}" id="report-kind">
+    <input type="hidden" name="ownership" value="{{ selected_ownership }}" id="report-ownership">
+
+    <div class="report-step" data-report-step="1">
+      {% if not place and not building %}
+      <div class="report-place-finder" id="report-place-finder" data-places-url="{% url 'api:place-list' %}" data-report-url="{% url 'reports:new' %}" data-region="{{ region.code }}">
+        <label for="report-place-query">장소 검색</label>
+        <div class="picker-tools"><input type="search" id="report-place-query" placeholder="장소 이름 또는 주소"><button type="button" class="btn" id="report-place-find">검색</button></div>
+        <p class="small muted" id="report-place-status" role="status" aria-live="polite"></p>
+        <ul class="result-list" id="report-place-results"></ul>
+      </div>
+      <details id="report-new-place" {% if form.is_bound %}open{% endif %}><summary>찾는 장소가 없어요 · 새 장소 제안</summary>
+      {% endif %}
+      <fieldset class="card">
+        <legend>장소 정보</legend>
+        {% if place %}
+          <input type="hidden" name="place" value="{{ place.pk }}">
+          <div class="card"><strong data-report-place>{{ place.name }}</strong><p class="muted">{{ place.address }} · {{ place.floor }}층</p></div>
+          <p class="small"><a href="{% url 'places:search' %}">다른 장소 찾기</a></p>
+        {% elif building %}
+          <input type="hidden" name="building" value="{{ building.pk }}">
+          <div class="card"><strong data-report-place>{{ building }}</strong><p class="muted">건물 공용 시설</p></div>
+        {% else %}
+          <div class="notice"><strong>지도에 없는 장소를 알려주세요.</strong><p class="small">이미 등록된 장소는 <a href="{% url 'places:search' %}">장소 검색</a>에서 찾을 수 있어요.</p></div>
+          {% include "reports/_field.html" with field=form.suggested_name %}
+          {% include "reports/_field.html" with field=form.suggested_address %}
+          <div class="coord-row">
+            {% include "reports/_field.html" with field=form.suggested_category %}
+            {% include "reports/_field.html" with field=form.suggested_floor %}
+          </div>
+          {% include "reports/_field.html" with field=form.suggested_phone %}
+        {% endif %}
+        <div id="report-location">
+          {% if show_picker %}{% include "reports/_location_fields.html" %}{% endif %}
+        </div>
+        {% include "reports/_field.html" with field=form.location_text %}
+      </fieldset>
+      {% if not place and not building %}</details>{% endif %}
+    </div>
+
+    <div class="report-step" data-report-step="2">
+      <fieldset class="card">
+        <legend>기존 시설 선택 / 새 시설 제안</legend>
+        {% include "reports/_field.html" with field=form.target_reference %}
+        {% include "reports/_field.html" with field=form.facility_name %}
+        <p class="muted small">새 시설은 검토 후 공개돼요. 기존 시설을 확인했다면 목록에서 골라 주세요.</p>
+      </fieldset>
+    </div>
+
+    <div class="report-step" data-report-step="3">
+      <div class="photo-slot report-photo" id="report-photo-preview" data-preview-url="{% url 'reports:photo-preview' %}">
+        <p>＋ <span data-facility-label>{{ kind_label }}</span> 사진</p>
+        <p class="small">바닥부터 시설까지, 턱이나 경사로가 함께 보이게 찍어 주세요.</p>
+        <img id="report-preview-image" alt="선택한 제보 사진" {% if form.kept_photo_url %}src="{{ form.kept_photo_url }}"{% else %}hidden{% endif %}>
+        <p id="report-preview-status" class="small" role="status" aria-live="polite"></p>
+      </div>
+      <fieldset class="card">
+        <legend><span data-facility-label>{{ kind_label }}</span> 사진</legend>
+        {% include "reports/_field.html" with field=form.photo %}
+        {{ form.photo_token }}
+        <p class="notice small">사진은 필수예요. 10MB 이하로 올려 주세요. 아이폰 HEIC 사진도 사용할 수 있어요.</p>
+        <p class="small muted">HEIC/HEIF를 고르면 턱없네 서버에서 미리보기용 JPEG로 변환해요. 미리보기 사진은 저장하지 않아요.</p>
+      </fieldset>
+    </div>
+
+    <div class="report-step" data-report-step="4">
+      <p class="muted">모르는 값은 추측하지 않아도 괜찮아요. 수치는 직접 측정했을 때만 입력해 주세요.</p>
+      {% if ai_prefill %}
+      <div class="notice ai-prefill" id="ai-prefill" data-url="{% url 'reports:ai-prefill' %}">
+        <h2>사진에서 확인할 내용을 정리해요</h2>
+        <p class="small muted">AI 제안은 참고용이에요. 최종 정보는 제보자가 선택합니다.</p>
+        <button type="button" class="btn btn-block" id="ai-prefill-button">AI로 항목 채우기</button>
+        <p class="muted small">누르면 고른 사진과 '추가 설명'이 {{ ai_recipient }}의 AI로 전송돼 빈 칸을 채워요(사진 위치 정보는 지우고 얼굴은 가린 뒤 전송). AI 값은 틀릴 수 있으니 꼭 확인해 주세요. AI 값을 그대로 내면 운영진이 확인한 뒤 반영돼요. 하루 {{ ai_prefill_limit }}번까지.</p>
+        <p class="small" id="ai-prefill-status" role="status" aria-live="polite"></p>
+        <input type="hidden" name="ai_prefill_token" id="ai-prefill-token" value="{{ ai_prefill_token }}">
+      </div>
+      <div id="ai-report-review" class="report-summary" hidden>
+        <div class="card"><h2>사진 기반 제안 · 직접 확인 필요</h2><div id="ai-report-facts"></div><p class="muted">최종 정보는 제보자가 선택합니다.</p></div>
+        <button type="button" class="btn btn-primary btn-block" id="ai-report-accept">제안 내용을 확인하고 계속</button>
+        <button type="button" class="btn btn-block" id="ai-report-edit">직접 입력으로 수정하기</button>
+      </div>
+      {% endif %}
+      <fieldset class="card" id="report-manual-fields">
+        <legend><span data-facility-label>{{ kind_label }}</span> 정보 <span class="muted small">(아는 것만 · 수치는 선택)</span></legend>
+        <div id="facility-observations">{% include "reports/_observation_fields.html" %}</div>
+      </fieldset>
+      <div id="report-manual-note">{% include "reports/_field.html" with field=form.note %}</div>
+    </div>
+
+    <div class="report-step" data-report-step="5">
+      <div id="report-summary" class="report-summary" hidden aria-label="입력한 제보 내용"></div>
+      <fieldset class="card">
+        <legend>마지막 확인</legend>
+        {% include "reports/_field.html" with field=form.observed_on %}
+        {% include "reports/_field.html" with field=form.profiles %}
+      </fieldset>
+      <div class="notice"><strong>확인 후 지도에 반영돼요</strong><p class="small">새 시설과 출입구 외 시설은 운영자가 검토한 뒤 공개됩니다. 기존 입구 제보는 주민 확인 또는 운영자 검토로 반영됩니다.</p></div>
+      {% if ai_notice %}
+        <p class="muted small" id="ai-notice">{{ ai_notice }}</p>
+        <input type="hidden" name="notice_token" value="{{ form.notice_token_value }}">
+      {% endif %}
+    </div>
+
+    <div class="report-navigation">
+      <p class="small" id="report-step-error" role="alert" hidden></p>
+      <button type="button" class="btn wizard-back" id="report-previous" hidden>이전 단계</button>
+      <button type="button" class="btn btn-primary btn-block" id="report-next" hidden>다음</button>
+      <button type="submit" class="btn btn-primary btn-block" id="report-submit">제보 제출하기</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+{% block extra_js %}
+{% include "includes/location_picker_js.html" %}
+<script src="{% static 'js/reports/facility-switcher.js' %}"></script>
+{% if ai_prefill %}<script src="{% static 'js/reports/ai-prefill.js' %}"></script>{% endif %}
+<script src="{% static 'js/reports/report-wizard.js' %}"></script>
+<script src="{% static 'js/reports/photo-preview.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,268 @@
+/* ─────────────────────────────────────────────────────────
+   지도·장소 화면. 판정 색은 common.css 의 --judge-* 변수만 쓴다 (빨간색 없음).
+   색만으로 구분하지 않도록: 미확인 = 점선 테두리, 조건부 = 손 아이콘 (기획 v2 3.1)
+   ───────────────────────────────────────────────────────── */
+
+/* ── 판정 표시 (마커·목록·상세 공통) ── */
+.judge-dot, .map-marker {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%; border: 2px solid #fff;
+  font-size: 12px; line-height: 1;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.judge-ACCESSIBLE  { background: var(--judge-accessible); }
+.judge-CONDITIONAL { background: var(--judge-conditional); }
+.judge-DIFFICULT   { background: var(--judge-difficult); }
+.judge-UNKNOWN     { background: var(--judge-unknown); border: 2px dashed var(--judge-unknown-border); box-shadow: none; }
+.judge-NONE        { background: var(--color-primary); }
+
+.map-marker { width: 28px; height: 28px; cursor: pointer; padding: 0; font-size: 14px; }
+.map-marker:focus-visible { outline: 3px solid var(--color-text); outline-offset: 2px; }
+.my-location {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--color-primary); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(59, 108, 246, 0.25);
+}
+
+
+/* ── 지도 화면: 데스크톱 [패널 | 지도], 모바일 [지도 위 / 패널 아래] ── */
+.map-layout { padding: 0; }
+#map-app { display: flex; height: calc(100dvh - var(--topbar-height)); }
+.map-panel {
+  width: 360px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; padding: 16px;
+  background: var(--color-surface); border-right: 1px solid var(--color-border);
+}
+/* 목록 스크롤바가 이동 조건 칩의 너비를 줄이거나 검색·조건 영역을 밀어내지 않게 분리 */
+.map-panel > * { flex-shrink: 0; }
+.map-panel > .map-results {
+  flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior-y: contain;
+}
+#profile-chips .chip { flex-shrink: 0; white-space: nowrap; }
+.map-unavailable, .map:empty { display: flex; align-items: center; justify-content: center; padding: 16px; color: var(--color-muted); background: #eef1f5; text-align: center; }
+
+.panel-label { margin: 0 0 8px; font-weight: 600; }
+.toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0 12px; }
+.toggle .toggle-label { white-space: nowrap; }  /* "모든 장소 보기"가 글자 중간에서 줄바꿈되지 않게 */
+
+.legend { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; font-size: 13px; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+
+.place-list { list-style: none; padding: 0; margin: 0; }
+.place-item {
+  display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px;
+  border-bottom: 1px solid var(--color-border); color: var(--color-text);
+}
+.place-item:hover, .place-item:focus-visible { background: #f0f4ff; }
+.place-item-body { display: flex; flex-direction: column; gap: 2px; }
+
+@media (max-width: 768px) {
+  #map-app { flex-direction: column-reverse; height: auto; }
+  .map-panel { width: 100%; border-right: 0; border-top: 1px solid var(--color-border); }
+  .map-panel > .map-results { flex: none; max-height: 50dvh; }
+}
+
+/* ── 장소 상세 ── */
+.place-detail { display: grid; gap: 16px; max-width: 720px; margin: 0 auto; }
+.place-detail h1 { margin: 4px 0; }
+.place-detail h2 { margin: 0 0 12px; font-size: 18px; }
+.place-detail h3 { margin: 12px 0 4px; font-size: 15px; }
+.judgment-list { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.judgment-list li { display: flex; gap: 10px; align-items: flex-start; }
+.section-building { background: #fafbfc; }
+.fields { margin: 0; display: grid; gap: 4px; }
+.field-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--color-border); }
+.field-row dt { color: var(--color-muted); }
+.field-row dd { margin: 0; text-align: right; }
+.entrance + .entrance { margin-top: 12px; }
+/* 입구 사진: 세로 사진도 잘리지 않게 전체를 보여 줌 (문턱·계단이 사진 아래쪽에 있는 경우가 많음). 누르면 원본 크기 */
+.entrance-photo { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--color-bg); border-radius: 8px; margin: 4px 0 8px; }
+.notice { padding: 12px; border-top: 1px solid var(--color-border); }
+.link-disabled { color: var(--color-muted); pointer-events: none; }
+
+/* ── 지도 홈: 검색·요약·빈 상태·오류·팝업 (와이어프레임 1·2·3·6번) ── */
+.search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-bar input[type="search"] { flex: 1; min-width: 0; }
+.search-bar select { padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.summary { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; font-size: 14px; }
+.summary li { display: flex; align-items: center; gap: 8px; }
+.summary strong { margin-left: auto; }
+.empty-state { display: grid; gap: 8px; margin-bottom: 12px; }
+.empty-state .actions { justify-content: flex-start; }
+.map-wrap { flex: 1; min-width: 0; position: relative; }
+.map-wrap .map { position: absolute; inset: 0; }
+.map-error, .popup { position: absolute; left: 16px; right: 16px; z-index: 5; }
+.map-error { top: 16px; padding: 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); display: grid; gap: 8px; }
+.popup { bottom: 16px; max-width: 420px; margin: 0 auto; padding: 16px; }
+.popup p { margin: 6px 0; }
+.popup-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-right: 28px; }
+.popup-close { position: absolute; top: 8px; right: 8px; border: 0; background: none; font-size: 20px; cursor: pointer; }
+@media (max-width: 768px) {
+  .map-wrap { height: 50dvh; flex: none; }
+}
+
+/* ── 검색 결과 (와이어프레임 4·5번). 카드 목록 기본은 common.css ── */
+.result-status { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+
+/* ── 상세: 판단 근거·확인 중 제보 (와이어프레임 7번) ── */
+.judge-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.pending-report { padding: 12px 0; border-top: 1px dashed var(--color-border); }
+
+/* ── 큰 글씨 모드 (common.css 의 html.large-text 와 짝) ── */
+html.large-text .legend,
+html.large-text .summary,
+html.large-text .result-status { font-size: 18px; }
+html.large-text .place-detail h2 { font-size: 23px; }
+html.large-text .place-detail h3 { font-size: 20px; }
+html.large-text .judge-dot { width: 26px; height: 26px; }
+
+/* 개인화: 기본 화면은 간단하게, 세부 입력은 기존 field/btn를 사용하는 dialog에 분리 */
+.mobility-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.mobility-toolbar select { min-width: 0; max-width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.mobility-settings > p:empty { display: none; }
+.mobility-settings > p { margin: 4px 0; }
+.map-condition-tools { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 4px 8px; align-items: center; margin-bottom: 8px; }
+.map-condition-tools .panel-label { margin: 0; }
+.map-condition-tools .mobility-settings, .map-condition-tools .mobility-toolbar { display: contents; }
+.map-condition-tools .mobility-settings > p, .map-condition-tools .mobility-result { grid-column: 1 / -1; }
+.map-condition-tools .btn { padding: 8px; white-space: nowrap; }
+html.large-text .map-condition-tools .btn { padding: 10px 8px; }
+.mobility-dialog { width: min(580px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text); }
+.mobility-dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+.mobility-dialog h2 { margin-top: 0; }
+.mobility-dialog select { width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.mobility-field { margin: 12px 0; }
+.mobility-multiple { margin: 16px 0; }
+.mobility-reference { margin: 16px 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); }
+.mobility-reference summary { cursor: pointer; font-weight: 600; }
+.mobility-reference .field-row { flex-wrap: wrap; }
+.mobility-reference .field-row dd { overflow-wrap: anywhere; }
+.mobility-multiple-choice { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+/* 계정 저장 동의 (회원만 보임) */
+.mobility-consent { margin: 16px 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); }
+.mobility-consent legend { padding: 0 4px; font-weight: 600; }
+.mobility-consent .consent-terms { margin: 8px 0; }
+.mobility-consent .consent-terms div { margin: 4px 0; }
+.mobility-consent .consent-terms dt { display: inline; font-weight: 600; }
+.mobility-consent .consent-terms dt::after { content: " · "; }
+.mobility-consent .consent-terms dd { display: inline; margin: 0; }
+.mobility-consent-check { display: flex; gap: 8px; align-items: flex-start; padding-top: 4px; font-weight: 600; }
+.mobility-consent-check input { flex: none; width: 20px; height: 20px; margin-top: 2px; }
+.mobility-actions { justify-content: flex-end; }
+@media (max-width: 768px) {
+  .mobility-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: 16px 16px 32px; }
+}
+
+
+/* Figma 01/19: mobile search → map → nearby list, desktop 342px panel. */
+.map-layout { padding: 16px 32px 32px; }
+#map-app { --map-content-height: max(440px, min(700px, calc(100dvh - 140px))); display: grid; grid-template-columns: 342px minmax(0, 1fr); gap: 24px; height: auto; min-height: calc(100dvh - 100px); align-items: start; }
+.map-panel { width: auto; height: var(--map-content-height); min-height: 0; border: 0; padding: 0; overflow: hidden; gap: 16px; }
+/* 큰 글씨·짧은 화면에서도 목록을 남기고, 펼친 조건 도구는 별도로 스크롤한다. */
+.map-discovery { display: grid; gap: 14px; max-height: calc(100% - 160px); overflow-y: auto; }
+.map-discovery h1 { font-size: 24px; }
+.map-mobile-title { display: none; }
+.map-discovery .search-bar { margin: 0; }
+.map-options { font-size: 12px; color: var(--color-muted); }
+.map-options summary { cursor: pointer; padding: 8px 0; }
+.map-options .summary { margin-top: 8px; }
+#profile-chips { margin: 0; }
+.map-condition-tools { display: block; margin: 0; }
+.map-condition-tools .mobility-settings { display: block; }
+.map-condition-tools .mobility-toolbar { display: flex; }
+.map-condition-tools .panel-label { display: none; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) .mobility-settings,
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) .mobility-toolbar { display: contents; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips { display: flex; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips .chip { width: 100%; }
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) #profile-chips .chip[aria-pressed="false"],
+.map-condition-tools:has([data-mobility-open]:not(:disabled)) [data-mobility-more] { display: none; }
+.map-panel > .map-results { flex: 1; min-height: 0; overflow-y: auto; max-height: 100%; }
+.map-wrap { height: var(--map-content-height); min-height: 440px; border-radius: 18px; overflow: hidden; background: var(--color-bg); }
+.map-unavailable, .map:empty { background: var(--color-bg); }
+.map-wrap .map { border-radius: 18px; }
+.place-list { display: grid; gap: 14px; }
+.place-item { padding: 16px; border: 0; border-radius: var(--radius); background: var(--color-bg); }
+.place-item-body { gap: 6px; flex: 1; min-width: 0; }
+.place-item:hover, .place-item:focus-visible { background: var(--color-soft); }
+.map-results h2 { margin-bottom: 14px; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; grid-column: 2; color: var(--color-muted); margin: 0; font-size: 12px; }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.judge-dot, .map-marker { background: var(--color-gray); border: 0; color: var(--color-muted); box-shadow: none; }
+.judge-ACCESSIBLE { background: var(--color-green-soft); color: var(--judge-accessible); }
+.judge-CONDITIONAL { background: var(--color-soft); color: var(--judge-conditional); }
+.judge-DIFFICULT { background: var(--color-gray); color: var(--color-muted); }
+.judge-UNKNOWN { background: var(--color-surface); border: 1px dashed var(--judge-unknown-border); }
+.judge-ACCESSIBLE::before { content: '●'; }
+.judge-DIFFICULT::before { content: '○'; }
+.judge-UNKNOWN::before { content: '?'; }
+/* 배경 원만 38→32px로 줄인다. 클릭 영역과 상태 아이콘 크기는 유지한다. */
+.map-marker { width: 38px; height: 38px; padding: 3px; background-clip: content-box; font-size: 18px; border-radius: 19px; }
+/* #84: 연한 바깥 원을 없애 밀집된 마커의 반복 고리를 줄이고, 클릭 영역은 유지한다. */
+.map-marker.judge-ACCESSIBLE { background: transparent; padding: 0; }
+.map-marker.judge-ACCESSIBLE::before {
+  content: ''; width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%; border: 1px solid var(--color-surface); background: var(--judge-accessible);
+}
+.result-status, .judge-status { padding: 10px; border-radius: 10px; background: var(--color-green-soft); color: var(--judge-accessible); }
+.result-status.status-CONDITIONAL, .judge-status.status-CONDITIONAL { background: var(--color-soft); color: var(--judge-conditional); }
+.result-status.status-DIFFICULT, .result-status.status-UNKNOWN, .judge-status.status-DIFFICULT, .judge-status.status-UNKNOWN { background: var(--color-gray); color: var(--color-muted); }
+.detail-header { display: grid; gap: 14px; }
+.detail-photo { min-height: 160px; border-radius: 0; }
+.detail-photo img { max-height: 220px; }
+.section-building { background: var(--color-soft); }
+.facility-section { scroll-margin-top: 90px; }
+.facility-links { display: flex; gap: 8px; }
+.facility-links a { flex: 1; justify-content: center; }
+.place-detail .entrance + .entrance { padding-top: 16px; }
+.mobility-toolbar > select, .mobility-toolbar > button { flex: 1; min-height: 40px; border: 0; border-radius: 12px; background: var(--color-bg); font-size: 12px; }
+.mobility-toolbar > button { background: var(--color-soft); }
+.mobility-dialog { border: 0; border-radius: 16px; padding: 24px; }
+.mobility-dialog h2 { font-size: 24px; }
+.mobility-dialog .field, .mobility-dialog .mobility-field { background: var(--color-bg); border-radius: 16px; padding: 16px; }
+.mobility-dialog select { background: var(--color-bg); }
+.mobility-dialog details { background: var(--color-soft); border: 0; padding: 16px; border-radius: 16px; }
+.category-filters { display: flex; gap: 8px; }
+.category-filters .chip { flex: 1; justify-content: center; }
+.search-page .search-bar { flex-wrap: wrap; margin: 0; }
+.search-page .search-bar input { flex-basis: calc(100% - 72px); }
+.search-page .search-bar select { flex: 1; background: var(--color-bg); border-radius: 12px; border-color: var(--color-border); }
+.search-page:has([data-mobility-open]:not(:disabled)) #search-profile { display: none; }
+.search-page [data-mobility-baseline] { display: grid; gap: 14px; }
+/* 세부 설정이 길어져도 본문만 스크롤하고 적용/취소 버튼은 계속 보이게 한다. */
+.mobility-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.mobility-dialog form { display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: calc(100dvh - 80px); width: 100%; }
+.mobility-dialog h2, .mobility-actions { flex-shrink: 0; }
+.mobility-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; align-content: start; }
+.mobility-dialog-body > .field { margin: 0; padding: 12px; }
+.mobility-dialog-body > .mobility-multiple, .mobility-dialog-body > .mobility-consent { margin: 0; }
+.mobility-dialog [data-mobility-custom] { display: grid; gap: 12px; }
+.mobility-dialog .mobility-help { justify-self: start; font: inherit; font-size: 12px; color: var(--color-primary); border: 0; background: transparent; min-height: 36px; padding: 4px 8px; cursor: pointer; }
+.mobility-actions { padding-top: 12px; border-top: 1px solid var(--color-border); margin: 0; }
+.mobility-actions .btn { min-width: 0; flex: 1; min-height: 52px; white-space: normal; }
+.mobility-dialog [data-mobility-error]:empty { display: none; }
+@media (max-width: 360px) {
+  html.large-text .mobility-dialog form, html.large-text .mobility-dialog-body { gap: 8px; }
+  html.large-text .mobility-dialog-body > .field { padding: 10px; }
+}
+@media (max-width: 768px) {
+  .map-layout { padding: 8px 24px 24px; }
+  #map-app { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-height: auto; }
+  .map-panel { display: contents; height: auto; }
+  .map-discovery { grid-row: 1; max-height: none; overflow: visible; }
+  .map-discovery h1 { font-size: 16px; }
+  .map-desktop-title { display: none; }
+  .map-mobile-title { display: inline; }
+  .map-wrap { grid-row: 2; height: 240px; min-height: 240px; }
+  .map-results { grid-row: 3; }
+  .map-panel > .map-results { max-height: min(480px, 55dvh); }
+  .map-legend { grid-column: 1; grid-row: 4; }
+  .map-error { left: 8px; right: 8px; top: 8px; gap: 4px; padding: 12px; }
+  .map-error .btn { min-height: 40px; padding: 8px; font-size: 12px; }
+  .map-error .actions { justify-content: start; }
+  .popup { bottom: 8px; left: 8px; right: 8px; max-height: calc(100% - 16px); overflow-y: auto; }
+  .map-options { margin-top: -8px; }
+  .mobility-dialog { border-radius: 0; padding: 24px 24px 32px; }
+  .mobility-dialog form { max-height: calc(100dvh - 56px); height: 100%; }
+  .mobility-dialog-body { flex: 1; }
+}

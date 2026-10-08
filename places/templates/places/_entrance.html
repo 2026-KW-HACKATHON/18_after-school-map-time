@@ -1,0 +1,14 @@
+<div class="entrance">
+  <h3>{{ entrance.name }}{% if not entrance.is_main %} <span class="badge-neutral">다른 출입구</span>{% endif %}</h3>
+  {% if entrance.description %}<p class="small">{{ entrance.description }}</p>{% endif %}
+  {% if entrance.photo %}
+    <a href="{{ entrance.photo.url }}" target="_blank" rel="noopener" title="사진 크게 보기"><img class="entrance-photo" src="{{ entrance.photo.url }}" alt="{{ entrance.name }} 사진 (누르면 크게 보기)" loading="lazy"></a>
+    {# 예전 모습이거나 얼굴·번호판이 보이면 운영자에게 수정 요청 (기획 v2 4.4) #}
+    <p class="small"><a href="{% url 'reports:photo-fix' entrance.id %}?next={{ request.get_full_path|urlencode }}">사진에 문제가 있나요? 수정 요청하기</a></p>
+  {% endif %}
+  {% include "places/_fields.html" with fields=entrance.fields %}
+  {% if entrance.checked_at %}<p class="muted small">최근 확인: {{ entrance.checked_at|date:"Y년 n월 j일" }}</p>{% endif %}
+  {% if entrance.location_text %}<p class="small">위치: {{ entrance.location_text }}</p>{% endif %}
+  {% if entrance.observation_note %}<p class="small">{{ entrance.observation_note }}</p>{% endif %}
+  <a class="btn" href="{% url 'reports:new' %}?{% if entrance.building_id %}building={{ entrance.building_id }}&ownership=BUILDING{% else %}place={{ entrance.place_id }}{% endif %}&facility_kind=ENTRANCE&target_reference=entrance:{{ entrance.id }}">이 출입구 정보 제보</a>
+</div>

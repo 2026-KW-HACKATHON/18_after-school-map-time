@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% comment %}와이어프레임 18번 "제보 처리 완료 안내"{% endcomment %}
+
+{% block title %}처리 완료 | 턱없네{% endblock %}
+{% block tabbar %}{% endblock %}
+
+{% block content %}
+<section class="page narrow screen-page" data-figma-node="1:637">
+  <p class="done-mark" aria-hidden="true">✓</p>
+  <h1>확인해 주셔서 고맙습니다</h1>
+  <p class="muted">{% if report.status == "VERIFIED" %}정보가 지도에 반영됐어요{% elif report.status == "REJECTED" %}반려 사유를 제보자에게 전달했어요{% else %}아직 확인 중인 제보예요{% endif %}</p>
+  <div class="card">
+    {% if report.status == "VERIFIED" %}
+      <p>승인된 정보는 공개 지도와 장소 상세에 바로 반영됐고, 판정도 다시 계산됐어요.</p>
+      {% if report.target_place %}<p><a href="{% url 'places:detail' report.target_place.pk %}">공개 화면에서 확인하기 →</a></p>{% endif %}
+    {% elif report.status == "REJECTED" %}
+      <p>반려했어요. 반려 사유: {{ report.reject_reason }}</p>
+    {% else %}<p>검토 화면에서 사진과 정보를 확인한 뒤 처리해 주세요.</p>
+    {% endif %}
+  </div>
+  <div class="screen-actions">
+    <a class="btn btn-primary" href="{% url 'ops:reports' %}?status=PENDING">대기함으로 돌아가기</a>
+    <a class="btn" href="{% url 'ops:report-review' report.pk %}">처리 기록 보기</a>
+  </div>
+</section>
+{% endblock %}

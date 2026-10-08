@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% comment %}
+  allauth 기본 화면(로그아웃 확인, 로그인 취소·오류 등)을 턱없네 공통 레이아웃(base.html) 안에 보여주기 위한 연결 파일.
+  allauth 템플릿의 head_title / content / extra_body 블록을 base.html 의 title / content / extra_js 블록으로 이어 준다.
+{% endcomment %}
+{% block title %}{% block head_title %}{% endblock head_title %} | 턱없네{% endblock title %}
+{% block extra_js %}{% block extra_body %}{% endblock extra_body %}{% endblock extra_js %}
