@@ -12,7 +12,8 @@ def extract(source_path, output_dir):
     output = Path(output_dir)
     original = json.loads((output / "wolgye1.geojson").read_text(encoding="utf-8"))
     codes = ("1135056000", "1135057000", "1135058000")
-    colors = ("#d14343", "#245ccc", "#16804a")
+    # 빨간색은 쓰지 않는다 (기획 v2: 빨강은 "위험·금지"로 읽혀 낙인이 됨) → 월계1동은 보라
+    colors = ("#7b4fc9", "#245ccc", "#16804a")
     features = []
     for number, (code, color) in enumerate(zip(codes, colors), 1):
         matches = [f for f in source["features"] if f["properties"]["adm_cd2"] == code]

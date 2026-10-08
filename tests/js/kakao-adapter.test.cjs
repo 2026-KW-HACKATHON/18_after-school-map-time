@@ -42,13 +42,13 @@ test("창 크기 변경 후 사용자가 이동한 지도 중심을 보존한다
 
 const layers = () => ({ detail_max_level: 5,
   overview: { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] } },
-  districts: { type: "FeatureCollection", features: ["#d14343", "#245ccc", "#16804a"].map((color) =>
+  districts: { type: "FeatureCollection", features: ["#7b4fc9", "#245ccc", "#16804a"].map((color) =>
     ({ type: "Feature", properties: { display_color: color }, geometry: { type: "Polygon", coordinates: [ring] } })) },
 });
 test("확대하면 세 동 색상·2.6px 점선을 표시하고 축소하면 외곽 하나만 표시한다", async () => {
   const p = await setup(), modes = [];
   assert.equal(p.adapter.setBoundaryLayers(layers(), (mode) => modes.push(mode)), true);
-  assert.deepEqual(p.polygons.map(x => x.strokeColor), ["#d14343", "#245ccc", "#16804a"]);
+  assert.deepEqual(p.polygons.map(x => x.strokeColor), ["#7b4fc9", "#245ccc", "#16804a"]);
   assert.ok(p.polygons.every(x => x.strokeWeight === 2.6 && x.strokeStyle === "dash" && x.fillOpacity === 0));
   p.map.level = 5; p.listeners.zoom_changed(); assert.equal(p.polygons.length, 3);
   p.map.level = 6; p.listeners.zoom_changed();

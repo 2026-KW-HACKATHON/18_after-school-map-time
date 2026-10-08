@@ -8,7 +8,7 @@ test("지도 메타 레이어·색상 범례·확대 안내 및 표시 토글은
   const p = await page({ boundary, layers });
   assert.equal(p.map.layers, layers);
   assert.equal(p.nodes["boundary-control"].hidden, false);
-  assert.match(p.nodes["boundary-legend"].textContent, /월계1동: 빨강 · 월계2동: 파랑 · 월계3동: 초록/);
+  assert.match(p.nodes["boundary-legend"].textContent, /월계1동: 보라 · 월계2동: 파랑 · 월계3동: 초록/);
   assert.match(p.nodes["boundary-credit"].textContent, /SGIS/);
   p.map.boundaryCallback("overview");
   assert.match(p.nodes["boundary-legend"].textContent, /전체 외곽/);

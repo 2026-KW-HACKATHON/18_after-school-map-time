@@ -41,7 +41,7 @@ class BoundaryTests(TestCase):
         self.assertEqual(layers["detail_max_level"], 5)
         features = layers["districts"]["features"]
         self.assertEqual([f["properties"]["adm_cd2"] for f in features], ["1135056000", "1135057000", "1135058000"])
-        self.assertEqual([f["properties"]["display_color"] for f in features], ["#d14343", "#245ccc", "#16804a"])
+        self.assertEqual([f["properties"]["display_color"] for f in features], ["#7b4fc9", "#245ccc", "#16804a"])
         self.assertEqual(features[0]["geometry"], data["boundary"]["geometry"])
         for feature in features + [layers["overview"]]:
             self.assertEqual(feature["properties"]["boundary_date"], "2026-07-01")
