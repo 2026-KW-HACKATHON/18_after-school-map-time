@@ -185,7 +185,7 @@
 {% block extra_js %}
 <script src="{% static 'js/mobility-settings.js' %}"></script>
 <script>
-  // 이동 조건 칩: 고른 조건의 판단 근거만 보여줌 (지도에서 고른 조건을 기억해 둔 게 있으면 그걸로 시작)
+  // Prefer the link's condition, then the saved condition.
   (function () {
     const chips = document.querySelectorAll("#detail-chips .chip");
     const panels = document.querySelectorAll(".judge-panel");
@@ -196,7 +196,8 @@
     let saved = null;
     try { saved = localStorage.getItem("teokeopne.profile"); } catch (e) {}
     const keys = [...chips].map((c) => c.dataset.profile);
-    select(keys.includes(saved) ? saved : keys[0]);
+    const linked = new URLSearchParams(window.location.search).get("profile");
+    select(keys.includes(linked) ? linked : keys.includes(saved) ? saved : keys[0]);
     function syncMobility() {
       if (!window.TeokMobility?.state()) return;
       chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.profile === window.TeokMobility.primaryProfile())));
