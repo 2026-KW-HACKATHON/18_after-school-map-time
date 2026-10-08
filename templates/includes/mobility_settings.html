@@ -3,6 +3,7 @@
      data-catalogue-url="{% url 'api:mobility-catalogue' %}"
      data-preferences-url="{% url 'api:mobility-preferences' %}"
      data-evaluate-url="{% url 'api:mobility-evaluate' %}"
+     data-places-url="{% url 'api:place-list' %}" data-reference-url="{% url 'api:mobility-reference' 0 %}"
      data-place-id="{{ place.pk|default:'' }}" data-mode="{{ mobility_mode|default:'map' }}"
      data-region="{% if place %}{{ place.region.code }}{% elif region %}{{ region.code }}{% endif %}">
   <div class="mobility-toolbar">
@@ -25,6 +26,19 @@
         <select id="mobility-companion" data-mobility-companion></select>
         <p class="small muted">추천값은 신분에 따른 판정이 아니에요. 조건을 바꾸면 이 동반자 Preset의 수정값만 초기화하고, 다른 설정은 유지해요.</p>
       </div>
+      <details class="mobility-reference" data-mobility-reference>
+        <summary>가본 장소로 참고값 가져오기</summary>
+        <p class="small muted">현재 지역에 등록된 장소에서 직접 이용한 입구 경로를 고르세요. 확인한 수치를 초안에 채우고 수정할 수 있어요. 장소 선택만으로 기존 설정이 바뀌거나 방문 이력이 저장되지는 않아요.</p>
+        <div class="field"><label for="mobility-reference-search">가본 장소 이름 찾기</label><input id="mobility-reference-search" type="search" data-mobility-reference-search placeholder="장소 이름 또는 주소" autocomplete="off"></div>
+        <div class="field"><label for="mobility-reference-place">등록된 장소 선택</label><select id="mobility-reference-place" data-mobility-reference-place disabled><option value="">장소 목록을 불러와 주세요</option></select></div>
+        <button type="button" class="btn" data-mobility-reference-reload>목록 새로 불러오기</button>
+        <div class="field" data-mobility-reference-route-box hidden><label for="mobility-reference-route">이용한 입구 경로</label><select id="mobility-reference-route" data-mobility-reference-route></select></div>
+        <div class="small" data-mobility-reference-facts aria-live="polite"></div>
+        <label class="mobility-multiple-choice" data-mobility-reference-step-box hidden><input type="checkbox" data-mobility-reference-step>경사로·들어 올리는 도움 없이 표시된 턱을 직접 통과했어요</label>
+        <p class="small" data-mobility-reference-proposal></p>
+        <button type="button" class="btn" data-mobility-reference-apply disabled>참고값으로 채우기</button>
+        <p class="small" data-mobility-reference-status role="status" aria-live="polite"></p>
+      </details>
       <div data-mobility-fields></div>
       <details class="mobility-multiple"><summary>동반자·여러 이동 조건 함께 적용</summary>
         <p class="small muted">모두 이용할 수 있는 같은 경로를 확인해요. 다른 사람의 원래 설정을 바꾸거나 서로 다른 입구를 섞지 않아요.</p>

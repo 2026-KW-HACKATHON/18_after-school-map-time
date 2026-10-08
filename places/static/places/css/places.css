@@ -132,6 +132,10 @@ html.large-text .map-condition-tools .btn { padding: 10px 8px; }
 .mobility-dialog select { width: 100%; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
 .mobility-field { margin: 12px 0; }
 .mobility-multiple { margin: 16px 0; }
+.mobility-reference { margin: 16px 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); }
+.mobility-reference summary { cursor: pointer; font-weight: 600; }
+.mobility-reference .field-row { flex-wrap: wrap; }
+.mobility-reference .field-row dd { overflow-wrap: anywhere; }
 .mobility-multiple-choice { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
 .mobility-actions { justify-content: flex-end; }
 @media (max-width: 768px) {

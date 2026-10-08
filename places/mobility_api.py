@@ -25,6 +25,20 @@ def settings_catalogue(request):
     return response
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def reference(request, pk):
+    parsed = parse_pk(pk)
+    if parsed is None:
+        return Response({"detail": "장소 ID는 ASCII 양의 정수로 입력해 주세요."}, status=400)
+    place = get_object_or_404(Place.objects.select_related("building", "region"), pk=parsed,
+                              is_closed=False, region__is_active=True)
+    from judgments.place_reference import place_reference
+    response = Response(place_reference(place))
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def evaluate(request):

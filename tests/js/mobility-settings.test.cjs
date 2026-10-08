@@ -21,7 +21,7 @@ function memoryStorage(initial = {}) {
   return { saved, getItem: (key) => saved[key] || null, setItem: (key, value) => { saved[key] = value; } };
 }
 function element() {
-  return { handlers: {}, children: [], hidden: false, disabled: false, value: "", textContent: "",
+  return { handlers: {}, children: [], hidden: false, disabled: false, checked: false, open: false, value: "", textContent: "",
     addEventListener(type, fn) { this.handlers[type] = fn; },
     setAttribute(key, value) { this[key] = value; },
     appendChild(child) { this.children.push(child); },
@@ -31,10 +31,11 @@ function element() {
 async function setup({ authenticated = false, storage = memoryStorage(), mode = "map", fetcher, search = "", settings } = {}) {
   const meta = metadata(authenticated), calls = [];
   if (settings) meta.settings = clone(settings);
-  const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice"].map((key) => [key, element()]));
+  const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice",
+    "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status"].map((key) => [key, element()]));
   const baseline = element(); baseline.hidden = true;
   const searchProfile = element(); searchProfile.value = "WHEELCHAIR";
-  const root = { dataset: { mode, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placeId: mode === "detail" ? "1" : "" },
+  const root = { dataset: { mode, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placesUrl: "/places", referenceUrl: "/reference/0/reference/", placeId: mode === "detail" ? "1" : "" },
     querySelector(selector) { return nodes[selector.replace("[data-mobility-", "").replace("]", "")]; } };
   const document = { querySelector: () => root, getElementById: () => mode === "search" ? searchProfile : null,
     querySelectorAll: () => [baseline], createElement: () => element(), dispatchEvent() {} };
@@ -51,6 +52,9 @@ async function setup({ authenticated = false, storage = memoryStorage(), mode = 
   return { nodes, baseline, searchProfile, calls, controller: window.TeokMobility, storage, meta,
     open() { nodes.open.handlers.click(); }, submit() { return nodes.form.handlers.submit({ preventDefault() {} }); },
     select(key) { nodes.preset.value = key; nodes.preset.handlers.change(); },
+    async expandReference() { nodes.reference.open = true; nodes.reference.handlers.toggle(); await new Promise(setImmediate); },
+    async referencePlace(id) { nodes["reference-place"].value = String(id); await nodes["reference-place"].handlers.change(); },
+    directStep(checked = true) { nodes["reference-step"].checked = checked; nodes["reference-step"].handlers.change(); },
     field(key, value) { const container = nodes.fields.children.find((c) => c.children[1].id === `mobility-field-${key}`);
       const input = container.children[1]; input.value = value; (input.handlers.input || input.handlers.change)(); } };
 }
@@ -212,4 +216,101 @@ test("검색의 이동 조건 선택값과 카드 스타일은 저장된 동반�
   const list = ui.nodes.result.children.find((node) => node.class === "result-list");
   assert.equal(list.children[0].children[0].class, "card result-card");
   assert.equal(list.children[0].children[0].children[3].textContent, "확인 2026-10-08");
+});
+
+function referenceRoute(height = "7", width = "80", id = "entrance:1") {
+  return { id, label: `경로 ${id}`, values: { max_step_height_cm: height, min_door_width_cm: width }, warnings: [],
+    entrances: [{ entrance_id: 1, label: "정문", fields: [{ key: "step_height_cm", label: "턱", value: height, unit: "cm", checked_at: "2026-10-08", pending: false }] }] };
+}
+function referenceFetcher(url, options) {
+  if (url.startsWith("/places?")) return { results: [{ id: 1, name: "가본 장소", address: "월계동" }, { id: 2, name: "다른 장소", address: "골목" }] };
+  if (url.startsWith("/reference/")) return { routes: [referenceRoute()], notice: "측정값이며 안전 보장 아님" };
+  if (url === "/preferences") return { settings: clone(options.body) };
+  return { results: [], notice: "안내", preferences: [] };
+}
+test("참고값은 직접 턱 통과 확인 시 높이만 추가하며 bool·미지원 필드를 추론하지 않는다", () => {
+  const meta = metadata(), data = clone(meta.settings), route = referenceRoute("0", "80");
+  route.values.can_use_stairs = true; route.values.min_passage_width_cm = "50";
+  assert.deepEqual(helpers.referenceValues(meta, data, route, false), { min_door_width_cm: "80" });
+  assert.deepEqual(helpers.referenceValues(meta, data, route, true), { max_step_height_cm: "0", min_door_width_cm: "80" });
+  data.selected = ["CRUTCH"];
+  assert.deepEqual(helpers.referenceValues(meta, data, route, true), { max_step_height_cm: "0" });
+  for (const values of [{ max_step_height_cm: "NaN", min_door_width_cm: true }, { max_step_height_cm: "3.25", min_door_width_cm: "1001" }])
+    assert.deepEqual(helpers.referenceValues(meta, meta.settings, { ...route, values }, true), {});
+  assert.deepEqual(helpers.referenceValues(meta, meta.settings, { ...route, incomplete: true }, true), {});
+  assert.deepEqual(helpers.referenceValues(meta, meta.settings, { ...route, unavailable: true }, true), {});
+});
+test("장소 선택은 기존 초안을 바꾸지 않고 적용 버튼에서만 현재 Preset 수치를 채운다", async () => {
+  const ui = await setup({ fetcher: referenceFetcher }); ui.open(); ui.field("max_step_height_cm", "4");
+  await ui.expandReference(); await ui.referencePlace(1);
+  assert.equal(ui.nodes.fields.children[0].children[1].value, "4");
+  ui.nodes["reference-apply"].handlers.click();
+  assert.equal(ui.nodes.fields.children[0].children[1].value, "4");
+  assert.equal(ui.nodes.fields.children[1].children[1].value, "80");
+  ui.directStep(); ui.nodes["reference-apply"].handlers.click();
+  assert.equal(ui.nodes.fields.children[0].children[1].value, "7");
+  assert.deepEqual(clone(ui.controller.state().overrides), {});
+  ui.nodes.cancel.handlers.click(); assert.equal(ui.storage.saved[helpers.GUEST_KEY], undefined);
+});
+test("참고값 저장·복원은 기존 저장 경로를 사용하고 방문 이력은 넣지 않는다", async () => {
+  const storage = memoryStorage(), ui = await setup({ storage, fetcher: referenceFetcher }); ui.open();
+  await ui.expandReference(); await ui.referencePlace(1); ui.directStep(); ui.nodes["reference-apply"].handlers.click(); await ui.submit();
+  const saved = JSON.parse(storage.saved[helpers.GUEST_KEY]);
+  assert.deepEqual(saved.overrides.WHEELCHAIR, { max_step_height_cm: "7", min_door_width_cm: "80" });
+  assert.deepEqual(Object.keys(saved).sort(), ["companions", "overrides", "rule_version", "selected", "version"]);
+  const restored = await setup({ storage }); assert.equal(restored.controller.state().overrides.WHEELCHAIR.max_step_height_cm, "7");
+});
+test("동반자 참고값 적용은 본인의 수치와 기존 bool 설정을 보존한다", async () => {
+  const ui = await setup({ authenticated: true, fetcher: referenceFetcher }); ui.open(); ui.field("max_step_height_cm", "4");
+  ui.select("ASSISTED_COMPANION"); ui.nodes.companion.value = "CRUTCH"; ui.nodes.companion.handlers.change();
+  ui.field("can_use_stairs", "false"); await ui.expandReference(); await ui.referencePlace(1);
+  ui.directStep(); ui.nodes["reference-apply"].handlers.click(); await ui.submit();
+  const data = ui.controller.state();
+  assert.equal(data.overrides.WHEELCHAIR.max_step_height_cm, "4");
+  assert.deepEqual(clone(data.overrides.ASSISTED_COMPANION), { can_use_stairs: false, max_step_height_cm: "7" });
+  assert.equal(data.overrides.ASSISTED_COMPANION.min_door_width_cm, undefined);
+});
+test("여러 입구는 사용자가 경로를 선택해야 하고 경로를 바꾸면 직접 통과 확인을 다시 받는다", async () => {
+  const ui = await setup({ fetcher: (url, options) => url.startsWith("/reference/") ? { routes: [referenceRoute("1", "70", "front"), referenceRoute("7", "90", "back")], notice: "안내" } : referenceFetcher(url, options) });
+  ui.open(); await ui.expandReference(); await ui.referencePlace(1);
+  assert.equal(ui.nodes["reference-apply"].disabled, true);
+  ui.nodes["reference-route"].value = "front"; ui.nodes["reference-route"].handlers.change(); ui.directStep();
+  ui.nodes["reference-apply"].handlers.click(); assert.equal(ui.nodes.fields.children[1].children[1].value, "70");
+  ui.nodes["reference-route"].value = "back"; ui.nodes["reference-route"].handlers.change();
+  assert.equal(ui.nodes["reference-step"].checked, false);
+  ui.directStep(); ui.nodes["reference-apply"].handlers.click();
+  assert.equal(ui.nodes.fields.children[0].children[1].value, "7"); assert.equal(ui.nodes.fields.children[1].children[1].value, "90");
+});
+test("검색·빈 목록·입구 미등록·Enter는 기존 저장 동작을 방해하지 않는다", async () => {
+  const ui = await setup({ fetcher: (url, options) => url.startsWith("/reference/") ? { routes: [], notice: "안내" } : referenceFetcher(url, options) });
+  ui.open(); await ui.expandReference();
+  assert.ok(ui.calls.find((c) => c.url === "/places?all=1"));
+  ui.nodes["reference-search"].value = "골목"; ui.nodes["reference-search"].handlers.input();
+  assert.equal(ui.nodes["reference-place"].children.length, 2);
+  let prevented = false; ui.nodes["reference-search"].handlers.keydown({ key: "Enter", preventDefault() { prevented = true; } }); assert.ok(prevented);
+  await ui.referencePlace(2); assert.match(ui.nodes["reference-status"].textContent, /입구 경로/);
+  ui.nodes["reference-search"].value = "없는 장소"; ui.nodes["reference-search"].handlers.input();
+  assert.equal(ui.nodes["reference-place"].disabled, true); assert.equal(ui.nodes["reference-apply"].disabled, true);
+  ui.field("max_step_height_cm", "4"); await ui.submit(); assert.equal(ui.controller.state().overrides.WHEELCHAIR.max_step_height_cm, "4");
+});
+test("장소 확인값 오류는 직접 입력을 보존하며 새로 불러오기 후 재시도 가능하다", async () => {
+  let fail = true;
+  const ui = await setup({ fetcher: (url, options) => { if (url.startsWith("/reference/") && fail) throw new Error("장소를 찾을 수 없음"); return referenceFetcher(url, options); } });
+  ui.open(); ui.field("max_step_height_cm", "4"); await ui.expandReference(); await ui.referencePlace(1);
+  assert.match(ui.nodes["reference-status"].textContent, /찾을 수 없음/); assert.equal(ui.nodes["reference-apply"].disabled, true);
+  assert.equal(ui.nodes.fields.children[0].children[1].value, "4");
+  fail = false; await ui.nodes["reference-reload"].handlers.click(); await ui.referencePlace(1);
+  assert.equal(ui.nodes["reference-apply"].disabled, false);
+});
+test("늦게 온 이전 장소 응답과 취소·Preset 변경 뒤 응답을 무시한다", async () => {
+  const pending = [];
+  const ui = await setup({ fetcher: (url, options) => url === "/reference/1/reference/" ? new Promise((resolve) => pending.push(resolve)) : referenceFetcher(url, options) });
+  ui.open(); await ui.expandReference(); const first = ui.referencePlace(1); await ui.referencePlace(2);
+  pending.shift()({ routes: [referenceRoute("1", "70")], notice: "old" }); await first;
+  ui.directStep(); ui.nodes["reference-apply"].handlers.click(); assert.equal(ui.nodes.fields.children[1].children[1].value, "80");
+  const changed = ui.referencePlace(1); ui.select("CRUTCH"); pending.shift()({ routes: [referenceRoute()], notice: "old" }); await changed;
+  assert.equal(ui.nodes["reference-apply"].disabled, true);
+  const cancelled = ui.referencePlace(1); ui.nodes.cancel.handlers.click(); ui.open();
+  pending.shift()({ routes: [referenceRoute()], notice: "old" }); await cancelled;
+  assert.equal(ui.nodes["reference-apply"].disabled, true); assert.deepEqual(clone(ui.controller.state().overrides), {});
 });
