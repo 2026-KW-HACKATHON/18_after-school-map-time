@@ -12,6 +12,7 @@
 
   const MARK_CLASS = "ai-filled";
   const NOTE_CLASS = "ai-filled-note";
+  const revisions = new WeakMap();
 
   function clearMarks(form) {
     form.querySelectorAll("." + NOTE_CLASS).forEach((el) => el.remove());
@@ -57,6 +58,12 @@
     const status = box.querySelector("#ai-prefill-status");
     const tokenInput = box.querySelector("#ai-prefill-token");
     const button = box.querySelector("#ai-prefill-button");
+    if (button.disabled) return;
+    const observations = deps.document.getElementById("facility-observations");
+    if (observations && observations.getAttribute("aria-busy") === "true") {
+      status.textContent = "입력 항목을 바꾸고 있어요. 전환이 끝난 뒤 다시 눌러 주세요.";
+      return;
+    }
     const photoInput = form.elements.photo;
     const file = photoInput && photoInput.files && photoInput.files[0];
     const keptPhoto = form.elements.photo_token && form.elements.photo_token.value;
@@ -65,9 +72,16 @@
       status.textContent = "사진을 고르거나 설명을 적은 뒤 눌러 주세요.";
       return;
     }
+    const revision = (revisions.get(form) || 0) + 1;
+    revisions.set(form, revision);
+    const facilityKind = form.elements.facility_kind ? form.elements.facility_kind.value : "ENTRANCE";
+    const ownership = form.elements.ownership ? form.elements.ownership.value : null;
+    const isCurrent = () => revisions.get(form) === revision &&
+      (!form.elements.facility_kind || form.elements.facility_kind.value === facilityKind) &&
+      (!form.elements.ownership || form.elements.ownership.value === ownership);
     const body = new deps.FormData();
     body.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
-    body.append("facility_kind", form.elements.facility_kind ? form.elements.facility_kind.value : "ENTRANCE");
+    body.append("facility_kind", facilityKind);
     body.append("note", note);
     if (file) body.append("photo", file);
     else if (keptPhoto) body.append("photo_token", keptPhoto);
@@ -77,6 +91,8 @@
     try {
       const response = await deps.fetch(box.dataset.url, { method: "POST", body, credentials: "same-origin" });
       const data = await response.json();
+      // A facility change invalidates both the fields and the signed result.
+      if (!isCurrent()) return;
       if (!data.ok) {
         status.textContent = data.message || "AI가 값을 채우지 못했어요. 직접 입력해 주세요.";
         return;
@@ -86,7 +102,7 @@
       tokenInput.value = data.token;
       status.textContent = message(data, filled);
     } catch (e) {
-      status.textContent = "연결이 불안정해요. 잠시 뒤 다시 누르거나 직접 입력해 주세요.";
+      if (isCurrent()) status.textContent = "연결이 불안정해요. 잠시 뒤 다시 누르거나 직접 입력해 주세요.";
     } finally {
       button.disabled = false;
     }
@@ -101,7 +117,9 @@
     const selector = doc.getElementById("facility-selector");
     if (selector) {
       selector.addEventListener("change", () => {
+        revisions.set(form, (revisions.get(form) || 0) + 1);
         box.querySelector("#ai-prefill-token").value = "";
+        box.querySelector("#ai-prefill-status").textContent = "시설이 바뀌어 이전 AI 결과는 적용하지 않아요. 직접 입력하거나 다시 분석해 주세요.";
         clearMarks(form);
       });
     }
