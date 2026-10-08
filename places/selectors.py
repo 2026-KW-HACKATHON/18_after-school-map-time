@@ -53,7 +53,7 @@ def unknown_payload():
 def map_places(region, profile=None, show_all=False):
     """
     지도·목록용 장소 목록.
-    - 이동 조건을 고르면 기본으로 '들어갈 수 있어요'·'도움 받으면'만 (어려움·미확인은 숨김, 기획 v2 3.2)
+    - 이동 조건을 고르면 기본으로 '들어갈 수 있어요'·'도움 받으면'·'정보가 필요해요' (어려움만 숨김, 기획 v2 3.2)
     - 접근성 낮은 순 정렬·"어려운 곳만 보기"는 만들지 않는다. 정렬은 화면에서 거리순
     """
     places = Place.objects.in_region(region).filter(is_closed=False).order_by("name")
