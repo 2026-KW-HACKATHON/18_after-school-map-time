@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
-from accounts.mobility_api import restored_settings
+from accounts.mobility_api import has_consent, restored_settings
 from core.validation import parse_pk
 from judgments.constants import display
 from judgments.engine import judge_profiles, load_rules
@@ -21,7 +21,7 @@ from .models import Place, Region
 def settings_catalogue(request):
     settings, warning = restored_settings(request.user)
     response = Response({**catalogue(), "authenticated": request.user.is_authenticated,
-                         "settings": settings, "warning": warning})
+                         "consented": has_consent(request.user), "settings": settings, "warning": warning})
     response["Cache-Control"] = "private, no-store"
     return response
 

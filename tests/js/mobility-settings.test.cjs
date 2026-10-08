@@ -5,7 +5,9 @@ const vm = require("node:vm");
 const helpers = require("../../static/js/mobility-settings.js");
 const source = fs.readFileSync(`${__dirname}/../../static/js/mobility-settings.js`, "utf8");
 const clone = (data) => JSON.parse(JSON.stringify(data));
-function metadata(authenticated = false) {
+// 서버는 consent를 빼고 정리한 설정을 돌려준다
+const withoutConsent = (body) => { const { consent, ...settings } = clone(body); return settings; };
+function metadata(authenticated = false, consented = authenticated) {
   const numeric = (label, max) => ({ label, type: "number", min: 0, max, step: "0.1", unit: "cm" });
   const fields = { max_step_height_cm: numeric("턱 높이", 500), min_door_width_cm: numeric("문 폭", 1000), can_use_stairs: { label: "계단", type: "bool" } };
   const presets = ["WHEELCHAIR", "STROLLER", "WALKER", "CRUTCH"].map((key) => ({ key, label: key, profile: key,
@@ -13,7 +15,7 @@ function metadata(authenticated = false) {
   presets.push({ ...presets[2], key: "LIMITED_WALKING", recommendation: "초기 추천이며 실제 조건을 수정하세요." });
   presets.push({ ...presets[1], key: "WITH_CHILD", companion: true, recommendation: "실제 동반자 조건을 선택하세요." });
   presets.push({ ...presets[0], key: "ASSISTED_COMPANION", companion: true, recommendation: "실제 동반자 조건을 선택하세요." });
-  return { fields, presets, rule_version: 2, authenticated, companion_options: presets.filter((p) => !p.companion), notice: "안전 보장 아님",
+  return { fields, presets, rule_version: 2, authenticated, consented, companion_options: presets.filter((p) => !p.companion), notice: "안전 보장 아님",
     settings: { version: 1, rule_version: 2, selected: ["WHEELCHAIR"], overrides: {}, companions: {} } };
 }
 function memoryStorage(initial = {}) {
@@ -28,11 +30,11 @@ function element() {
     replaceChildren(...children) { this.children = children; },
     focus() { this.focused = true; }, showModal() { this.open = true; }, close() { this.open = false; }, reportValidity() { return true; } };
 }
-async function setup({ authenticated = false, storage = memoryStorage(), mode = "map", fetcher, search = "", settings } = {}) {
-  const meta = metadata(authenticated), calls = [];
+async function setup({ authenticated = false, consented = authenticated, storage = memoryStorage(), mode = "map", fetcher, search = "", settings } = {}) {
+  const meta = metadata(authenticated, consented), calls = [];
   if (settings) meta.settings = clone(settings);
   const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice",
-    "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status"].map((key) => [key, element()]));
+    "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status", "consent-box", "consent", "browser-note"].map((key) => [key, element()]));
   const baseline = element(); baseline.hidden = true;
   const searchProfile = element(); searchProfile.value = "WHEELCHAIR";
   const root = { dataset: { mode, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placesUrl: "/places", referenceUrl: "/reference/0/reference/", placeId: mode === "detail" ? "1" : "" },
@@ -45,7 +47,7 @@ async function setup({ authenticated = false, storage = memoryStorage(), mode = 
       calls.push({ url, options: clone(options || {}) });
       if (url === "/catalogue") return clone(meta);
       if (fetcher) return fetcher(url, options);
-      if (url === "/preferences") return { settings: clone(options.body) };
+      if (url === "/preferences") return { settings: withoutConsent(options.body) };
       return { results: [], notice: "안전 보장 아님", preferences: [] };
     } });
   await window.TeokMobility.ready();
@@ -178,7 +180,9 @@ test("회원 저장은 익명 localStorage를 읽거나 변경하지 않는다",
   const storage = memoryStorage({ [helpers.GUEST_KEY]: "손상된 익명 값" }), ui = await setup({ authenticated: true, storage });
   ui.open(); ui.field("max_step_height_cm", "4"); await ui.submit();
   assert.equal(storage.saved[helpers.GUEST_KEY], "손상된 익명 값");
-  assert.equal(ui.calls.find((c) => c.url === "/preferences").options.method, "PUT");
+  const saved = ui.calls.find((c) => c.url === "/preferences").options;
+  assert.equal(saved.method, "PUT");
+  assert.equal(saved.body.consent, true);
 });
 test("저장 중 중복 submit은 한 번만 처리하고 실패해도 입력을 보존한다", async () => {
   let rejectSave, count = 0;
@@ -225,7 +229,7 @@ function referenceRoute(height = "7", width = "80", id = "entrance:1") {
 function referenceFetcher(url, options) {
   if (url.startsWith("/places?")) return { results: [{ id: 1, name: "가본 장소", address: "월계동" }, { id: 2, name: "다른 장소", address: "골목" }] };
   if (url.startsWith("/reference/")) return { routes: [referenceRoute()], notice: "측정값이며 안전 보장 아님" };
-  if (url === "/preferences") return { settings: clone(options.body) };
+  if (url === "/preferences") return { settings: withoutConsent(options.body) };
   return { results: [], notice: "안내", preferences: [] };
 }
 test("참고값은 직접 턱 통과 확인 시 높이만 추가하며 bool·미지원 필드를 추론하지 않는다", () => {
@@ -313,6 +317,55 @@ test("늦게 온 이전 장소 응답과 취소·Preset 변경 뒤 응답을 무
   const cancelled = ui.referencePlace(1); ui.nodes.cancel.handlers.click(); ui.open();
   pending.shift()({ routes: [referenceRoute()], notice: "old" }); await cancelled;
   assert.equal(ui.nodes["reference-apply"].disabled, true); assert.deepEqual(clone(ui.controller.state().overrides), {});
+});
+
+test("저장 위치: 비회원·동의 안 한 회원은 브라우저, 동의한 회원은 계정, 체크를 풀면 철회", () => {
+  assert.equal(helpers.saveTarget({ authenticated: false, consented: false }, undefined), "browser");
+  assert.equal(helpers.saveTarget({ authenticated: false, consented: false }, true), "browser");
+  assert.equal(helpers.saveTarget({ authenticated: true, consented: false }, undefined), "browser");
+  assert.equal(helpers.saveTarget({ authenticated: true, consented: false }, false), "browser");
+  assert.equal(helpers.saveTarget({ authenticated: true, consented: false }, true), "account");
+  assert.equal(helpers.saveTarget({ authenticated: true, consented: true }, undefined), "account");
+  assert.equal(helpers.saveTarget({ authenticated: true, consented: true }, false), "withdraw");
+});
+test("동의하지 않은 회원은 계정에 저장하지 않고 이 브라우저에만 저장한다", async () => {
+  const storage = memoryStorage(), ui = await setup({ authenticated: true, consented: false, storage });
+  ui.open();
+  assert.equal(ui.nodes["consent-box"].hidden, false); assert.equal(ui.nodes.consent.checked, false);
+  assert.equal(ui.nodes["browser-note"].hidden, true);
+  ui.field("max_step_height_cm", "4"); await ui.submit();
+  assert.equal(ui.calls.filter((c) => c.url === "/preferences").length, 0);
+  assert.equal(JSON.parse(storage.saved[helpers.GUEST_KEY]).overrides.WHEELCHAIR.max_step_height_cm, "4");
+  assert.match(ui.nodes.warning.textContent, /이 브라우저/);
+  // 칩으로 조건만 바꿔도 서버에 저장하지 않는다
+  await ui.controller.selectPreset("STROLLER");
+  assert.equal(ui.calls.filter((c) => c.url === "/preferences").length, 0);
+  // 새로고침하면 브라우저 값으로 복원
+  const restored = await setup({ authenticated: true, consented: false, storage });
+  assert.equal(restored.controller.primaryProfile(), "STROLLER");
+});
+test("동의에 체크하고 저장하면 계정에 저장하고, 이후 조건 변경도 계정에 저장한다", async () => {
+  const ui = await setup({ authenticated: true, consented: false });
+  ui.open(); ui.nodes.consent.checked = true; ui.field("max_step_height_cm", "4"); await ui.submit();
+  assert.equal(ui.calls.filter((c) => c.url === "/preferences" && c.options.method === "PUT").length, 1);
+  assert.match(ui.nodes.warning.textContent, /계정에 저장/);
+  await ui.controller.selectPreset("STROLLER");
+  assert.equal(ui.calls.filter((c) => c.url === "/preferences" && c.options.method === "PUT").length, 2);
+});
+test("동의했던 회원이 체크를 풀고 저장하면 계정 값을 지우고 브라우저에만 저장한다", async () => {
+  const storage = memoryStorage(), ui = await setup({ authenticated: true, storage, fetcher: (url, options) => (
+    url === "/preferences" ? { settings: clone(options.body || {}), consented: false } : { results: [], notice: "안내", preferences: [] }) });
+  ui.open(); assert.equal(ui.nodes.consent.checked, true);
+  ui.nodes.consent.checked = false; ui.field("max_step_height_cm", "4"); await ui.submit();
+  const calls = ui.calls.filter((c) => c.url === "/preferences");
+  assert.deepEqual(calls.map((c) => c.options.method), ["DELETE"]);
+  assert.equal(JSON.parse(storage.saved[helpers.GUEST_KEY]).overrides.WHEELCHAIR.max_step_height_cm, "4");
+  assert.match(ui.nodes.warning.textContent, /철회/);
+  ui.open(); assert.equal(ui.nodes.consent.checked, false);
+});
+test("비회원 설정 창에는 동의 칸 대신 브라우저 저장 안내가 보인다", async () => {
+  const ui = await setup(); ui.open();
+  assert.equal(ui.nodes["consent-box"].hidden, true); assert.equal(ui.nodes["browser-note"].hidden, false);
 });
 test("바꾼 값이 없으면 '내 조건 적용'이라고 표시하지 않는다", async () => {
   const p = await setup({ mode: "detail", search: "?profile=STROLLER" });

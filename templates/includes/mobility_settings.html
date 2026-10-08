@@ -45,6 +45,23 @@
         <div data-mobility-multiple></div>
       </details>
       <p class="notice small" data-mobility-notice></p>
+      {# 비회원: 서버에 저장하지 않는다는 안내 #}
+      <p class="small muted" data-mobility-browser-note hidden>설정은 이 브라우저에만 저장돼요. 장소를 판정할 때만 서버로 보내 계산하고, 서버에는 저장하지 않아요.</p>
+      {% comment %}
+        회원: 이동 조건은 몸 상태를 짐작할 수 있는 정보라 계정에 저장하려면 따로 동의를 받는다 (개인정보 보호법 제15조·제23조).
+        동의하지 않아도 모든 기능을 똑같이 쓸 수 있고, 그때는 이 브라우저에만 저장한다.
+      {% endcomment %}
+      <fieldset class="mobility-consent" data-mobility-consent-box hidden>
+        <legend>내 계정에 저장하기 (선택)</legend>
+        <p class="small">동의하면 다른 기기에서 로그인해도 이 설정을 불러올 수 있어요. 동의하지 않아도 모든 기능을 똑같이 쓸 수 있고, 설정은 이 브라우저에만 저장돼요.</p>
+        <dl class="small consent-terms">
+          <div><dt>수집 항목</dt><dd>고른 이동 조건(휠체어·유아차·보행 보조기 등, 동반자 조건 포함)과 직접 바꾼 기준값(턱 높이·문 폭·계단·엘리베이터·화장실 필요 여부 등). 몸 상태를 짐작할 수 있는 정보라서 따로 동의를 받아요.</dd></div>
+          <div><dt>이용 목적</dt><dd>로그인했을 때 내 이동 조건을 불러와 지도에 적용하기. 다른 목적으로 쓰거나 다른 곳에 주지 않아요.</dd></div>
+          <div><dt>보관 기간</dt><dd>동의를 철회하거나 회원 정보가 삭제될 때까지. 체크를 풀고 설정 저장을 누르면 바로 지워요.</dd></div>
+          <div><dt>거부할 권리</dt><dd>동의하지 않을 수 있고, 동의하지 않아도 불이익은 없어요.</dd></div>
+        </dl>
+        <label class="mobility-consent-check"><input type="checkbox" data-mobility-consent> 위 내용을 확인했고, 내 이동 조건(민감정보)을 계정에 저장하는 데 동의해요</label>
+      </fieldset>
       <p data-mobility-error role="alert"></p>
       <div class="actions mobility-actions">
         <button type="button" class="btn" data-mobility-reset>이 조건 기본값으로</button>
