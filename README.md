@@ -7,6 +7,9 @@
 
 2026 광운대학교 해커톤 · 18조 **방과 후 지도타임** · 카테고리: 배리어프리 및 생활 편의
 
+> **현재 상태 (2026-10-08):** 본선 무박 2일 진행 중. 서비스는 실제 도메인에서 운영 중이며 AI 기능(Google Gemini)도 켜져 있습니다.
+> 본선 중 작업: Figma 디자인 적용 · 판정 기준표 반영 · 개인화 기능. 테스트 Django 382개 + 화면 JS 31개 통과.
+
 ---
 
 ## 📌 프로젝트 소개
@@ -57,12 +60,18 @@
 | M-9 | 📏 판정 규칙 데이터화 | 판정 기준을 코드가 아닌 데이터로 관리, 규칙 버전·근거(법령/준용/팀 기준) 기록. 2층 이상은 층 이동(엘리베이터)까지 판정 | ✅ |
 | M-10 | 🛡️ 제보 검증 | 판정이 내려가는 제보는 주민 2명 확인 또는 운영자 승인 후 반영, 가입 7일 미만 계정의 하향 제보는 운영자만, 같은 장소 24시간 1회 | ✅ |
 | M-11 | 🗾 지역 확장 구조 | 모든 데이터를 지역(Region) 단위로 관리 → 노원구·서울로 확장 가능 | ✅ |
+| S-AI | 🤖 AI 사진 판별 | 제보 사진·설명에서 입구·시설 항목 **후보와 근거**를 뽑아 운영자 검토를 돕고, 주민은 제보 화면에서 'AI로 항목 채우기'로 빈 칸을 채움 (자동 승인 없음) | ✅ 운영 중 |
+| — | 🎨 Figma 디자인 · 📏 판정 기준표 · 👤 개인화 | 본선 중 반영 | 🔧 진행 중 |
 
-> ✅ = 구현 완료. 판정 기준 수치는 초안(`judgments/data/rules_v2.json`)이며 판정 기준표 확정 후 교체합니다. F6은 도구 완료 후 실제 답사 데이터 입력 중입니다.
+> ✅ = 구현 완료 · 🔧 = 진행 중. 판정 기준 수치는 초안(`judgments/data/rules_v2.json`)이며 본선 중 판정 기준표로 교체합니다. F6은 도구 완료 후 실제 답사 데이터 입력 중입니다.
 
 **사장님·건물주 기능 (Should, ✅):** 사장님 인증(6자리 코드 + QR 안내 쪽지, 상단 "내 가게" 메뉴), 도움 제공·이동식 경사로 선언(사진 확인 후 반영), 정정 요청, 입구 사진 교체 요청, "가고 싶어요" + 사장님 대시보드(조건별 조회 수·경사로 가이드), 경사로 설치 지원사업 안내, 공개 API·GeoJSON 내보내기
 
-**운영자 AI 검토 보조 (✅ 구현, 기본 꺼짐):** 운영자 검토 화면에서 주민 출입구 제보의 사진·설명(전화번호 가림)을 Google Gemini(결제 연결한 유료 등급)로 보내 입구 단차·경사로·문 형태 등 **후보와 근거**만 받음 (출입구와 엘리베이터·계단·경사로·화장실 등 접근 시설). 주민도 제보 화면에서 'AI로 항목 채우기'로 빈 칸을 채울 수 있음(하루 3회, AI 값을 그대로 내면 운영자만 승인). 운영자가 고른 값만 제보에 저장하고 승인은 직접. 자동 승인 없음, 후보를 저장한 제보는 운영자만 승인(이전 주민 확인 제외). 개인정보 고지 확정 전까지 `AI_ENABLED=False` (명세: AI 명세서 v1.3 A안)
+**AI 사진 판별 (✅ 서버에서 사용 중, 2026-10-05~):** Google Gemini API **유료 등급**(`gemini-3.5-flash-lite`, 입력을 구글 제품 개선에 쓰지 않음). 개인정보 고지는 법적 검토(신지현) 완료.
+- **운영자 검토 보조** — 제보 검토 화면에서 "AI 후보 불러오기" → 입구 단차·계단·경사로·문 폭·문 형태와 엘리베이터·계단·경사로·화장실 등 접근 시설 항목의 **후보·근거·확실성**을 표로 보여 줌. 운영자가 고른 값만 제보에 저장하고 승인은 직접
+- **주민 'AI로 항목 채우기'** — 제보 화면에서 버튼을 눌렀을 때만 사진·설명을 보내 **빈 칸만** 채우고 근거 표시 (1명 하루 3회)
+- **지키는 원칙** — 자동 승인 없음 · 근거 없으면 "모름" · 사진은 위치 정보 삭제·얼굴 가림 후, 설명은 전화번호 가림 후 전송 · AI 값이 들어간 제보는 운영자만 승인(이전 주민 확인 제외) · 하루 전체 한도 · 설정이 잘못되면 운영자 화면에 경고
+- 명세: 윤재석 「AI 연동 명세서 v1.3」(A안). 구조와 켜는 방법은 [docs/structure.md](docs/structure.md), [docs/deploy.md](docs/deploy.md) 5-5
 
 **공공데이터 연동 (✅):** 공공데이터포털 장애인편의시설 현황에서 월계동 공공·업무시설 46곳을 초기 데이터로 (주거시설 제외, 뜻이 바로 맞는 항목만 값으로, 출처 "공공데이터" 표시)
 
@@ -76,7 +85,7 @@
 - 장소 상세와 `GET /api/v1/places/<id>/`에서 가게/건물별 `facilities`, `facility_counts`를 확인합니다. 기존 `entrances`, `fields`, 판정 응답은 유지합니다.
 - `Entrance`는 유지하고, `AccessFacility`는 장소 또는 건물 한 곳에 연결합니다. 사진·위치·관측값은 기존 `Report` / `AccessibilityValue` 이력에 보존합니다. 새 시설 사실은 기존 엘리베이터·화장실 BOOL 값에 자동 복사하지 않으며 기존 판정을 바꾸지 않습니다.
 - 건물 공용 입구 → 층 이동 시설 → 가게 입구를 나눠 기록할 수 있지만, 시설 간 경로 그래프·자동 경로 탐색·시설을 조합한 새로운 판정은 후속 범위입니다.
-- 이 확장에는 `places` 0002·0003, `reports` 0006 Migration이 필요합니다. 실제 DB 적용은 별도 승인 후 진행합니다. 테스트는 임시 DB에서 시설 등록·조회·검증·검토·기존 데이터 보존을 확인합니다.
+- 이 확장의 Migration(`places` 0002·0003, `reports` 0006)은 배포 서버에 적용되어 있습니다. 테스트는 임시 DB에서 시설 등록·조회·검증·검토·기존 데이터 보존을 확인합니다.
 
 **정보 신뢰도·개인정보 (✅):** 주민 "지금도 맞아요" 재확인(최근 확인일 갱신, 판정은 그대로), 운영자 지역 집계의 재답사 대상(180일 넘게 확인 없음), 아이폰 HEIC 사진 업로드(JPEG로 바꿔 저장), 올리기 전 브라우저에서 사진 줄이기(1600px·위치 정보 없이 전송, 10MB 초과 미리 안내), 올린 사진의 촬영 위치(EXIF) 자동 삭제와 **얼굴 자동 가림**(서버 안 OpenCV, 외부 전송 없음), 확인 전 제보 사진은 로그인한 주민에게만
 
@@ -99,10 +108,12 @@
 | Backend | Python 3.12, Django 5.2 (LTS), Django REST Framework |
 | Frontend | Django Template, HTML/CSS, Vanilla JS (지도 데이터는 DRF JSON API) |
 | 지도 | 카카오맵 JavaScript SDK, 카카오 로컬 REST API |
+| AI | Google Gemini API (`gemini-3.5-flash-lite`, 구조화 JSON 출력) — `requests`로 직접 호출, 설정으로 OpenAI 전환 가능 |
+| 사진 처리 | Pillow, OpenCV(얼굴 자동 가림), pi-heif(아이폰 HEIC), 브라우저 사진 줄이기(Canvas) |
 | DB | PostgreSQL 16 (Docker 없이 실행 시 SQLite 폴백) |
 | 서버 | Gunicorn, Nginx (리버스 프록시·HTTPS·정적 파일) |
 | 인프라 | Docker, Docker Compose, AWS EC2 |
-| CI/CD | GitHub Actions (PR마다 테스트, `develop` 머지 시 EC2 자동 배포) |
+| CI/CD | GitHub Actions (PR마다 Django 테스트 + 화면 JS 테스트, `develop` 머지 시 EC2 자동 배포) |
 
 ---
 
@@ -151,7 +162,7 @@ docker compose exec web python manage.py createsuperuser
 | `KAKAO_JAVASCRIPT_KEY` | 카카오맵 JS 키 (브라우저 노출 → 카카오 개발자센터에 허용 도메인 등록 필수) | (발급값) |
 | `KAKAO_REST_API_KEY` | 카카오 REST 키 (**서버 전용**, 카카오 로그인 client_id로도 사용) | (발급값) |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (보안 설정에서 '사용함'일 때만) | |
-| `AI_ENABLED` | AI 검토 보조 켜기. 개인정보 고지 확정 전에는 `False` | `False` |
+| `AI_ENABLED` | AI 기능 켜기 (운영자 검토 보조 + 주민 'AI로 항목 채우기'). 배포 서버는 `True` | `False` |
 | `AI_PROVIDER` | 사진·설명을 보낼 곳: `gemini` 또는 `openai` | `gemini` |
 | `GEMINI_API_KEY` | Google AI Studio 키 (**서버 전용**, 결제 연결한 유료 등급 프로젝트만) | |
 | `GEMINI_MODEL` | 이미지 입력 + JSON 출력 형식 지원 모델 (사진 판단을 더 원하면 `gemini-3.8-flash`) | `gemini-3.5-flash-lite` |
@@ -184,6 +195,8 @@ docker compose exec web python manage.py createsuperuser
 ```bash
 docker compose exec web python manage.py test
 ```
+
+2026-10-08 기준 Django 테스트 382개. AI 테스트는 가짜 AI 클라이언트를 써서 키·네트워크·비용 없이 돌아갑니다.
 
 화면 JS 테스트(장소 선택의 검색·핀·좌표 동기화, 제보 시설 종류 전환, 사진 줄이기, AI로 항목 채우기)는 Node.js 18 이상에서 추가 패키지 없이 실행합니다. CI에서도 같이 돌아갑니다.
 
@@ -246,7 +259,7 @@ python manage.py runserver
 ├── core/                   # 헬스체크(/health/), 홈, 공통 context processor, 사진 정리(EXIF 삭제·얼굴 가림)
 ├── accounts/               # 회원 — 커스텀 User, 카카오 로그인, 내 활동(/me/), 서비스 안 알림
 ├── places/                 # 장소 데이터 — 지역·건물·장소·출입구·접근성 필드 정의
-├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인
+├── reports/                # 접근성 값과 출처 — 제보 묶음·값·확인, AI 사진 판별(ai.py)
 ├── judgments/              # 판정 — 규칙(데이터)·판정 엔진·판정 결과
 ├── ops/                    # 운영자 화면 — 제보 검토·장소 등록·인증 승인·지역 집계·전시 포스터·답사 CSV 가져오기 (관리자 계정만)
 ├── owners/                 # 사장님·건물주 — 인증·한마디·선언·정정·가고 싶어요·대시보드·지원사업
@@ -255,6 +268,7 @@ python manage.py runserver
 ├── nginx/                  # 배포용 nginx 설정 — http(인증서 발급 전)·https·공통 스니펫
 ├── scripts/                # 운영 스크립트 — backup_db.sh(DB 백업)
 ├── docs/                   # 문서 — deploy.md(배포 런북), structure.md(파일별 역할), survey-guide.md(답사·데이터 넣기), context/(기획·인프라 설계)
+├── tests/js/               # 화면 JS 테스트 (Node 내장 테스트 러너, 추가 패키지 없음)
 ├── .github/                # 이슈·PR 템플릿, CI·자동 배포 워크플로우
 ├── .claude/commands/       # Claude Code 팀 공용 커맨드
 ├── Dockerfile              # 배포용 이미지 (gunicorn)
@@ -265,6 +279,7 @@ python manage.py runserver
 ├── manage.py
 ├── CLAUDE.md               # Claude Code 작업 안내서
 ├── CONTRIBUTING.md         # 협업 규칙
+├── THIRD_PARTY_NOTICES.md  # 사용한 오픈소스·외부 서비스와 라이선스 준수 방법
 └── README.md
 ```
 
@@ -284,11 +299,12 @@ python manage.py runserver
 | `/me/` | 내 활동 — 내 제보 처리 상태(반려 사유 포함), 기여 수, 긍정 배지 |
 | `/notifications/` | 알림 — 제보·요청 처리 결과, 인증 결과, 가고 싶어요 가게 소식 |
 | `/support/` | 경사로 설치 지원사업 안내 |
+| `/report/ai-prefill/` | (JSON, 로그인) 제보 화면 'AI로 항목 채우기' |
+| `/ops/` | 운영자 화면 — **10초마다 새 검토 대기 확인(메뉴 배지·안내·탭 제목)**, 제보 기록 선택 삭제(확인 화면), 대시보드(AI 사용량·설정 경고), 제보 검토(판정 변화 미리보기·**AI 후보 불러오기**·승인·반려·새 장소 등록), 장소 등록·수정, 사장님·건물주 인증 코드 발급·안내 쪽지·승인, 지역 집계(구청용), 전시 포스터 |
+| `/admin/` | 관리자 — 전체 데이터·판정 규칙·건물 정보 관리 |
 
 공개 API 오류는 항상 JSON `{"detail": "..."}` 입니다. 없는 장소(`/api/v1/places/999999/`)와 잘못된 주소(`/api/v1/places/abc/`, 없는 API 경로) 모두 `404 application/json`.
 슬래시 없는 주소(`/api/v1/places`)는 `/api/v1/places/`로 301. 개발 환경(`DEBUG=True`)에서 잘못된 주소는 Django 디버그 404 화면이 나옵니다.
-| `/ops/` | 운영자 화면 — **10초마다 새 검토 대기 확인(메뉴 배지·안내·탭 제목)**, 제보 기록 선택 삭제(확인 화면), 대시보드, 제보 검토(판정 변화 미리보기·승인·반려·새 장소 등록), 장소 등록·수정, 사장님·건물주 인증 코드 발급·안내 쪽지·승인, 지역 집계(구청용), 전시 포스터 |
-| `/admin/` | 관리자 — 전체 데이터·판정 규칙·건물 정보 관리 |
 
 > **앱(폴더) 경계 = 기능 경계 = 담당자 경계.**
 > 파일 하나하나의 역할과 구성은 **[docs/structure.md](docs/structure.md)** 에 정리되어 있습니다.
@@ -304,8 +320,9 @@ python manage.py runserver
 | 9/27 | EC2 · 도메인 · HTTPS 실제 적용, `develop` 머지 시 자동 배포 | ✅ |
 | 9/28(월) | 중간발표·멘토링 → 피드백 반영한 기획 v2 (가게·건물주 관점, 확장성) | ✅ |
 | 9/29 ~ 10/1 | 기획 v2 모델·판정 엔진, 와이어프레임 18개 화면, 사장님·건물주 기능, 엘리베이터 판정, 지역 집계, 전체 QA | ✅ |
-| ~ 10/7 | 실제 답사 데이터 입력, 판정 기준표 반영, Figma 디자인 적용, 지원사업 정보 확인 | ⏳ |
-| 10/8(목) ~ 10/9(금) | **본선 무박 2일** — 마무리·시연 준비, 10/9 최종발표 | ⏳ |
+| 10/2 ~ 10/5 | 접근 시설 제보(박현웅), QA 후속·입력 검증, HEIC·브라우저 사진 줄이기, 롤백·복구 런북, AI 명세 v1.3(윤재석) 구현 → Gemini 유료 연동(운영자 검토 보조·시설 분석·주민 'AI로 항목 채우기'), 서버에서 AI 켜기 | ✅ |
+| 10/8(목) ~ 10/9(금) | **본선 무박 2일** — Figma 디자인 적용, 판정 기준표 반영, 개인화 기능, 시연 준비 · 10/9 최종발표 | 🔧 |
+| 진행 중 | 실제 답사 데이터 입력, 노원구 2026년 지원사업 공고 확인 | ⏳ |
 | 10/11(일) ~ 10/13(화) | 전시 + 주민투표 (서비스 무중단 운영) | ⏳ |
 
 ---
@@ -325,7 +342,16 @@ python manage.py runserver
 
 ## 📚 오픈소스 / 출처
 
-대회 규정에 따라 사용한 오픈소스와 외부 서비스를 명시합니다.
+대회 규정에 따라 사용한 오픈소스와 외부 서비스를 명시합니다. **버전·하위 패키지·바이너리에 포함된 라이브러리까지 전체 목록과 라이선스 준수 방법은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)** 에 있습니다.
+
+### 라이선스 준수
+
+- 모든 오픈소스는 **수정 없이** 공식 배포본(`pip`, Docker 공식 이미지, CDN)으로 사용하고, 다른 프로젝트의 소스 코드를 레포에 복사하지 않았습니다 (대회 규정).
+- 서버 이미지에는 각 패키지의 **라이선스·저작권 표시 원문**이 `site-packages/*.dist-info/`에 그대로 들어 있습니다.
+- **LGPL**(psycopg2, pi-heif 바이너리의 libheif·libde265, OpenCV 바이너리의 일부 라이브러리)은 수정 없이 별도 공유 라이브러리로 쓰고, 원본 소스 위치를 밝힙니다. `requirements.txt`·`Dockerfile`이 공개돼 있어 다른 버전으로 교체해 다시 빌드할 수 있습니다.
+- **MPL-2.0**(certifi)은 수정 없이 사용합니다. **OFL-1.1**(Pretendard)·**MIT**(qrcode-generator)는 원본 CDN 주소로 불러옵니다.
+- 공공데이터는 출처(공공데이터포털 · 한국사회보장정보원)를 장소 상세 화면과 이 문서에 표시합니다.
+- 외부 API(카카오, Google Gemini)는 각 약관을 따르고, AI 결과는 사람이 확인한 뒤에만 반영합니다.
 
 | 이름 | 용도 | 라이선스 / 약관 |
 | --- | --- | --- |
@@ -335,18 +361,23 @@ python manage.py runserver
 | [PyJWT](https://github.com/jpadilla/pyjwt) · [cryptography](https://cryptography.io/) · [oauthlib](https://github.com/oauthlib/oauthlib) | allauth 의존성 (토큰 처리) | MIT · Apache-2.0/BSD · BSD-3-Clause |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | `.env` 로드 | BSD-3-Clause |
 | [dj-database-url](https://github.com/jazzband/dj-database-url) | DB URL 파싱 | BSD-3-Clause |
-| [psycopg2](https://www.psycopg.org/) | PostgreSQL 드라이버 | LGPL-3.0 |
+| [psycopg2](https://www.psycopg.org/) (psycopg2-binary) | PostgreSQL 드라이버 | LGPL-3.0-or-later (예외 조항 포함) |
 | [Gunicorn](https://gunicorn.org/) | WSGI 서버 | MIT |
 | [Pillow](https://python-pillow.org/) | 이미지 처리 | MIT-CMU |
 | [OpenCV](https://opencv.org/) (opencv-python-headless) | 제보 사진 얼굴 자동 가림 (정면 얼굴 검출기 포함) | Apache-2.0 |
 | [NumPy](https://numpy.org/) | OpenCV 이미지 배열 | BSD-3-Clause |
 | [pi-heif](https://github.com/bigcat88/pillow_heif) | 아이폰 HEIC/HEIF 사진 읽기 (JPEG로 바꿔 저장) | BSD-3-Clause (포함된 libheif·libde265는 LGPL-3.0) |
-| [Requests](https://requests.readthedocs.io/) | 외부 API 호출 | Apache-2.0 |
+| [Requests](https://requests.readthedocs.io/) (+ urllib3 · idna · charset-normalizer · certifi) | 외부 API 호출 | Apache-2.0 (MIT · BSD-3-Clause · MIT · MPL-2.0) |
+| [asgiref](https://github.com/django/asgiref) · [sqlparse](https://github.com/andialbrecht/sqlparse) · [tzdata](https://github.com/python/tzdata) · [cffi](https://github.com/python-cffi/cffi) · [pycparser](https://github.com/eliben/pycparser) | Django·cryptography 의존성 | BSD-3-Clause · BSD-3-Clause · Apache-2.0 · MIT-0 · BSD-3-Clause |
 | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (cdnjs) | 사장님 인증 안내 쪽지·전시 포스터의 QR 코드 | MIT |
 | [PostgreSQL](https://www.postgresql.org/) | 데이터베이스 | PostgreSQL License |
 | [Nginx](https://nginx.org/) | 리버스 프록시 (배포) | BSD-2-Clause |
+| [Python](https://www.python.org/) (`python:3.12-slim` 이미지) · [Docker](https://www.docker.com/) · [Certbot](https://certbot.eff.org/) | 서버 실행 환경 · 컨테이너 · HTTPS 인증서 | PSF-2.0 · Apache-2.0 · Apache-2.0 |
+| GitHub Actions (`actions/checkout`·`setup-python`·`setup-node`, `docker/login-action`, `appleboy/ssh-action`) | CI·자동 배포 | MIT · Apache-2.0 · MIT |
 | [Pretendard](https://github.com/orioncactus/pretendard) | 웹폰트 | SIL OFL 1.1 |
-| [카카오맵 API](https://apis.map.kakao.com/) | 지도 · 장소 정보 | [카카오 API 이용약관](https://developers.kakao.com/terms/latest/ko/site-policies) |
+| [카카오맵 API](https://apis.map.kakao.com/) · 카카오 로그인 | 지도 · 장소 정보 · 로그인 | [카카오 API 이용약관](https://developers.kakao.com/terms/latest/ko/site-policies) |
+| [Google Gemini API](https://ai.google.dev/) (유료 등급) | 제보 사진·설명에서 접근성 항목 후보 추출 | [Gemini API 추가 약관](https://ai.google.dev/gemini-api/terms) (유료 등급: 입력을 제품 개선에 쓰지 않음) |
+| [DuckDNS](https://www.duckdns.org/) · [Let's Encrypt](https://letsencrypt.org/) | 도메인 · HTTPS 인증서 | 각 서비스 약관 |
 | [한국사회보장정보원_장애인편의시설 현황](https://www.data.go.kr/data/15092317/openapi.do) (공공데이터포털) | 월계동 공공·업무시설 초기 데이터 (`places/data/public/`) | 이용허락범위 제한 없음 |
 
 ### 참고 자료
@@ -359,3 +390,4 @@ python manage.py runserver
 
 - 레포 규칙·Docker·CI 구성 방식은 팀장이 PM·인프라를 맡았던 [pirogramming/Dopamine-Ledger](https://github.com/pirogramming/Dopamine-Ledger)의 협업 규칙을 참고했습니다. (앱 코드는 사용하지 않음)
 - 개발 과정에서 AI 도구(Claude Code)를 활용했으며, 결과물은 팀원 전원이 검토·이해한 뒤 반영합니다.
+- 서비스 안의 AI 기능은 Google Gemini API를 쓰며, 사용 사실과 받는 곳을 제보 화면에 안내합니다.
