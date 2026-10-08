@@ -21,6 +21,10 @@ from django.core.files.storage import default_storage
 from .images import normalize_photo
 
 TEMP_DIR = "upload_tmp"
+# 사진 저작권 안내: 올린 사진은 공개되므로 남이 찍은 사진(인터넷·지도 로드뷰 캡처 등)을 올리면 저작권 침해가 될 수 있다.
+# 사진 칸이 있는 모든 폼(주민 제보·사진 수정 요청·사장님 선언·정정·사진 교체)에 같은 문장을 붙인다 (setup_kept_photo)
+PHOTO_RIGHTS_NOTICE = ("직접 찍은 사진만 올려 주세요. 인터넷·지도 로드뷰 캡처처럼 다른 사람의 사진은 저작권 때문에 올릴 수 없어요. "
+                       "올린 사진은 확인을 거쳐 턱없네에 공개돼요.")
 SALT = "teokeopne.kept-upload"
 MAX_AGE = 60 * 60 * 24  # 하루
 
@@ -84,6 +88,9 @@ class KeepPhotoMixin:
     """
 
     def setup_kept_photo(self):
+        photo = self.fields["photo"]
+        if PHOTO_RIGHTS_NOTICE not in (photo.help_text or ""):  # 저작권 안내 (모든 사진 칸 공통)
+            photo.help_text = f"{photo.help_text} {PHOTO_RIGHTS_NOTICE}".strip()
         self.fields["photo_token"] = forms.CharField(required=False, widget=forms.HiddenInput)
         self.kept_photo = None
         token = self.data.get("photo_token") if self.is_bound else ""

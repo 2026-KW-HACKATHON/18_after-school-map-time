@@ -65,3 +65,17 @@ class NotFoundTests(TestCase):
         res = self.client.get("/places/abc/")
         self.assertEqual(res.status_code, 404)
         self.assertIn("text/html", res["Content-Type"])
+
+
+class PhotoRightsNoticeTests(TestCase):
+    """사진 칸이 있는 모든 폼에 '직접 찍은 사진만' 저작권 안내가 붙는다"""
+
+    def test_every_photo_form_shows_notice(self):
+        from core.uploads import PHOTO_RIGHTS_NOTICE
+        from owners.forms import DeclarationForm, PhotoRequestForm
+        from reports.forms import PhotoFixForm
+
+        for form_class in (PhotoFixForm, PhotoRequestForm, DeclarationForm):
+            with self.subTest(form=form_class.__name__):
+                help_text = form_class().fields["photo"].help_text
+                self.assertEqual(help_text.count(PHOTO_RIGHTS_NOTICE), 1)  # 원래 안내 + 저작권 안내 한 번
