@@ -192,10 +192,12 @@ class SearchPageTests(ViewTestBase):
         self.assertContains(res, "등록된 장소가 없어요")
         self.assertContains(res, "새 장소 제안하기")
 
-    def test_empty_query_shows_form_only(self):
+    def test_empty_query_shows_all_places(self):
         res = self.client.get(self.url)
         self.assertContains(res, "장소 검색")
         self.assertNotContains(res, "검색 결과")
+        self.assertContains(res, "전체 장소")
+        self.assertEqual(len(res.context["results"]), 3)
 
     def test_address_and_category_match_personal_search(self):
         from judgments.mobility import default_settings

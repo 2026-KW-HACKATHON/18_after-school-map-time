@@ -30,14 +30,14 @@ function element() {
     replaceChildren(...children) { this.children = children; },
     focus() { this.focused = true; }, showModal() { this.open = true; }, close() { this.open = false; }, reportValidity() { return true; } };
 }
-async function setup({ authenticated = false, consented = authenticated, storage = memoryStorage(), mode = "map", fetcher, search = "", settings } = {}) {
+async function setup({ authenticated = false, consented = authenticated, storage = memoryStorage(), mode = "map", fetcher, search = "", settings, page = "1", category = "" } = {}) {
   const meta = metadata(authenticated, consented), calls = [];
   if (settings) meta.settings = clone(settings);
   const nodes = Object.fromEntries(["dialog", "form", "open", "warning", "summary", "more", "preset", "companion-box", "companion", "recommendation", "fields", "multiple", "cancel", "reset", "save", "error", "result", "notice",
     "reference", "reference-search", "reference-place", "reference-reload", "reference-route-box", "reference-route", "reference-facts", "reference-step-box", "reference-step", "reference-proposal", "reference-apply", "reference-status", "consent-box", "consent", "browser-note"].map((key) => [key, element()]));
   const baseline = element(); baseline.hidden = true;
   const searchProfile = element(); searchProfile.value = "WHEELCHAIR";
-  const root = { dataset: { mode, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placesUrl: "/places", referenceUrl: "/reference/0/reference/", placeId: mode === "detail" ? "1" : "" },
+  const root = { dataset: { mode, page, category, catalogueUrl: "/catalogue", preferencesUrl: "/preferences", evaluateUrl: "/evaluate", placesUrl: "/places", referenceUrl: "/reference/0/reference/", placeId: mode === "detail" ? "1" : "" },
     querySelector(selector) { return nodes[selector.replace("[data-mobility-", "").replace("]", "")]; } };
   const document = { querySelector: () => root, getElementById: () => mode === "search" ? searchProfile : null,
     querySelectorAll: () => [baseline], createElement: () => element(), dispatchEvent() {} };
@@ -220,6 +220,33 @@ test("검색의 이동 조건 선택값과 카드 스타일은 저장된 동반�
   const list = ui.nodes.result.children.find((node) => node.class === "result-list");
   assert.equal(list.children[0].children[0].class, "card result-card");
   assert.equal(list.children[0].children[0].children[3].textContent, "확인 2026-10-08");
+});
+
+test("빈 검색어 개인화도 현재 페이지·업종을 전달하고 전체 페이지 링크를 보존한다", async () => {
+  const data = metadata().settings; data.overrides.WHEELCHAIR = { max_step_height_cm: "4" };
+  const p = await setup({mode:"search",settings:data,page:"2",category:"CAFE",search:"?q=&category=CAFE&page=2&profile=WHEELCHAIR",fetcher:async()=>({
+    results:[],total_count:75,page:2,num_pages:3,has_next:true,has_previous:true,notice:"안내",preferences:[]})});
+  await new Promise(setImmediate);
+  const request=p.calls.find(c=>c.url==="/evaluate");
+  assert.equal(request.options.body.q,"");assert.equal(request.options.body.page,"2");assert.equal(request.options.body.category,"CAFE");
+  const nav=p.nodes.result.children.find(n=>n['aria-label']==="장소 목록 페이지");
+  const links=nav.children.filter(n=>n.href);
+  assert.equal(links.length,2);
+  for (const [index,page] of [[0,"1"],[1,"3"]]) {
+    const params=new URLSearchParams(links[index].href.slice(1));
+    assert.equal(params.get('page'),page);assert.equal(params.get('category'),"CAFE");assert.equal(params.get('profile'),"WHEELCHAIR");
+    assert.equal(params.get('q'),"");
+  }
+});
+
+test("빈 전체 목록과 검색 불일치 안내는 구분하고 페이지가 하나면 탐색 링크를 숨긴다",async()=>{
+  const data=metadata().settings;data.overrides.WHEELCHAIR={max_step_height_cm:"4"};
+  for(const [search,expected] of [["","아직 등록된 장소가 없어요."],["?q=없는가게","아직 일치하는 장소를 찾지 못했어요."]]) {
+    const p=await setup({mode:"search",settings:data,search,fetcher:async()=>({results:[],total_count:0,page:1,num_pages:1,notice:"안내",preferences:[]})});
+    await new Promise(setImmediate);
+    assert.ok(p.nodes.result.children.some(n=>n.textContent===expected));
+    assert.equal(p.nodes.result.children.some(n=>n['aria-label']==="장소 목록 페이지"),false);
+  }
 });
 
 function referenceRoute(height = "7", width = "80", id = "entrance:1") {

@@ -21,8 +21,8 @@
   <div data-mobility-baseline>
   {% if searched %}
     {% if results %}
-      <h2>{{ region.name }} 검색 결과</h2>
-      <p class="small muted">{{ results|length }}곳 · {{ profile.label }} 기준</p>
+      <h2>{{ region.name }} {% if q %}검색 결과{% else %}전체 장소{% endif %}</h2>
+      <p class="small muted">전체 {{ page_obj.paginator.count }}곳 · {{ profile.label }} 기준</p>
       <ul class="result-list">
         {% for r in results %}
         <li><a class="card result-card" href="{% url 'places:detail' r.place.pk %}?profile={{ profile.key }}">
@@ -33,13 +33,20 @@
         </a></li>
         {% endfor %}
       </ul>
+      {% if page_obj.has_other_pages %}
+      <nav class="screen-actions" aria-label="장소 목록 페이지">
+        <p class="small muted">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 페이지</p>
+        {% if page_obj.has_previous %}<a class="btn" href="?{{ pagination_query }}&amp;page={{ page_obj.previous_page_number }}">이전 장소</a>{% endif %}
+        {% if page_obj.has_next %}<a class="btn" href="?{{ pagination_query }}&amp;page={{ page_obj.next_page_number }}">다음 장소</a>{% endif %}
+      </nav>
+      {% endif %}
     {% else %}
-      <h2>아직 일치하는 장소를 찾지 못했어요.</h2>
-      <p class="muted">"{{ q }}"(으)로 등록된 장소가 없어요. 장소 이름이나 주소를 바꿔 검색해 보세요.</p>
+      <h2>{% if q %}아직 일치하는 장소를 찾지 못했어요.{% else %}아직 등록된 장소가 없어요.{% endif %}</h2>
+      <p class="muted">{% if q %}"{{ q }}"(으)로 등록된 장소가 없어요. 장소 이름이나 주소를 바꿔 검색해 보세요.{% else %}이 지역과 업종에 등록된 장소가 없어요. 다른 업종을 선택하거나 새 장소로 제안해 주세요.{% endif %}</p>
       <div class="notice"><strong>지도를 함께 채워주세요</strong><p>알고 있는 장소라면 새 장소로 제안할 수 있어요.</p></div>
       <div class="screen-actions"><a class="btn btn-primary" href="{% url 'places:search' %}">다시 검색하기</a><a class="btn" href="{% url 'reports:new' %}">새 장소 제안하기</a></div>
     {% endif %}
-  {% else %}<p class="muted">장소 이름이나 주소를 입력하면 출입 정보를 확인할 수 있어요.</p>{% endif %}
+  {% else %}<p class="muted">아직 서비스 지역이 등록되지 않았어요.</p>{% endif %}
   </div>
 </section>
 {% endblock %}
